@@ -157,6 +157,37 @@ export default function HomePage() {
         </div>
       </div>
 
+      <div className="border rounded p-4 bg-white text-sm space-y-3">
+        <h2 className="text-base font-semibold mb-1">¿Cómo instalar esta app en tu celular?</h2>
+        <p className="text-gray-600">
+          Seguí estos pasos para tener acceso rápido desde la pantalla de inicio de tu celular.
+        </p>
+
+        <div>
+          <h3 className="font-semibold text-[#31435d]">iPhone (Safari)</h3>
+          <ol className="list-decimal list-inside text-gray-700 space-y-1 mt-1">
+            <li>Abrí este enlace en Safari.</li>
+            <li>Tocá el botón <strong>Compartir</strong> (icono de cuadrado con flecha hacia arriba).</li>
+            <li>Deslizá hacia abajo y elegí <strong>"Agregar a la pantalla de inicio"</strong>.</li>
+            <li>Confirmá con <strong>Agregar</strong>.</li>
+          </ol>
+        </div>
+
+        <div>
+          <h3 className="font-semibold text-[#31435d]">Android (Chrome)</h3>
+          <ol className="list-decimal list-inside text-gray-700 space-y-1 mt-1">
+            <li>Abrí este enlace en Chrome.</li>
+            <li>Tocá el botón de <strong>tres puntos</strong> arriba a la derecha.</li>
+            <li>Elegí <strong>"Agregar a pantalla principal"</strong> o <strong>"Instalar app"</strong>.</li>
+            <li>Confirmá cuando aparezca el mensaje.</li>
+          </ol>
+        </div>
+
+        <p className="text-gray-600">
+          Una vez instalado, vas a ver el icono de la academia en tu pantalla de inicio y podés entrar directo como si fuera una app.
+        </p>
+      </div>
+
       {error && <p className="text-sm text-red-600">{error}</p>}
     </section>
   );
