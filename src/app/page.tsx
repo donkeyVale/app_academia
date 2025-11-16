@@ -175,8 +175,9 @@ export default function HomePage() {
     <section className="space-y-6 max-w-5xl mx-auto px-4 py-4">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold">Bienvenido</h1>
-          <p className="text-sm text-gray-600">Usuario: {userName ?? '...'}</p>
+          <h1 className="text-2xl font-semibold">
+            Bienvenido {userName ?? '...'}
+          </h1>
         </div>
         <button
           type="button"
