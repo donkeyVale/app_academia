@@ -13,10 +13,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Academia Padel",
+  title: "AGENDO",
   description: "Gestión de agenda, alumnos, planes y finanzas para tu academia de pádel.",
   openGraph: {
-    title: "Academia Padel",
+    title: "AGENDO",
     description: "Gestión de agenda, alumnos, planes y finanzas para tu academia de pádel.",
     url: process.env.NEXT_PUBLIC_BASE_URL ?? "https://app_academia.nativatech.com.py",
     siteName: "Academia Padel",
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Academia Padel",
+    title: "AGENDO",
     description: "Gestión de agenda, alumnos, planes y finanzas para tu academia de pádel.",
     images: [
       (process.env.NEXT_PUBLIC_BASE_URL ?? "https://app_academia.nativatech.com.py") +
