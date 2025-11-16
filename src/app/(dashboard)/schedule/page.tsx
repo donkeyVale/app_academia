@@ -712,7 +712,7 @@ export default function SchedulePage() {
           <p className="text-xs text-gray-500">Se crearán reservas para los alumnos seleccionados.</p>
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
-        <button className="bg-black text-white rounded px-4 py-2 disabled:opacity-50" disabled={saving}>
+        <button className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50" disabled={saving}>
           {saving ? 'Creando...' : 'Crear clase'}
         </button>
           </form>

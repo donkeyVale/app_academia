@@ -413,7 +413,7 @@ export default function PlansClient() {
               </div>
               {error && <p className="text-sm text-red-600">{error}</p>}
               <button
-                className="bg-black text-white rounded px-4 py-2 disabled:opacity-50"
+                className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50"
                 disabled={saving}
               >
                 {saving ? 'Guardando...' : 'Crear plan'}
@@ -471,7 +471,7 @@ export default function PlansClient() {
                             </button>
                             <button
                               type="submit"
-                              className="bg-black text-white rounded px-3 py-1 text-xs disabled:opacity-50"
+                              className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-3 py-1 text-xs disabled:opacity-50"
                               disabled={saving}
                             >
                               {saving ? 'Guardando...' : 'Guardar cambios'}
@@ -578,7 +578,7 @@ export default function PlansClient() {
           </div>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button
-            className="bg-black text-white rounded px-4 py-2 disabled:opacity-50"
+            className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50"
             disabled={saving}
           >
             {saving ? 'Asignando...' : 'Asignar plan'}
@@ -664,7 +664,7 @@ export default function PlansClient() {
             </div>
           </div>
           <button
-            className="bg-black text-white rounded px-4 py-2 disabled:opacity-50"
+            className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50"
             disabled={reportLoading}
           >
             {reportLoading ? 'Cargando...' : 'Ver resumen'}
