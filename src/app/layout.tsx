@@ -22,7 +22,9 @@ export const metadata: Metadata = {
     siteName: "Academia Padel",
     images: [
       {
-        url: "/icons/logoAgendo.jpg",
+        url:
+          (process.env.NEXT_PUBLIC_BASE_URL ?? "https://app_academia.nativatech.com.py") +
+          "/icons/logoAgendo.jpg",
         width: 512,
         height: 512,
         alt: "Logo Academia Padel",
@@ -34,7 +36,10 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Academia Padel",
     description: "Gestión de agenda, alumnos, planes y finanzas para tu academia de pádel.",
-    images: ["/icons/logoAgendo.jpg"],
+    images: [
+      (process.env.NEXT_PUBLIC_BASE_URL ?? "https://app_academia.nativatech.com.py") +
+        "/icons/logoAgendo.jpg",
+    ],
   },
 };
 
