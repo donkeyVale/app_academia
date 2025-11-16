@@ -16,6 +16,11 @@ export default function HomePage() {
   const [studentsCount, setStudentsCount] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    window.location.href = '/login';
+  };
+
   useEffect(() => {
     let active = true;
     (async () => {
@@ -119,6 +124,13 @@ export default function HomePage() {
           <Link className="underline" href="/students" onClick={() => setMenuOpen(false)}>Alumnos</Link>
           <Link className="underline" href="/finance" onClick={() => setMenuOpen(false)}>Finanzas</Link>
           <Link className="underline" href="/reports" onClick={() => setMenuOpen(false)}>Reportes</Link>
+          <button
+            type="button"
+            className="text-left underline text-red-600 mt-1"
+            onClick={handleLogout}
+          >
+            Cerrar sesión
+          </button>
         </nav>
       )}
 
