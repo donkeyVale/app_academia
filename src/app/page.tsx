@@ -281,7 +281,8 @@ export default function HomePage() {
           <ol className="list-decimal list-inside text-gray-700 space-y-1 mt-1">
             <li>Abrí este enlace en Safari.</li>
             <li>Tocá el botón <strong>Compartir</strong> (icono de cuadrado con flecha hacia arriba).</li>
-            <li>Deslizá hacia abajo y elegí <strong>"Agregar a la pantalla de inicio"</strong>.</li>
+            <li>En el menú que se abre, tocá los <strong>tres puntitos</strong> (Más opciones).</li>
+            <li>Elegí <strong>"Agregar a inicio"</strong> o <strong>"Agregar a pantalla de inicio"</strong>.</li>
             <li>Confirmá con <strong>Agregar</strong>.</li>
           </ol>
         </div>
