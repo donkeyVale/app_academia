@@ -52,6 +52,7 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <link rel="manifest" href="/manifest.json" />
+        <meta name="apple-mobile-web-app-title" content="AGENDO" />
         <meta name="theme-color" content="#3cadaf" />
       </head>
       <body
