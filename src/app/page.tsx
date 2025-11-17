@@ -80,6 +80,7 @@ export default function HomePage() {
   const [userName, setUserName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const [activePlansCount, setActivePlansCount] = useState(0);
   const [studentsWithPlanCount, setStudentsWithPlanCount] = useState(0);
@@ -105,11 +106,16 @@ export default function HomePage() {
       if (userId) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('full_name')
+          .select('full_name, role')
           .eq('id', userId)
           .maybeSingle();
         if (profile?.full_name) {
           displayName = profile.full_name as string;
+        }
+        if (profile?.role === 'admin') {
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
         }
       }
       setUserName(displayName);
@@ -217,6 +223,16 @@ export default function HomePage() {
             <IconMoney />
             <span>Finanzas</span>
           </Link>
+          {isAdmin && (
+            <Link
+              className="underline flex items-center gap-2"
+              href="/users"
+              onClick={() => setMenuOpen(false)}
+            >
+              <IconUsers />
+              <span>Usuarios</span>
+            </Link>
+          )}
           <Link
             className="underline flex items-center gap-2"
             href="/reports"

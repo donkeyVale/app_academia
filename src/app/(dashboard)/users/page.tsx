@@ -4,6 +4,21 @@ import { useEffect, useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
 
 const ROLES = ['admin', 'coach', 'student'] as const;
+const iconColor = "#3cadaf";
+
+const IconUsers = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+    className="w-5 h-5"
+    {...props}
+  >
+    <circle cx="8" cy="9" r="3" stroke={iconColor} fill="none" strokeWidth="1.6" />
+    <circle cx="16" cy="9" r="3" stroke={iconColor} fill="none" strokeWidth="1.6" />
+    <path d="M3 19c0-2.2 2.2-4 5-4" stroke={iconColor} strokeWidth="1.6" fill="none" />
+    <path d="M21 19c0-2.2-2.2-4-5-4" stroke={iconColor} strokeWidth="1.6" fill="none" />
+  </svg>
+);
 
 type Role = (typeof ROLES)[number];
 
@@ -171,14 +186,17 @@ export default function UsersPage() {
   return (
     <section className="max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold mb-2">Usuarios</h1>
+        <div className="flex items-center gap-2 mb-1">
+          <IconUsers />
+          <h1 className="text-2xl font-semibold text-[#31435d]">Usuarios</h1>
+        </div>
         <p className="text-sm text-gray-600">
           Creá usuarios de acceso al sistema y asignales uno o varios roles.
         </p>
       </div>
 
       <div className="border rounded p-4 bg-white space-y-3">
-        <h2 className="text-base font-semibold">Crear usuario</h2>
+        <h2 className="text-base font-semibold text-[#31435d]">Crear usuario</h2>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -281,33 +299,38 @@ export default function UsersPage() {
       </div>
 
       <div className="border rounded p-4 bg-white">
-        <h2 className="text-base font-semibold mb-2">Usuarios registrados</h2>
+        <div className="flex items-center gap-2 mb-2">
+          <IconUsers className="w-4 h-4" />
+          <h2 className="text-base font-semibold text-[#31435d]">Usuarios registrados</h2>
+        </div>
         {loadingList ? (
           <p className="text-sm">Cargando...</p>
         ) : users.length === 0 ? (
           <p className="text-sm text-gray-600">Todavía no hay usuarios registrados.</p>
         ) : (
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left py-2">Nombre</th>
-                <th className="text-left py-2">Rol principal</th>
-                <th className="text-left py-2">Roles asignados</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => {
-                const allRoles = rolesForUser(u.id);
-                return (
-                  <tr key={u.id} className="border-b last:border-b-0">
-                    <td className="py-2">{u.full_name ?? '(Sin nombre)'}</td>
-                    <td className="py-2">{u.role}</td>
-                    <td className="py-2">{allRoles.join(', ') || '-'}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm border-collapse">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-2 pr-4">Nombre</th>
+                  <th className="text-left py-2 pr-4">Rol principal</th>
+                  <th className="text-left py-2">Roles asignados</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((u) => {
+                  const allRoles = rolesForUser(u.id);
+                  return (
+                    <tr key={u.id} className="border-b last:border-b-0">
+                      <td className="py-2 pr-4 whitespace-nowrap">{u.full_name ?? '(Sin nombre)'}</td>
+                      <td className="py-2 pr-4 whitespace-nowrap">{u.role}</td>
+                      <td className="py-2">{allRoles.join(', ') || '-'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </section>
