@@ -652,19 +652,23 @@ export default function PlansClient() {
           <ul className="text-sm divide-y">
             {studentPlans
               .filter((sp) => sp.remaining_classes > 0)
-              .map((sp) => (
-              <li key={sp.id} className="py-2 flex flex-col md:flex-row md:items-center md:justify-between gap-1">
-                <div>
-                  <span className="font-medium">{sp.students?.notes ?? sp.students?.level ?? sp.student_id}</span>
-                  {' • '}Plan: {sp.plans?.name ?? sp.plan_id}
-                  {' • '}Incluye: {sp.plans?.classes_included ?? '?'} clases
-                  {' • '}Restantes: {sp.remaining_classes}
-                </div>
-                <div className="text-xs text-gray-500">
-                  Asignado: {new Date(sp.purchased_at).toLocaleString()}
-                </div>
-              </li>
-            ))}
+              .map((sp) => {
+                const studentInfo = students.find((s) => s.id === sp.student_id);
+                const displayName = studentInfo?.full_name ?? studentInfo?.notes ?? studentInfo?.level ?? sp.student_id;
+                return (
+                  <li key={sp.id} className="py-2 flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+                    <div>
+                      <span className="font-medium">{displayName}</span>
+                      {' • '}Plan: {sp.plans?.name ?? sp.plan_id}
+                      {' • '}Incluye: {sp.plans?.classes_included ?? '?'} clases
+                      {' • '}Restantes: {sp.remaining_classes}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Asignado: {new Date(sp.purchased_at).toLocaleString()}
+                    </div>
+                  </li>
+                );
+              })}
           </ul>
         )}
         </div>
