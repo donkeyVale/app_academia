@@ -3,8 +3,6 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 
 // Helper para usar Supabase en Server Components / rutas del lado servidor
 export const createClientServer = () => {
-  const cookieStore = cookies();
-
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -15,6 +13,7 @@ export const createClientServer = () => {
   return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       get(name: string) {
+        const cookieStore = cookies() as any;
         return cookieStore.get(name)?.value;
       },
       // En Server Components normalmente no escribimos cookies; estas funciones se usan
