@@ -178,7 +178,7 @@ export default function StudentsPage() {
   }
 
   return (
-    <section className="space-y-4 max-w-5xl mx-auto">
+    <section className="space-y-4 max-w-5xl mx-auto px-4 py-6">
       <div className="flex items-center gap-2">
         <IconStudents />
         <h1 className="text-2xl font-semibold text-[#31435d]">Alumnos</h1>
@@ -189,7 +189,7 @@ export default function StudentsPage() {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <div className="border rounded bg-white p-4">
+      <div className="border rounded-lg bg-white p-4 shadow-sm">
         {loading ? (
           <p className="text-sm text-gray-600">Cargando alumnos...</p>
         ) : students.length === 0 ? (
@@ -198,10 +198,10 @@ export default function StudentsPage() {
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm border-collapse">
               <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 pr-4">Alumno</th>
-                  <th className="text-left py-2 pr-4">Plan</th>
-                  <th className="text-left py-2">Clases restantes</th>
+                <tr className="border-b bg-gray-50">
+                  <th className="text-left py-2 px-3">Alumno</th>
+                  <th className="text-left py-2 px-3">Plan</th>
+                  <th className="text-left py-2 px-3">Clases restantes</th>
                 </tr>
               </thead>
               <tbody>
@@ -215,10 +215,10 @@ export default function StudentsPage() {
                   const displayName = profile?.full_name || '(Sin nombre vinculado)';
 
                   return (
-                    <tr key={s.id} className="border-b last:border-b-0">
-                      <td className="py-2 pr-4 whitespace-nowrap">{displayName}</td>
-                      <td className="py-2 pr-4 whitespace-nowrap">{planName}</td>
-                      <td className="py-2">{remaining !== null ? remaining : '-'}</td>
+                    <tr key={s.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                      <td className="py-2 px-3 whitespace-nowrap">{displayName}</td>
+                      <td className="py-2 px-3 whitespace-nowrap">{planName}</td>
+                      <td className="py-2 px-3">{remaining !== null ? remaining : '-'}</td>
                     </tr>
                   );
                 })}

@@ -178,29 +178,32 @@ export default function HomePage() {
   }, [supabase]);
 
   return (
-    <section className="space-y-6 max-w-5xl mx-auto px-4 py-4">
+    <section className="space-y-6 max-w-5xl mx-auto px-4 py-6">
       <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-semibold text-[#31435d]">
             Bienvenido {userName ?? '...'}
           </h1>
+          <p className="text-sm text-gray-600">
+            Gestioná tu agenda, alumnos, planes y finanzas desde un solo lugar.
+          </p>
         </div>
         <button
           type="button"
-          className="border rounded px-3 py-2 text-sm flex flex-col justify-center items-center gap-0.5"
+          className="border border-gray-300 bg-white rounded-full px-3 py-2 text-xs flex flex-col justify-center items-center gap-0.5 shadow-sm hover:shadow-md transition-shadow"
           onClick={() => setMenuOpen((v) => !v)}
-          aria-label="Abrir menú"
+          aria-label="Abrir menú principal"
         >
-          <span className="block w-5 h-0.5 bg-black" />
-          <span className="block w-5 h-0.5 bg-black" />
-          <span className="block w-5 h-0.5 bg-black" />
+          <span className="block w-5 h-0.5 bg-[#31435d] rounded" />
+          <span className="block w-5 h-0.5 bg-[#31435d] rounded" />
+          <span className="block w-5 h-0.5 bg-[#31435d] rounded" />
         </button>
       </div>
 
       {menuOpen && (
-        <nav className="border rounded p-3 bg-white flex flex-col gap-2 text-sm">
+        <nav className="border rounded-lg p-3 bg-white flex flex-col gap-2 text-sm shadow-md">
           <Link
-            className="underline flex items-center gap-2"
+            className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-50 transition-colors"
             href="/schedule"
             onClick={() => setMenuOpen(false)}
           >
@@ -208,7 +211,7 @@ export default function HomePage() {
             <span>Agenda</span>
           </Link>
           <Link
-            className="underline flex items-center gap-2"
+            className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-50 transition-colors"
             href="/students"
             onClick={() => setMenuOpen(false)}
           >
@@ -216,7 +219,7 @@ export default function HomePage() {
             <span>Alumnos</span>
           </Link>
           <Link
-            className="underline flex items-center gap-2"
+            className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-50 transition-colors"
             href="/finance"
             onClick={() => setMenuOpen(false)}
           >
@@ -225,7 +228,7 @@ export default function HomePage() {
           </Link>
           {isAdmin && (
             <Link
-              className="underline flex items-center gap-2"
+              className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-50 transition-colors"
               href="/users"
               onClick={() => setMenuOpen(false)}
             >
@@ -234,7 +237,7 @@ export default function HomePage() {
             </Link>
           )}
           <Link
-            className="underline flex items-center gap-2"
+            className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-50 transition-colors"
             href="/reports"
             onClick={() => setMenuOpen(false)}
           >
@@ -243,7 +246,7 @@ export default function HomePage() {
           </Link>
           <button
             type="button"
-            className="text-left underline text-red-600 mt-1"
+            className="text-left mt-2 px-3 py-2 rounded text-xs text-red-600 hover:bg-red-50 transition-colors"
             onClick={handleLogout}
           >
             Cerrar sesión
@@ -252,7 +255,7 @@ export default function HomePage() {
       )}
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="border rounded p-4 bg-white">
+        <div className="border rounded-lg p-4 bg-white shadow-sm">
           <div className="flex items-center gap-2 mb-1">
             <IconMoney />
             <p className="text-xs uppercase text-gray-500">Planes activos</p>
@@ -260,7 +263,7 @@ export default function HomePage() {
           <p className="text-2xl font-semibold">{loading ? '...' : activePlansCount}</p>
           <p className="text-xs text-gray-500 mt-1">Planes con al menos un alumno con clases disponibles</p>
         </div>
-        <div className="border rounded p-4 bg-white">
+        <div className="border rounded-lg p-4 bg-white shadow-sm">
           <div className="flex items-center gap-2 mb-1">
             <IconStudents />
             <p className="text-xs uppercase text-gray-500">Alumnos con plan</p>
@@ -268,7 +271,7 @@ export default function HomePage() {
           <p className="text-2xl font-semibold">{loading ? '...' : studentsWithPlanCount}</p>
           <p className="text-xs text-gray-500 mt-1">Alumnos que aún tienen clases en algún plan</p>
         </div>
-        <div className="border rounded p-4 bg-white">
+        <div className="border rounded-lg p-4 bg-white shadow-sm">
           <div className="flex items-center gap-2 mb-1">
             <IconCalendar />
             <p className="text-xs uppercase text-gray-500">Clases de hoy</p>
@@ -276,7 +279,7 @@ export default function HomePage() {
           <p className="text-2xl font-semibold">{loading ? '...' : todayClassesCount}</p>
           <p className="text-xs text-gray-500 mt-1">Clases programadas para el día de hoy</p>
         </div>
-        <div className="border rounded p-4 bg-white">
+        <div className="border rounded-lg p-4 bg-white shadow-sm">
           <div className="flex items-center gap-2 mb-1">
             <IconUsers />
             <p className="text-xs uppercase text-gray-500">Profesores / Alumnos</p>
@@ -286,7 +289,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      <div className="border rounded p-4 bg-white text-sm space-y-3">
+      <div className="border rounded-lg p-4 bg-white text-sm space-y-3 shadow-sm">
         <h2 className="text-base font-semibold mb-1">¿Cómo instalar esta app en tu celular?</h2>
         <p className="text-gray-600">
           Seguí estos pasos para tener acceso rápido desde la pantalla de inicio de tu celular.

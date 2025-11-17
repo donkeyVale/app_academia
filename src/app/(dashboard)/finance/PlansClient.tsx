@@ -419,16 +419,16 @@ export default function PlansClient() {
   };
 
   return (
-    <section className="mt-6 space-y-6">
+    <section className="mt-6 space-y-6 max-w-5xl mx-auto px-4">
       <div className="flex items-center gap-2">
         <IconMoney />
         <h1 className="text-2xl font-semibold text-[#31435d]">Finanzas / Planes</h1>
       </div>
 
-      <div className="border rounded">
+      <div className="border rounded-lg bg-white shadow-sm">
         <button
           type="button"
-          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t"
+          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
           onClick={() => setShowCreatePlan((v) => !v)}
         >
           <span>Crear plan</span>
@@ -478,13 +478,13 @@ export default function PlansClient() {
             </form>
 
             {plans.length > 0 && (
-              <div className="pt-2 border-t mt-2">
+              <div className="pt-3 border-t mt-2">
                 <h3 className="text-sm font-semibold mb-2">Planes existentes</h3>
                 <ul className="space-y-2 text-sm">
                   {plans.map((p) => {
                     const activeStudents = studentPlans.filter((sp) => sp.plan_id === p.id && sp.remaining_classes > 0).length;
                     return (
-                    <li key={p.id} className="border rounded p-2">
+                    <li key={p.id} className="border rounded-lg p-3 bg-white">
                       {editingPlanId === p.id ? (
                         <form onSubmit={onUpdatePlan} className="grid gap-2">
                           <div>
@@ -538,7 +538,7 @@ export default function PlansClient() {
                       ) : (
                         <div className="flex items-center justify-between gap-2">
                           <div>
-                            <div className="font-medium">{p.name}</div>
+                            <div className="font-medium text-[#31435d]">{p.name}</div>
                             <div className="text-xs text-gray-600">
                               {p.classes_included} clases • {p.price_cents} {p.currency}
                             </div>
@@ -551,14 +551,14 @@ export default function PlansClient() {
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
-                              className="text-xs underline text-red-600"
+                              className="text-xs px-3 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50"
                               onClick={() => onDeletePlan(p)}
                             >
                               Eliminar
                             </button>
                             <button
                               type="button"
-                              className="text-xs underline"
+                              className="text-xs px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
                               onClick={() => startEditPlan(p)}
                             >
                               Editar
@@ -567,196 +567,197 @@ export default function PlansClient() {
                         </div>
                       )}
                     </li>
-                  );})}
-                </ul>
-              </div>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+
+    <div className="border rounded-lg bg-white shadow-sm">
+      <button
+        type="button"
+        className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+        onClick={() => setShowAssignPlan((v) => !v)}
+      >
+        <span>Asignar plan y ver recientes</span>
+        <span className="text-xs text-gray-500">{showAssignPlan ? '▼' : '▲'}</span>
+      </button>
+      {showAssignPlan && (
+        <div className="space-y-4 p-4">
+          <h2 className="text-lg font-semibold mb-2">Asignar plan a alumno</h2>
+          <form onSubmit={onAssignPlan} className="grid gap-3 max-w-xl">
+            <div>
+              <label className="block text-sm mb-1">Alumno</label>
+              <select
+                className="border rounded p-2 w-full"
+                value={selectedStudentId}
+                onChange={(e) => setSelectedStudentId(e.target.value)}
+              >
+                <option value="">Selecciona un alumno</option>
+                {students.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.full_name ?? s.notes ?? s.level ?? s.id}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm mb-1">Plan</label>
+              <select
+                className="border rounded p-2 w-full"
+                value={selectedPlanId}
+                onChange={(e) => {
+                  const planId = e.target.value;
+                  setSelectedPlanId(planId);
+                  const plan = plans.find((p) => p.id === planId);
+                  if (plan) setRemainingClassesInput(String(plan.classes_included));
+                }}
+              >
+                <option value="">Selecciona un plan</option>
+                {plans.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.classes_included} clases)
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm mb-1">Clases restantes iniciales</label>
+              <input
+                type="number"
+                min={1}
+                className="border rounded p-2 w-full"
+                value={remainingClassesInput}
+                onChange={(e) => setRemainingClassesInput(e.target.value)}
+              />
+            </div>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <button
+              className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50"
+              disabled={saving}
+            >
+              {saving ? 'Asignando...' : 'Asignar plan'}
+            </button>
+          </form>
+
+          <div>
+            <h2 className="text-lg font-semibold mb-2">Planes asignados recientes</h2>
+            {loading ? (
+              <p className="text-sm text-gray-600">Cargando...</p>
+            ) : studentPlans.filter((sp) => sp.remaining_classes > 0).length === 0 ? (
+              <p className="text-sm text-gray-600">Aún no hay planes asignados con clases pendientes.</p>
+            ) : (
+              <ul className="text-sm space-y-2">
+                {studentPlans
+                  .filter((sp) => sp.remaining_classes > 0)
+                  .map((sp) => {
+                    const studentInfo = students.find((s) => s.id === sp.student_id);
+                    const displayName = studentInfo?.full_name ?? studentInfo?.notes ?? studentInfo?.level ?? sp.student_id;
+                    return (
+                      <li key={sp.id} className="py-2 px-3 border rounded-lg bg-white flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+                        <div>
+                          <div className="font-medium text-[#31435d]">{displayName}</div>
+                          <div className="text-xs text-gray-600">
+                            Plan: {sp.plans?.name ?? sp.plan_id} • Incluye: {sp.plans?.classes_included ?? '?'} clases • Restantes: {sp.remaining_classes}
+                          </div>
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Asignado: {new Date(sp.purchased_at).toLocaleString()}
+                        </div>
+                      </li>
+                    );
+                  })}
+              </ul>
             )}
           </div>
-        )}
-      </div>
-
-      <div className="border rounded">
-        <button
-          type="button"
-          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t"
-          onClick={() => setShowAssignPlan((v) => !v)}
-        >
-          <span>Asignar plan y ver recientes</span>
-          <span className="text-xs text-gray-500">{showAssignPlan ? '▼' : '▲'}</span>
-        </button>
-        {showAssignPlan && (
-          <div className="space-y-4 p-4">
-        <h2 className="text-lg font-semibold mb-2">Asignar plan a alumno</h2>
-        <form onSubmit={onAssignPlan} className="grid gap-3 max-w-xl">
-          <div>
-            <label className="block text-sm mb-1">Alumno</label>
-            <select
-              className="border rounded p-2 w-full"
-              value={selectedStudentId}
-              onChange={(e) => setSelectedStudentId(e.target.value)}
-            >
-              <option value="">Selecciona un alumno</option>
-              {students.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.full_name ?? s.notes ?? s.level ?? s.id}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm mb-1">Plan</label>
-            <select
-              className="border rounded p-2 w-full"
-              value={selectedPlanId}
-              onChange={(e) => {
-                const planId = e.target.value;
-                setSelectedPlanId(planId);
-                const plan = plans.find((p) => p.id === planId);
-                if (plan) setRemainingClassesInput(String(plan.classes_included));
-              }}
-            >
-              <option value="">Selecciona un plan</option>
-              {plans.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({p.classes_included} clases)
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm mb-1">Clases restantes iniciales</label>
-            <input
-              type="number"
-              min={1}
-              className="border rounded p-2 w-full"
-              value={remainingClassesInput}
-              onChange={(e) => setRemainingClassesInput(e.target.value)}
-            />
-          </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <button
-            className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50"
-            disabled={saving}
-          >
-            {saving ? 'Asignando...' : 'Asignar plan'}
-          </button>
-        </form>
-
-        <div>
-          <h2 className="text-lg font-semibold mb-2">Planes asignados recientes</h2>
-        {loading ? (
-          <p className="text-sm">Cargando...</p>
-        ) : studentPlans.filter((sp) => sp.remaining_classes > 0).length === 0 ? (
-          <p className="text-sm">Aún no hay planes asignados con clases pendientes.</p>
-        ) : (
-          <ul className="text-sm divide-y">
-            {studentPlans
-              .filter((sp) => sp.remaining_classes > 0)
-              .map((sp) => {
-                const studentInfo = students.find((s) => s.id === sp.student_id);
-                const displayName = studentInfo?.full_name ?? studentInfo?.notes ?? studentInfo?.level ?? sp.student_id;
-                return (
-                  <li key={sp.id} className="py-2 flex flex-col md:flex-row md:items-center md:justify-between gap-1">
-                    <div>
-                      <span className="font-medium">{displayName}</span>
-                      {' • '}Plan: {sp.plans?.name ?? sp.plan_id}
-                      {' • '}Incluye: {sp.plans?.classes_included ?? '?'} clases
-                      {' • '}Restantes: {sp.remaining_classes}
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      Asignado: {new Date(sp.purchased_at).toLocaleString()}
-                    </div>
-                  </li>
-                );
-              })}
-          </ul>
-        )}
         </div>
-          </div>
-        )}
-      </div>
+      )}
+    </div>
 
-      <div className="border rounded">
-        <button
-          type="button"
-          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t"
-          onClick={() => setShowStudentSummary((v) => !v)}
-        >
-          <span>Resumen por alumno</span>
-          <span className="text-xs text-gray-500">{showStudentSummary ? '▼' : '▲'}</span>
-        </button>
-        {showStudentSummary && (
-          <div className="p-4 space-y-4">
-        <h2 className="text-lg font-semibold mb-2">Resumen por alumno</h2>
-        <form onSubmit={onLoadReport} className="grid gap-3 max-w-xl mb-4">
-          <div>
-            <label className="block text-sm mb-1">Alumno</label>
-            <select
-              className="border rounded p-2 w-full"
-              value={reportStudentId}
-              onChange={(e) => setReportStudentId(e.target.value)}
+    <div className="border rounded-lg bg-white shadow-sm">
+      <button
+        type="button"
+        className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+        onClick={() => setShowStudentSummary((v) => !v)}
+      >
+        <span>Resumen por alumno</span>
+        <span className="text-xs text-gray-500">{showStudentSummary ? '▼' : '▲'}</span>
+      </button>
+      {showStudentSummary && (
+        <div className="p-4 space-y-4">
+          <h2 className="text-lg font-semibold mb-2">Resumen por alumno</h2>
+          <form onSubmit={onLoadReport} className="grid gap-3 max-w-xl mb-4">
+            <div>
+              <label className="block text-sm mb-1">Alumno</label>
+              <select
+                className="border rounded p-2 w-full"
+                value={reportStudentId}
+                onChange={(e) => setReportStudentId(e.target.value)}
+              >
+                <option value="">Selecciona un alumno</option>
+                {students.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.full_name ?? s.notes ?? s.level ?? s.id}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm mb-1">Desde</label>
+                <input
+                  type="date"
+                  className="border rounded p-2 w-full"
+                  value={reportFrom}
+                  onChange={(e) => setReportFrom(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Hasta</label>
+                <input
+                  type="date"
+                  className="border rounded p-2 w-full"
+                  value={reportTo}
+                  onChange={(e) => setReportTo(e.target.value)}
+                />
+              </div>
+            </div>
+            <button
+              className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50"
+              disabled={reportLoading}
             >
-              <option value="">Selecciona un alumno</option>
-              {students.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.full_name ?? s.notes ?? s.level ?? s.id}
-                </option>
+              {reportLoading ? 'Cargando...' : 'Ver resumen'}
+            </button>
+          </form>
+
+          {reportSummary && (
+            <div className="mb-4 text-sm">
+              <p><strong>Plan:</strong> {reportSummary.planName ?? 'Sin nombre'}</p>
+              <p><strong>Clases del plan:</strong> {reportSummary.totalClasses}</p>
+              <p><strong>Usadas:</strong> {reportSummary.usedClasses}</p>
+              <p><strong>Disponibles:</strong> {reportSummary.remainingClasses}</p>
+            </div>
+          )}
+
+          {reportHistory.length > 0 && (
+            <ul className="text-sm divide-y">
+              {reportHistory.map((row) => (
+                <li key={row.classId} className="py-2 flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+                  <div>
+                    <span className="font-medium">{new Date(row.date).toLocaleString()}</span>
+                    {' • '}Estado: {row.present ? 'Presente' : 'Ausente'}
+                    {' • '}Consumió plan: {row.consumedPlan ? 'Sí' : 'No'}
+                  </div>
+                </li>
               ))}
-            </select>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm mb-1">Desde</label>
-              <input
-                type="date"
-                className="border rounded p-2 w-full"
-                value={reportFrom}
-                onChange={(e) => setReportFrom(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-sm mb-1">Hasta</label>
-              <input
-                type="date"
-                className="border rounded p-2 w-full"
-                value={reportTo}
-                onChange={(e) => setReportTo(e.target.value)}
-              />
-            </div>
-          </div>
-          <button
-            className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50"
-            disabled={reportLoading}
-          >
-            {reportLoading ? 'Cargando...' : 'Ver resumen'}
-          </button>
-        </form>
-
-        {reportSummary && (
-          <div className="mb-4 text-sm">
-            <p><strong>Plan:</strong> {reportSummary.planName ?? 'Sin nombre'}</p>
-            <p><strong>Clases del plan:</strong> {reportSummary.totalClasses}</p>
-            <p><strong>Usadas:</strong> {reportSummary.usedClasses}</p>
-            <p><strong>Disponibles:</strong> {reportSummary.remainingClasses}</p>
-          </div>
-        )}
-
-        {reportHistory.length > 0 && (
-          <ul className="text-sm divide-y">
-            {reportHistory.map((row) => (
-              <li key={row.classId} className="py-2 flex flex-col md:flex-row md:items-center md:justify-between gap-1">
-                <div>
-                  <span className="font-medium">{new Date(row.date).toLocaleString()}</span>
-                  {' • '}Estado: {row.present ? 'Presente' : 'Ausente'}
-                  {' • '}Consumió plan: {row.consumedPlan ? 'Sí' : 'No'}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-          </div>
-        )}
-      </div>
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
     </section>
   );
 }

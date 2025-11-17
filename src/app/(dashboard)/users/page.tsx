@@ -180,15 +180,15 @@ export default function UsersPage() {
 
   if (forbidden) {
     return (
-      <section className="w-full max-w-4xl mx-auto px-4 space-y-4">
-        <h1 className="text-2xl font-semibold">Usuarios</h1>
+      <section className="w-full max-w-5xl mx-auto px-4 py-6 space-y-4">
+        <h1 className="text-2xl font-semibold text-[#31435d]">Usuarios</h1>
         <p className="text-sm text-red-600">Solo administradores pueden acceder a este módulo.</p>
       </section>
     );
   }
 
   return (
-    <section className="w-full max-w-4xl mx-auto px-4 space-y-6">
+    <section className="w-full max-w-5xl mx-auto px-4 py-6 space-y-6">
       <div>
         <div className="flex items-center gap-2 mb-1">
           <IconUsers />
@@ -199,10 +199,10 @@ export default function UsersPage() {
         </p>
       </div>
 
-      <div className="border rounded bg-white">
+      <div className="border rounded-lg bg-white shadow-sm">
         <button
           type="button"
-          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-semibold bg-gray-50 hover:bg-gray-100 rounded-t"
+          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-semibold bg-gray-50 hover:bg-gray-100 rounded-t-lg"
           onClick={() => setShowCreateUser((v) => !v)}
         >
           <span>Crear usuario</span>
@@ -210,7 +210,7 @@ export default function UsersPage() {
         </button>
         {showCreateUser && (
           <div className="p-4 space-y-3">
-            <form onSubmit={handleSubmit} className="space-y-3">
+            <form onSubmit={handleSubmit} className="space-y-3 max-w-xl">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm mb-1">Nombre</label>
@@ -313,10 +313,10 @@ export default function UsersPage() {
         )}
       </div>
 
-      <div className="border rounded bg-white">
+      <div className="border rounded-lg bg-white shadow-sm">
         <button
           type="button"
-          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-semibold bg-gray-50 hover:bg-gray-100 rounded-t"
+          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-semibold bg-gray-50 hover:bg-gray-100 rounded-t-lg"
           onClick={() => setShowUsersList((v) => !v)}
         >
           <span>Usuarios registrados</span>
@@ -325,30 +325,30 @@ export default function UsersPage() {
         {showUsersList && (
           <div className="p-4">
             {loadingList ? (
-              <p className="text-sm">Cargando...</p>
+              <p className="text-sm text-gray-600">Cargando...</p>
             ) : users.length === 0 ? (
               <p className="text-sm text-gray-600">Todavía no hay usuarios registrados.</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm border-collapse">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2 pr-4">Nombre</th>
-                  <th className="text-left py-2 pr-4">Rol principal</th>
-                  <th className="text-left py-2">Roles asignados</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((u) => {
-                  const allRoles = rolesForUser(u.id);
-                  return (
-                    <tr key={u.id} className="border-b last:border-b-0">
-                      <td className="py-2 pr-4 whitespace-nowrap">{u.full_name ?? '(Sin nombre)'}</td>
-                      <td className="py-2 pr-4 whitespace-nowrap">{u.role}</td>
-                      <td className="py-2">{allRoles.join(', ') || '-'}</td>
+                  <thead>
+                    <tr className="border-b bg-gray-50">
+                      <th className="text-left py-2 px-3">Nombre</th>
+                      <th className="text-left py-2 px-3">Rol principal</th>
+                      <th className="text-left py-2 px-3">Roles asignados</th>
                     </tr>
-                  );
-                })}
+                  </thead>
+                  <tbody>
+                    {users.map((u) => {
+                      const allRoles = rolesForUser(u.id);
+                      return (
+                        <tr key={u.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                          <td className="py-2 px-3 whitespace-nowrap">{u.full_name ?? '(Sin nombre)'}</td>
+                          <td className="py-2 px-3 whitespace-nowrap">{u.role}</td>
+                          <td className="py-2 px-3 text-xs text-gray-700">{allRoles.join(', ') || '-'}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

@@ -677,16 +677,16 @@ export default function SchedulePage() {
   };
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-6 max-w-5xl mx-auto px-4 py-6">
       <div className="flex items-center gap-2">
         <IconCalendar />
         <h1 className="text-2xl font-semibold text-[#31435d]">Agenda</h1>
       </div>
 
-      <div className="border rounded">
+      <div className="border rounded-lg bg-white shadow-sm">
         <button
           type="button"
-          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t"
+          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
           onClick={() => setShowCreateSection((v) => !v)}
         >
           <span>Crear clase</span>
@@ -787,19 +787,19 @@ export default function SchedulePage() {
         )}
       </div>
 
-      <div className="border rounded">
+      <div className="border rounded-lg bg-white shadow-sm">
         <button
           type="button"
-          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t"
+          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
           onClick={() => setShowUpcomingSection((v) => !v)}
         >
           <span>Próximas clases</span>
           <span className="text-xs text-gray-500">{showUpcomingSection ? '▼' : '▲'}</span>
         </button>
         {showUpcomingSection && (
-          <div className="space-y-2 p-4">
-            <h2 className="text-lg font-semibold">Próximas clases</h2>
-        <div className="grid gap-3 md:grid-cols-5 p-3 border rounded">
+          <div className="space-y-3 p-4">
+            <h2 className="text-lg font-semibold text-[#31435d]">Próximas clases</h2>
+        <div className="grid gap-3 md:grid-cols-5 p-3 border rounded-lg bg-gray-50">
           <div>
             <label className="block text-xs mb-1">Sede</label>
             <select className="border rounded p-2 w-full" value={filterLocationId} onChange={(e) => setFilterLocationId(e.target.value)}>
@@ -837,30 +837,32 @@ export default function SchedulePage() {
           </div>
         </div>
         {loading ? (
-          <p>Cargando...</p>
+          <p className="text-sm text-gray-600">Cargando clases...</p>
         ) : filteredClasses.length === 0 ? (
-          <p>No hay clases programadas.</p>
+          <p className="text-sm text-gray-600">No hay clases programadas.</p>
         ) : (
-          <ul className="divide-y">
+          <ul className="space-y-3">
             {filteredClasses.map((cls) => {
               const court = courtsMap[cls.court_id || ''];
               const location = court ? locationsMap[court.location_id] : undefined;
               const coach = coachesMap[cls.coach_id || ''];
               const alumnos = bookingsCount[cls.id] ?? 0;
               return (
-                <li key={cls.id} className="py-2 text-sm">
-                  <div className="flex items-center justify-between gap-2">
-                    <div>
-                      <span className="font-medium">{new Date(cls.date).toLocaleString()}</span>
-                      {' • '}Sede: {location?.name ?? '-'}
-                      {' • '}Cancha: {court?.name ?? '-'}
-                      {' • '}Profesor: {coach?.full_name ?? 'Coach'}
-                      {' • '}Tipo: {cls.type}
-                      {' • '}Alumnos/Cupo: {alumnos}/{cls.capacity}
+                <li key={cls.id} className="text-sm border rounded-lg p-3 bg-white shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="font-semibold text-[#31435d]">
+                        {new Date(cls.date).toLocaleString()}
+                      </div>
+                      <div className="text-xs text-gray-600 space-y-0.5">
+                        <p><span className="font-medium">Sede:</span> {location?.name ?? '-'}</p>
+                        <p><span className="font-medium">Cancha:</span> {court?.name ?? '-'} • <span className="font-medium">Profesor:</span> {coach?.full_name ?? 'Coach'}</p>
+                        <p><span className="font-medium">Tipo:</span> {cls.type} • <span className="font-medium">Alumnos/Cupo:</span> {alumnos}/{cls.capacity}</p>
+                      </div>
                     </div>
-                    <div className="shrink-0 flex gap-2">
+                    <div className="shrink-0 flex flex-col sm:flex-row gap-2 items-end sm:items-center">
                       <button
-                        className="text-red-600 underline"
+                        className="text-xs px-3 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50"
                         onClick={async () => {
                           if (!confirm('¿Cancelar y eliminar esta clase? Se eliminarán reservas y asistencias asociadas.')) return;
                           const { error: delErr } = await supabase.from('class_sessions').delete().eq('id', cls.id);
@@ -883,17 +885,15 @@ export default function SchedulePage() {
                             return n;
                           });
                         }}
-                      >
-                        Cancelar
-                      </button>
+                      >Cancelar</button>
                       <button
-                        className="text-blue-600 underline"
+                        className="text-xs px-3 py-1 rounded border border-[#3cadaf] text-[#3cadaf] hover:bg-[#e6f5f6]"
                         onClick={() => openAttendance(cls)}
                       >
                         Asistencia
                       </button>
                       <button
-                        className="text-gray-700 underline"
+                        className="text-xs px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
                         onClick={() => openEdit(cls)}
                       >
                         Editar
@@ -911,12 +911,12 @@ export default function SchedulePage() {
 
       {editing && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white w-full max-w-lg rounded shadow flex flex-col max-h-[90vh]">
+          <div className="bg-white w-full max-w-lg rounded-lg shadow-lg flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b">
               <h3 className="text-lg font-semibold">Editar clase</h3>
               <button className="text-sm underline" onClick={() => setEditing(null)}>Cerrar</button>
             </div>
-            <div className="grid gap-3 px-4 py-3 overflow-y-auto">
+            <div className="grid gap-3 px-4 py-3 overflow-y-auto text-sm">
               <div>
                 <label className="block text-sm mb-1">Cancha</label>
                 <select className="border rounded p-2 w-full" value={editCourtId} onChange={(e) => setEditCourtId(e.target.value)}>
@@ -993,8 +993,8 @@ export default function SchedulePage() {
               </div>
             </div>
             <div className="flex justify-end gap-2 px-4 py-3 border-t bg-white">
-              <button className="px-3 py-2 border rounded" onClick={() => setEditing(null)}>Cancelar</button>
-              <button className="px-3 py-2 bg-black text-white rounded disabled:opacity-50" disabled={saving} onClick={onSaveEdit}>{saving ? 'Guardando...' : 'Guardar cambios'}</button>
+              <button className="px-3 py-2 border rounded text-sm" onClick={() => setEditing(null)}>Cancelar</button>
+              <button className="px-3 py-2 bg-[#3cadaf] hover:bg-[#31435d] text-white rounded text-sm disabled:opacity-50" disabled={saving} onClick={onSaveEdit}>{saving ? 'Guardando...' : 'Guardar cambios'}</button>
             </div>
           </div>
         </div>
@@ -1002,22 +1002,22 @@ export default function SchedulePage() {
 
       {attendanceClass && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white w-full max-w-lg rounded shadow flex flex-col max-h-[90vh]">
+          <div className="bg-white w-full max-w-lg rounded-lg shadow-lg flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b">
               <h3 className="text-lg font-semibold">Asistencia</h3>
               <button className="text-sm underline" onClick={() => setAttendanceClass(null)}>Cerrar</button>
             </div>
-            <div className="px-4 py-3 overflow-y-auto">
+            <div className="px-4 py-3 overflow-y-auto text-sm">
               {attendanceLoading ? (
                 <p className="text-sm">Cargando alumnos...</p>
               ) : attendanceList.length === 0 ? (
                 <p className="text-sm">No hay alumnos reservados para esta clase.</p>
               ) : (
-                <ul className="space-y-2 text-sm">
+                <ul className="space-y-2">
                   {attendanceList.map((row, idx) => (
-                    <li key={row.student_id} className="flex items-center justify-between gap-2 border-b pb-1">
-                      <span>{row.label}</span>
-                      <label className="flex items-center gap-1">
+                    <li key={row.student_id} className="flex items-center justify-between gap-2 border-b pb-2">
+                      <span className="font-medium">{row.label}</span>
+                      <label className="flex items-center gap-1 text-xs">
                         <input
                           type="checkbox"
                           checked={row.present}
@@ -1038,9 +1038,9 @@ export default function SchedulePage() {
               )}
             </div>
             <div className="flex justify-end gap-2 px-4 py-3 border-t bg-white">
-              <button className="px-3 py-2 border rounded" onClick={() => setAttendanceClass(null)}>Cancelar</button>
+              <button className="px-3 py-2 border rounded text-sm" onClick={() => setAttendanceClass(null)}>Cancelar</button>
               <button
-                className="px-3 py-2 bg-black text-white rounded disabled:opacity-50"
+                className="px-3 py-2 bg-[#3cadaf] hover:bg-[#31435d] text-white rounded text-sm disabled:opacity-50"
                 disabled={attendanceSaving}
                 onClick={onSaveAttendance}
               >
