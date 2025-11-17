@@ -39,6 +39,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Link href="/users" onClick={() => setMenuOpen(false)} className="underline">
               Usuarios
             </Link>
+            <Link href="/reports" onClick={() => setMenuOpen(false)} className="underline">
+              Reportes
+            </Link>
             <div className="mt-1">
               <LogoutButton />
             </div>

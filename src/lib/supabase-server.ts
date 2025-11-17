@@ -1,6 +1,6 @@
-import { cookies as nextCookies } from 'next/headers';
+import { cookies } from 'next/headers';
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 
-// Provide a function that returns the cookie store to the helper
+// Helper para usar Supabase en Server Components / rutas del lado servidor
 export const createClientServer = () =>
-  createServerComponentClient({ cookies: () => nextCookies() });
+  createServerComponentClient({ cookies });
