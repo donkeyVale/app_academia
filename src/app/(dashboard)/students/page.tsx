@@ -1,4 +1,8 @@
-import { requireUser } from '@/lib/auth';
+"use client";
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClientBrowser } from '@/lib/supabase';
 
 const iconColor = '#3cadaf';
 
@@ -15,8 +19,34 @@ const IconStudents = () => (
   </svg>
 );
 
-export default async function StudentsPage() {
-  await requireUser();
+export default function StudentsPage() {
+  const router = useRouter();
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    const supabase = createClientBrowser();
+
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) {
+        router.replace('/login');
+      } else {
+        setChecking(false);
+      }
+    });
+  }, [router]);
+
+  if (checking) {
+    return (
+      <section className="space-y-3">
+        <div className="flex items-center gap-2">
+          <IconStudents />
+          <h1 className="text-2xl font-semibold text-[#31435d]">Alumnos</h1>
+        </div>
+        <p className="text-sm text-gray-600">Cargando...</p>
+      </section>
+    );
+  }
+
   return (
     <section className="space-y-3">
       <div className="flex items-center gap-2">
