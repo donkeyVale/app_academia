@@ -19,20 +19,103 @@ const IconStudents = () => (
   </svg>
 );
 
+type StudentRow = {
+  id: string;
+  user_id: string | null;
+  level: string | null;
+  notes: string | null;
+};
+
+type StudentPlanRow = {
+  student_id: string;
+  remaining_classes: number;
+  plans: {
+    name: string;
+  }[] | null;
+};
+
+type ProfileRow = {
+  id: string;
+  full_name: string | null;
+};
+
 export default function StudentsPage() {
   const router = useRouter();
   const [checking, setChecking] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [students, setStudents] = useState<StudentRow[]>([]);
+  const [plansByStudent, setPlansByStudent] = useState<Record<string, StudentPlanRow | undefined>>({});
+  const [profilesByUser, setProfilesByUser] = useState<Record<string, ProfileRow | undefined>>({});
 
   useEffect(() => {
     const supabase = createClientBrowser();
 
-    supabase.auth.getUser().then(({ data }) => {
+    (async () => {
+      const { data } = await supabase.auth.getUser();
       if (!data.user) {
         router.replace('/login');
-      } else {
-        setChecking(false);
+        return;
       }
-    });
+
+      setChecking(false);
+      setLoading(true);
+      setError(null);
+
+      try {
+        const [studentsRes, studentPlansRes] = await Promise.all([
+          supabase.from('students').select('id, user_id, level, notes'),
+          supabase.from('student_plans').select('student_id, remaining_classes, plans(name)'),
+        ]);
+
+        if (studentsRes.error) throw studentsRes.error;
+        if (studentPlansRes.error) throw studentPlansRes.error;
+
+        const studentsData = (studentsRes.data ?? []) as StudentRow[];
+        const plansData = (studentPlansRes.data ?? []) as StudentPlanRow[];
+
+        // Cargar perfiles para obtener el full_name de cada alumno (cuando tenga user vinculado)
+        const userIds = Array.from(
+          new Set(
+            studentsData
+              .map((s) => s.user_id)
+              .filter((id): id is string => !!id)
+          )
+        );
+
+        let profilesMap: Record<string, ProfileRow> = {};
+        if (userIds.length > 0) {
+          const profilesRes = await supabase
+            .from('profiles')
+            .select('id, full_name')
+            .in('id', userIds);
+
+          if (profilesRes.error) throw profilesRes.error;
+
+          const profilesData = (profilesRes.data ?? []) as ProfileRow[];
+          profilesMap = profilesData.reduce<Record<string, ProfileRow>>((acc, p) => {
+            acc[p.id] = p;
+            return acc;
+          }, {});
+        }
+
+        const plansMap: Record<string, StudentPlanRow> = {};
+        for (const p of plansData) {
+          // Si hay varios registros de plan para el mismo alumno, nos quedamos con el primero.
+          if (!plansMap[p.student_id]) {
+            plansMap[p.student_id] = p;
+          }
+        }
+
+        setStudents(studentsData);
+        setPlansByStudent(plansMap);
+        setProfilesByUser(profilesMap);
+      } catch (err: any) {
+        setError(err?.message ?? 'Error cargando alumnos.');
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [router]);
 
   if (checking) {
@@ -48,12 +131,56 @@ export default function StudentsPage() {
   }
 
   return (
-    <section className="space-y-3">
+    <section className="space-y-4">
       <div className="flex items-center gap-2">
         <IconStudents />
         <h1 className="text-2xl font-semibold text-[#31435d]">Alumnos</h1>
       </div>
-      <p className="text-sm text-gray-600">Listado y gestión de alumnos (pendiente DB).</p>
+      <p className="text-sm text-gray-600">
+        Listado de alumnos con su plan activo y clases restantes (si corresponde).
+      </p>
+
+      {error && <p className="text-sm text-red-600">{error}</p>}
+
+      <div className="border rounded bg-white p-4">
+        {loading ? (
+          <p className="text-sm text-gray-600">Cargando alumnos...</p>
+        ) : students.length === 0 ? (
+          <p className="text-sm text-gray-600">Todavía no hay alumnos registrados.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm border-collapse">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-2 pr-4">Alumno</th>
+                  <th className="text-left py-2 pr-4">Nivel</th>
+                  <th className="text-left py-2 pr-4">Plan</th>
+                  <th className="text-left py-2">Clases restantes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {students.map((s) => {
+                  const planInfo = plansByStudent[s.id];
+                  const planName = planInfo?.plans && planInfo.plans.length > 0 ? planInfo.plans[0].name : '-';
+                  const remaining = planInfo?.remaining_classes ?? null;
+
+                  const profile = s.user_id ? profilesByUser[s.user_id] : undefined;
+                  const displayName = profile?.full_name || '(Sin nombre vinculado)';
+
+                  return (
+                    <tr key={s.id} className="border-b last:border-b-0">
+                      <td className="py-2 pr-4 whitespace-nowrap">{displayName}</td>
+                      <td className="py-2 pr-4 whitespace-nowrap">{s.level ?? '-'}</td>
+                      <td className="py-2 pr-4 whitespace-nowrap">{planName}</td>
+                      <td className="py-2">{remaining !== null ? remaining : '-'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </section>
   );
 }

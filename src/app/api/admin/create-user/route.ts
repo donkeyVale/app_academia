@@ -125,6 +125,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Si el usuario tiene rol de alumno, crear también su registro en students
+    if (uniqueRoles.includes('student')) {
+      const { error: studentInsertError } = await supabaseAdmin
+        .from('students')
+        .insert({
+          user_id: newUserId,
+          level: null,
+          notes: null,
+        });
+
+      if (studentInsertError) {
+        return NextResponse.json(
+          { error: 'Usuario creado, pero falló la creación del registro de alumno.' },
+          { status: 500 }
+        );
+      }
+    }
+
     return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json(
