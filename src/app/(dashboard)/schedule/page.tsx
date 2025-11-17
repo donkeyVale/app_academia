@@ -33,7 +33,13 @@ type ClassSession = {
   price_cents: number;
   currency: string;
 };
-type Student = { id: string; level: string | null; notes: string | null };
+type Student = {
+  id: string;
+  user_id: string | null;
+  level: string | null;
+  notes: string | null;
+  full_name?: string | null;
+};
 
 export default function SchedulePage() {
   const supabase = createClientBrowser();
@@ -110,10 +116,44 @@ export default function SchedulePage() {
       // Load students (for selection)
       const { data: studs, error: eS } = await supabase
         .from('students')
-        .select('id, level, notes')
+        .select('id, user_id, level, notes')
         .order('created_at', { ascending: false });
       if (eS) setError(eS.message);
-      setStudents(studs ?? []);
+
+      let enrichedStudents: Student[] = (studs as Student[]) ?? [];
+      if (enrichedStudents.length > 0) {
+        const userIds = Array.from(
+          new Set(
+            enrichedStudents
+              .map((s) => s.user_id)
+              .filter((id): id is string => !!id)
+          )
+        );
+
+        if (userIds.length > 0) {
+          const { data: profilesData, error: profErr } = await supabase
+            .from('profiles')
+            .select('id, full_name')
+            .in('id', userIds);
+
+          if (!profErr && profilesData) {
+            const profilesMap = (profilesData as { id: string; full_name: string | null }[]).reduce<Record<string, string | null>>(
+              (acc, p) => {
+                acc[p.id] = p.full_name;
+                return acc;
+              },
+              {}
+            );
+
+            enrichedStudents = enrichedStudents.map((s) => ({
+              ...s,
+              full_name: s.user_id ? profilesMap[s.user_id] ?? null : null,
+            }));
+          }
+        }
+      }
+
+      setStudents(enrichedStudents);
 
       // Load classes in a safe window (from 1h ago to next 14 days) to avoid TZ edge cases
       const now = new Date();
@@ -721,12 +761,15 @@ export default function SchedulePage() {
               .filter((s) => {
                 const t = (studentQuery || '').toLowerCase();
                 if (!t) return true;
-                const label = (s.notes || '') + ' ' + (s.level || '') + ' ' + s.id;
+                const label =
+                  (s.full_name || '') + ' ' + (s.notes || '') + ' ' + (s.level || '') + ' ' + s.id;
                 return label.toLowerCase().includes(t);
               })
               .map((s) => (
-              <option key={s.id} value={s.id}>{s.notes ?? s.level ?? s.id}</option>
-            ))}
+                <option key={s.id} value={s.id}>
+                  {s.full_name ?? s.notes ?? s.level ?? s.id}
+                </option>
+              ))}
           </select>
           <p className="text-xs text-gray-500">Se crearán reservas para los alumnos seleccionados.</p>
         </div>
