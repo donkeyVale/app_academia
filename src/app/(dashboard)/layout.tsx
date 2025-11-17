@@ -10,6 +10,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Link href="/schedule">Agenda</Link>
           <Link href="/students">Alumnos</Link>
           <Link href="/finance">Finanzas</Link>
+          <Link href="/users">Usuarios</Link>
           <LogoutButton />
         </nav>
       </header>
