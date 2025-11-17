@@ -439,7 +439,13 @@ export default function SchedulePage() {
 
       const list = (bookingsData ?? []).map((b: any) => {
         const s = b.students;
-        const label = (s?.notes || '') || (s?.level || '') || s?.id || b.student_id;
+        const studentInfo = students.find((stu) => stu.id === b.student_id);
+        const label =
+          (studentInfo?.full_name || '') ||
+          (s?.notes || '') ||
+          (s?.level || '') ||
+          s?.id ||
+          b.student_id;
         return {
           student_id: b.student_id as string,
           present: attMap.get(b.student_id) ?? false,
@@ -973,11 +979,14 @@ export default function SchedulePage() {
                     .filter((s) => {
                       const t = (editStudentQuery || '').toLowerCase();
                       if (!t) return true;
-                      const label = (s.notes || '') + ' ' + (s.level || '') + ' ' + s.id;
+                      const label =
+                        (s.full_name || '') + ' ' + (s.notes || '') + ' ' + (s.level || '') + ' ' + s.id;
                       return label.toLowerCase().includes(t);
                     })
                     .map((s) => (
-                      <option key={s.id} value={s.id}>{s.notes ?? s.level ?? s.id}</option>
+                      <option key={s.id} value={s.id}>
+                        {s.full_name ?? s.notes ?? s.level ?? s.id}
+                      </option>
                     ))}
                 </select>
                 <p className="text-xs text-gray-500">Se crearán/eliminarán reservas según los cambios. Máximo 4.</p>
