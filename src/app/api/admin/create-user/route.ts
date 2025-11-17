@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-service';
-import { createClientServer } from '@/lib/supabase-server';
 
 export async function POST(req: NextRequest) {
   try {
@@ -34,35 +33,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'Debe seleccionar al menos un rol.' },
         { status: 400 }
-      );
-    }
-
-    // Verificar que quien llama sea admin
-    const supabaseServer = createClientServer();
-    const { data: authData } = await supabaseServer.auth.getUser();
-    const currentUser = authData.user;
-
-    if (!currentUser) {
-      return NextResponse.json({ error: 'No autenticado.' }, { status: 401 });
-    }
-
-    const { data: profile, error: profileError } = await supabaseServer
-      .from('profiles')
-      .select('role')
-      .eq('id', currentUser.id)
-      .maybeSingle();
-
-    if (profileError) {
-      return NextResponse.json(
-        { error: 'Error verificando permisos.' },
-        { status: 500 }
-      );
-    }
-
-    if (!profile || profile.role !== 'admin') {
-      return NextResponse.json(
-        { error: 'Solo administradores pueden crear usuarios.' },
-        { status: 403 }
       );
     }
 
