@@ -28,10 +28,8 @@ type StudentRow = {
 
 type StudentPlanRow = {
   student_id: string;
+  plan_id: string | null;
   remaining_classes: number;
-  plans: {
-    name: string;
-  }[] | null;
 };
 
 type ProfileRow = {
@@ -46,6 +44,7 @@ export default function StudentsPage() {
   const [error, setError] = useState<string | null>(null);
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [plansByStudent, setPlansByStudent] = useState<Record<string, StudentPlanRow | undefined>>({});
+  const [planNamesById, setPlanNamesById] = useState<Record<string, string>>({});
   const [profilesByUser, setProfilesByUser] = useState<Record<string, ProfileRow | undefined>>({});
 
   useEffect(() => {
@@ -65,7 +64,7 @@ export default function StudentsPage() {
       try {
         const [studentsRes, studentPlansRes] = await Promise.all([
           supabase.from('students').select('id, user_id, level, notes'),
-          supabase.from('student_plans').select('student_id, remaining_classes, plans(name)'),
+          supabase.from('student_plans').select('student_id, plan_id, remaining_classes'),
         ]);
 
         if (studentsRes.error) throw studentsRes.error;
@@ -99,16 +98,38 @@ export default function StudentsPage() {
           }, {});
         }
 
+        // Construir mapas de planes
         const plansMap: Record<string, StudentPlanRow> = {};
+        const planIds = new Set<string>();
         for (const p of plansData) {
           // Si hay varios registros de plan para el mismo alumno, nos quedamos con el primero.
           if (!plansMap[p.student_id]) {
             plansMap[p.student_id] = p;
           }
+          if (p.plan_id) {
+            planIds.add(p.plan_id);
+          }
+        }
+
+        let planNamesMap: Record<string, string> = {};
+        if (planIds.size > 0) {
+          const plansRes = await supabase
+            .from('plans')
+            .select('id, name')
+            .in('id', Array.from(planIds));
+
+          if (plansRes.error) throw plansRes.error;
+
+          const plansRows = plansRes.data as { id: string; name: string }[];
+          planNamesMap = plansRows.reduce<Record<string, string>>((acc, p) => {
+            acc[p.id] = p.name;
+            return acc;
+          }, {});
         }
 
         setStudents(studentsData);
         setPlansByStudent(plansMap);
+        setPlanNamesById(planNamesMap);
         setProfilesByUser(profilesMap);
       } catch (err: any) {
         setError(err?.message ?? 'Error cargando alumnos.');
@@ -161,7 +182,8 @@ export default function StudentsPage() {
               <tbody>
                 {students.map((s) => {
                   const planInfo = plansByStudent[s.id];
-                  const planName = planInfo?.plans && planInfo.plans.length > 0 ? planInfo.plans[0].name : '-';
+                  const planId = planInfo?.plan_id ?? null;
+                  const planName = planId ? planNamesById[planId] ?? '-' : '-';
                   const remaining = planInfo?.remaining_classes ?? null;
 
                   const profile = s.user_id ? profilesByUser[s.user_id] : undefined;
