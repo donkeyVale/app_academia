@@ -176,7 +176,7 @@ export default function UsersPage() {
 
   if (forbidden) {
     return (
-      <section className="max-w-4xl mx-auto space-y-4">
+      <section className="w-full max-w-4xl mx-auto px-4 space-y-4">
         <h1 className="text-2xl font-semibold">Usuarios</h1>
         <p className="text-sm text-red-600">Solo administradores pueden acceder a este módulo.</p>
       </section>
@@ -184,7 +184,7 @@ export default function UsersPage() {
   }
 
   return (
-    <section className="max-w-4xl mx-auto space-y-6">
+    <section className="w-full max-w-4xl mx-auto px-4 space-y-6">
       <div>
         <div className="flex items-center gap-2 mb-1">
           <IconUsers />
