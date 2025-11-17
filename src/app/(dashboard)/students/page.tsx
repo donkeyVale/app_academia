@@ -189,7 +189,7 @@ export default function StudentsPage() {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <div className="border rounded-lg bg-white p-4 shadow-sm">
+      <div className="border rounded-lg bg-white p-4 shadow-sm border-t-4 border-[#3cadaf]">
         {loading ? (
           <p className="text-sm text-gray-600">Cargando alumnos...</p>
         ) : students.length === 0 ? (

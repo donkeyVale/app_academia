@@ -255,33 +255,41 @@ export default function HomePage() {
       )}
 
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="border rounded-lg p-4 bg-white shadow-sm">
+        <div className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#3cadaf]">
           <div className="flex items-center gap-2 mb-1">
-            <IconMoney />
+            <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
+              <IconMoney />
+            </div>
             <p className="text-xs uppercase text-gray-500">Planes activos</p>
           </div>
           <p className="text-2xl font-semibold">{loading ? '...' : activePlansCount}</p>
           <p className="text-xs text-gray-500 mt-1">Planes con al menos un alumno con clases disponibles</p>
         </div>
-        <div className="border rounded-lg p-4 bg-white shadow-sm">
+        <div className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#22c55e]">
           <div className="flex items-center gap-2 mb-1">
-            <IconStudents />
+            <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
+              <IconStudents />
+            </div>
             <p className="text-xs uppercase text-gray-500">Alumnos con plan</p>
           </div>
           <p className="text-2xl font-semibold">{loading ? '...' : studentsWithPlanCount}</p>
           <p className="text-xs text-gray-500 mt-1">Alumnos que aún tienen clases en algún plan</p>
         </div>
-        <div className="border rounded-lg p-4 bg-white shadow-sm">
+        <div className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#3b82f6]">
           <div className="flex items-center gap-2 mb-1">
-            <IconCalendar />
+            <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
+              <IconCalendar />
+            </div>
             <p className="text-xs uppercase text-gray-500">Clases de hoy</p>
           </div>
           <p className="text-2xl font-semibold">{loading ? '...' : todayClassesCount}</p>
           <p className="text-xs text-gray-500 mt-1">Clases programadas para el día de hoy</p>
         </div>
-        <div className="border rounded-lg p-4 bg-white shadow-sm">
+        <div className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#f97316]">
           <div className="flex items-center gap-2 mb-1">
-            <IconUsers />
+            <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
+              <IconUsers />
+            </div>
             <p className="text-xs uppercase text-gray-500">Profesores / Alumnos</p>
           </div>
           <p className="text-2xl font-semibold">{loading ? '...' : `${coachesCount} / ${studentsCount}`}</p>
@@ -289,7 +297,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      <div className="border rounded-lg p-4 bg-white text-sm space-y-3 shadow-sm">
+      <div className="border rounded-lg p-4 bg-[#f0f9fb] text-sm space-y-3 shadow-sm border border-[#3cadaf]/20">
         <h2 className="text-base font-semibold mb-1">¿Cómo instalar esta app en tu celular?</h2>
         <p className="text-gray-600">
           Seguí estos pasos para tener acceso rápido desde la pantalla de inicio de tu celular.

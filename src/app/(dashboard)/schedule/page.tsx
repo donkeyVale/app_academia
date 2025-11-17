@@ -683,7 +683,7 @@ export default function SchedulePage() {
         <h1 className="text-2xl font-semibold text-[#31435d]">Agenda</h1>
       </div>
 
-      <div className="border rounded-lg bg-white shadow-sm">
+      <div className="border rounded-lg bg-white shadow-sm border-t-4 border-[#3cadaf]">
         <button
           type="button"
           className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
@@ -799,7 +799,7 @@ export default function SchedulePage() {
         {showUpcomingSection && (
           <div className="space-y-3 p-4">
             <h2 className="text-lg font-semibold text-[#31435d]">Próximas clases</h2>
-        <div className="grid gap-3 md:grid-cols-5 p-3 border rounded-lg bg-gray-50">
+        <div className="grid gap-3 md:grid-cols-5 p-3 border rounded-lg bg-[#f0f9fb]">
           <div>
             <label className="block text-xs mb-1">Sede</label>
             <select className="border rounded p-2 w-full" value={filterLocationId} onChange={(e) => setFilterLocationId(e.target.value)}>

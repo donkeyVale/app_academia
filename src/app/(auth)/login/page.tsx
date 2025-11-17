@@ -21,16 +21,71 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-dvh flex items-center justify-center p-6">
-      <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4 border p-6 rounded">
-        <h1 className="text-xl font-semibold">Iniciar sesión</h1>
-        <input className="w-full border p-2 rounded" placeholder="Email" value={email} onChange={(e)=>setEmail(e.target.value)} />
-        <input className="w-full border p-2 rounded" placeholder="Contraseña" type="password" value={password} onChange={(e)=>setPassword(e.target.value)} />
-        {error && <p className="text-red-600 text-sm">{error}</p>}
-        <button className="w-full bg-black text-white py-2 rounded disabled:opacity-50" disabled={loading}>
-          {loading ? 'Ingresando...' : 'Ingresar'}
-        </button>
-      </form>
+    <main className="min-h-dvh flex items-center justify-center bg-gradient-to-br from-[#0f172a] via-[#1d3b4f] to-[#3cadaf] relative overflow-hidden p-6">
+      {/* Capa decorativa con blur para darle movimiento al fondo */}
+      <div className="pointer-events-none absolute inset-0 opacity-40">
+        <div className="absolute -top-32 -left-24 h-64 w-64 rounded-full bg-[#3cadaf] blur-3xl" />
+        <div className="absolute -bottom-40 right-0 h-72 w-72 rounded-full bg-[#22c55e] blur-3xl" />
+      </div>
+
+      <div className="relative z-10 w-full max-w-md">
+        <div className="mb-6 text-center text-white">
+          <div className="mx-auto mb-3 h-12 w-12 rounded-full bg-white/10 border border-white/30 flex items-center justify-center text-lg font-bold tracking-tight">
+            A
+          </div>
+          <h1 className="text-2xl font-semibold tracking-tight">AGENDO</h1>
+          <p className="text-sm text-white/80">
+            Gestioná la agenda de tu academia de pádel en un solo lugar.
+          </p>
+        </div>
+
+        <form
+          onSubmit={onSubmit}
+          className="w-full space-y-4 rounded-2xl bg-white/95 p-6 shadow-xl backdrop-blur-sm"
+        >
+          <h2 className="text-lg font-semibold text-[#31435d] mb-1">Iniciar sesión</h2>
+          <p className="text-xs text-gray-500 mb-2">
+            Ingresá con tu correo y contraseña para acceder al panel.
+          </p>
+
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-gray-600">Correo electrónico</label>
+            <input
+              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf] focus:border-[#3cadaf]"
+              placeholder="nombre@tuacademia.com"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-gray-600">Contraseña</label>
+            <input
+              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf] focus:border-[#3cadaf]"
+              placeholder="••••••••"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+
+          {error && <p className="text-red-600 text-xs">{error}</p>}
+
+          <button
+            className="w-full bg-[#3cadaf] hover:bg-[#31435d] text-white py-2 rounded-md text-sm font-medium disabled:opacity-50 transition-colors"
+            disabled={loading}
+          >
+            {loading ? 'Ingresando...' : 'Ingresar'}
+          </button>
+
+          <p className="text-[11px] text-gray-400 text-center mt-2">
+            Si no tenés acceso, solicitá un usuario a tu administrador.
+          </p>
+        </form>
+      </div>
     </main>
   );
 }

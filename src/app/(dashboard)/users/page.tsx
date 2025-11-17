@@ -199,7 +199,7 @@ export default function UsersPage() {
         </p>
       </div>
 
-      <div className="border rounded-lg bg-white shadow-sm">
+      <div className="border rounded-lg bg-white shadow-sm border-t-4 border-[#3cadaf]">
         <button
           type="button"
           className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-semibold bg-gray-50 hover:bg-gray-100 rounded-t-lg"
