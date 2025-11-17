@@ -11,25 +11,31 @@ export const createClientServer = () => {
   }
 
   return createServerClient(supabaseUrl, supabaseAnonKey, {
-    // Implementación recomendada por Supabase para Next.js App Router
+    // Usamos la interfaz "deprecada" basada en get/set/remove, que es la que
+    // tu versión de @supabase/ssr está esperando internamente.
     cookies: {
-      getAll() {
+      get(name: string) {
         const cookieStore = cookies() as any;
-        // NextRequestCookies / ReadonlyRequestCookies ya exponen getAll()
-        return cookieStore.getAll();
+        const cookie = cookieStore.get(name);
+        return cookie?.value;
       },
-      setAll(cookiesToSet) {
+      set(name: string, value: string, options: CookieOptions) {
         const cookieStore = cookies() as any;
         try {
-          cookiesToSet.forEach(({ name, value, options }: { name: string; value: string; options: CookieOptions }) => {
-            // En Server Components esto puede lanzar; por eso el try/catch.
-            // En rutas / acciones sí puede escribir cookies.
-            // @ts-ignore: el tipo de cookies() en Next no declara set con CookieOptions exactamente igual
-            cookieStore.set(name, value, options as any);
-          });
+          // @ts-ignore
+          cookieStore.set(name, value, options as any);
         } catch {
-          // Si se llama desde un Server Component puro, ignoramos el intento de escritura.
-          // Las sesiones se refrescan vía middleware o desde el cliente.
+          // En Server Components puros puede fallar; lo ignoramos.
+        }
+      },
+      remove(name: string, options: CookieOptions) {
+        const cookieStore = cookies() as any;
+        try {
+          // Simulamos remove seteando la cookie expirada
+          // @ts-ignore
+          cookieStore.set(name, '', { ...(options as any), maxAge: 0 });
+        } catch {
+          // Ignorado en Server Components puros.
         }
       },
     },
