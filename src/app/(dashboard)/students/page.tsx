@@ -27,6 +27,7 @@ type StudentRow = {
 };
 
 type StudentPlanRow = {
+  id: string;
   student_id: string;
   plan_id: string | null;
   remaining_classes: number;
@@ -64,7 +65,7 @@ export default function StudentsPage() {
       try {
         const [studentsRes, studentPlansRes] = await Promise.all([
           supabase.from('students').select('id, user_id, level, notes'),
-          supabase.from('student_plans').select('student_id, plan_id, remaining_classes'),
+          supabase.from('student_plans').select('id, student_id, plan_id, remaining_classes'),
         ]);
 
         if (studentsRes.error) throw studentsRes.error;
@@ -98,13 +99,38 @@ export default function StudentsPage() {
           }, {});
         }
 
+        // Cargar usos de clases por plan para calcular clases restantes reales
+        let usageCountsByPlan: Record<string, number> = {};
+        if (plansData.length > 0) {
+          const studentPlanIds = plansData.map((p) => p.id);
+          const { data: usagesData, error: usagesErr } = await supabase
+            .from('plan_usages')
+            .select('student_plan_id')
+            .in('student_plan_id', studentPlanIds);
+
+          if (usagesErr) throw usagesErr;
+
+          usageCountsByPlan = (usagesData ?? []).reduce<Record<string, number>>((acc, u: any) => {
+            const pid = u.student_plan_id as string;
+            acc[pid] = (acc[pid] || 0) + 1;
+            return acc;
+          }, {});
+        }
+
         // Construir mapas de planes
         const plansMap: Record<string, StudentPlanRow> = {};
         const planIds = new Set<string>();
         for (const p of plansData) {
+          const used = usageCountsByPlan[p.id] || 0;
+          const effectiveRemaining = Math.max(0, (p.remaining_classes ?? 0) - used);
+          const withEffective: StudentPlanRow = {
+            ...p,
+            remaining_classes: effectiveRemaining,
+          };
+
           // Si hay varios registros de plan para el mismo alumno, nos quedamos con el primero.
           if (!plansMap[p.student_id]) {
-            plansMap[p.student_id] = p;
+            plansMap[p.student_id] = withEffective;
           }
           if (p.plan_id) {
             planIds.add(p.plan_id);
@@ -152,7 +178,7 @@ export default function StudentsPage() {
   }
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-4 max-w-5xl mx-auto">
       <div className="flex items-center gap-2">
         <IconStudents />
         <h1 className="text-2xl font-semibold text-[#31435d]">Alumnos</h1>
@@ -174,7 +200,6 @@ export default function StudentsPage() {
               <thead>
                 <tr className="border-b">
                   <th className="text-left py-2 pr-4">Alumno</th>
-                  <th className="text-left py-2 pr-4">Nivel</th>
                   <th className="text-left py-2 pr-4">Plan</th>
                   <th className="text-left py-2">Clases restantes</th>
                 </tr>
@@ -192,7 +217,6 @@ export default function StudentsPage() {
                   return (
                     <tr key={s.id} className="border-b last:border-b-0">
                       <td className="py-2 pr-4 whitespace-nowrap">{displayName}</td>
-                      <td className="py-2 pr-4 whitespace-nowrap">{s.level ?? '-'}</td>
                       <td className="py-2 pr-4 whitespace-nowrap">{planName}</td>
                       <td className="py-2">{remaining !== null ? remaining : '-'}</td>
                     </tr>
