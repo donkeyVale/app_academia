@@ -3,6 +3,22 @@
 import { useEffect, useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
 
+const iconColor = "#3cadaf";
+
+const IconMoney = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+    className="w-5 h-5"
+    {...props}
+  >
+    <rect x="3" y="6" width="18" height="12" rx="2" ry="2" stroke={iconColor} fill="none" strokeWidth="1.6" />
+    <circle cx="12" cy="12" r="3" stroke={iconColor} fill="none" strokeWidth="1.6" />
+    <path d="M6 9h2" stroke={iconColor} strokeWidth="1.6" />
+    <path d="M16 15h2" stroke={iconColor} strokeWidth="1.6" />
+  </svg>
+);
+
 type Plan = {
   id: string;
   name: string;
@@ -368,6 +384,11 @@ export default function PlansClient() {
 
   return (
     <section className="mt-6 space-y-6">
+      <div className="flex items-center gap-2">
+        <IconMoney />
+        <h1 className="text-2xl font-semibold text-[#31435d]">Finanzas / Planes</h1>
+      </div>
+
       <div className="border rounded">
         <button
           type="button"

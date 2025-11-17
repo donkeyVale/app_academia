@@ -53,6 +53,10 @@ export default function UsersPage() {
   const [loadingList, setLoadingList] = useState(true);
   const [forbidden, setForbidden] = useState(false);
 
+  // UI: secciones plegables
+  const [showCreateUser, setShowCreateUser] = useState(true);
+  const [showUsersList, setShowUsersList] = useState(false);
+
   useEffect(() => {
     let active = true;
     (async () => {
@@ -195,9 +199,18 @@ export default function UsersPage() {
         </p>
       </div>
 
-      <div className="border rounded p-4 bg-white space-y-3">
-        <h2 className="text-base font-semibold text-[#31435d]">Crear usuario</h2>
-        <form onSubmit={handleSubmit} className="space-y-3">
+      <div className="border rounded bg-white">
+        <button
+          type="button"
+          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-semibold bg-gray-50 hover:bg-gray-100 rounded-t"
+          onClick={() => setShowCreateUser((v) => !v)}
+        >
+          <span>Crear usuario</span>
+          <span className="text-xs text-gray-500">{showCreateUser ? '▼' : '▲'}</span>
+        </button>
+        {showCreateUser && (
+          <div className="p-4 space-y-3">
+            <form onSubmit={handleSubmit} className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm mb-1">Nombre</label>
@@ -285,31 +298,39 @@ export default function UsersPage() {
             </p>
           </div>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          {success && <p className="text-sm text-green-600">{success}</p>}
+              {error && <p className="text-sm text-red-600">{error}</p>}
+              {success && <p className="text-sm text-green-600">{success}</p>}
 
-          <button
-            type="submit"
-            className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 text-sm disabled:opacity-50"
-            disabled={submitting}
-          >
-            {submitting ? 'Creando usuario...' : 'Crear usuario'}
-          </button>
-        </form>
+              <button
+                type="submit"
+                className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 text-sm disabled:opacity-50"
+                disabled={submitting}
+              >
+                {submitting ? 'Creando usuario...' : 'Crear usuario'}
+              </button>
+            </form>
+          </div>
+        )}
       </div>
 
-      <div className="border rounded p-4 bg-white">
-        <div className="flex items-center gap-2 mb-2">
-          <IconUsers className="w-4 h-4" />
-          <h2 className="text-base font-semibold text-[#31435d]">Usuarios registrados</h2>
-        </div>
-        {loadingList ? (
-          <p className="text-sm">Cargando...</p>
-        ) : users.length === 0 ? (
-          <p className="text-sm text-gray-600">Todavía no hay usuarios registrados.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm border-collapse">
+      <div className="border rounded bg-white">
+        <button
+          type="button"
+          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-semibold bg-gray-50 hover:bg-gray-100 rounded-t"
+          onClick={() => setShowUsersList((v) => !v)}
+        >
+          <span>Usuarios registrados</span>
+          <span className="text-xs text-gray-500">{showUsersList ? '▼' : '▲'}</span>
+        </button>
+        {showUsersList && (
+          <div className="p-4">
+            {loadingList ? (
+              <p className="text-sm">Cargando...</p>
+            ) : users.length === 0 ? (
+              <p className="text-sm text-gray-600">Todavía no hay usuarios registrados.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b">
                   <th className="text-left py-2 pr-4">Nombre</th>
@@ -328,8 +349,10 @@ export default function UsersPage() {
                     </tr>
                   );
                 })}
-              </tbody>
-            </table>
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>

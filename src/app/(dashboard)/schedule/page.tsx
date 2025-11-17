@@ -4,6 +4,22 @@ import { useEffect, useMemo, useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
 import { logAudit } from '@/lib/audit';
 
+const iconColor = "#3cadaf";
+
+const IconCalendar = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+    className="w-5 h-5"
+    {...props}
+  >
+    <rect x="3" y="4" width="18" height="17" rx="2" ry="2" stroke={iconColor} fill="none" strokeWidth="1.6" />
+    <path d="M3 9h18" stroke={iconColor} strokeWidth="1.6" />
+    <path d="M9 3v4" stroke={iconColor} strokeWidth="1.6" />
+    <path d="M15 3v4" stroke={iconColor} strokeWidth="1.6" />
+  </svg>
+);
+
 type Court = { id: string; name: string; location_id: string };
 type Location = { id: string; name: string };
 type Coach = { id: string; user_id: string | null; specialty: string | null; full_name?: string | null };
@@ -616,7 +632,10 @@ export default function SchedulePage() {
 
   return (
     <section className="space-y-6">
-      <h1 className="text-2xl font-semibold">Agenda</h1>
+      <div className="flex items-center gap-2">
+        <IconCalendar />
+        <h1 className="text-2xl font-semibold text-[#31435d]">Agenda</h1>
+      </div>
 
       <div className="border rounded">
         <button
