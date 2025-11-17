@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 
 export default function PreloaderProvider({ children }: { children: React.ReactNode }) {
@@ -17,8 +18,14 @@ export default function PreloaderProvider({ children }: { children: React.ReactN
       {showPreloader && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-[#0f172a] via-[#1d3b4f] to-[#3cadaf] text-white">
           <div className="flex flex-col items-center gap-3">
-            <div className="h-16 w-16 rounded-full bg-white/10 border border-white/40 flex items-center justify-center text-2xl font-bold tracking-tight animate-pulse">
-              A
+            <div className="h-16 w-16 rounded-full bg-white/10 border border-white/40 flex items-center justify-center overflow-hidden animate-pulse">
+              <Image
+                src="/icons/logoAgendo.jpg"
+                alt="Logo AGENDO"
+                width={64}
+                height={64}
+                className="object-cover"
+              />
             </div>
             <div className="text-center">
               <div className="text-xl font-semibold tracking-tight">AGENDO</div>

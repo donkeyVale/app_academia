@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
 
@@ -30,8 +31,14 @@ export default function LoginPage() {
 
       <div className="relative z-10 w-full max-w-md">
         <div className="mb-6 text-center text-white">
-          <div className="mx-auto mb-3 h-12 w-12 rounded-full bg-white/10 border border-white/30 flex items-center justify-center text-lg font-bold tracking-tight">
-            A
+          <div className="mx-auto mb-3 h-16 w-16 rounded-full bg-white/10 border border-white/30 flex items-center justify-center overflow-hidden">
+            <Image
+              src="/icons/logoAgendo.jpg"
+              alt="Logo AGENDO"
+              width={64}
+              height={64}
+              className="object-cover"
+            />
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">AGENDO</h1>
           <p className="text-sm text-white/80">
