@@ -85,6 +85,7 @@ export default function PlansClient() {
   const [showCreatePlan, setShowCreatePlan] = useState(false);
   const [showAssignPlan, setShowAssignPlan] = useState(true);
   const [showStudentSummary, setShowStudentSummary] = useState(false);
+  const [recentPlansSearch, setRecentPlansSearch] = useState('');
 
   // Edición de plan existente
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
@@ -650,32 +651,55 @@ export default function PlansClient() {
             ) : studentPlans.filter((sp) => sp.remaining_classes > 0).length === 0 ? (
               <p className="text-sm text-gray-600">Aún no hay planes asignados con clases pendientes.</p>
             ) : (
-              <ul className="text-sm space-y-2">
-                {studentPlans
-                  .filter((sp) => sp.remaining_classes > 0)
-                  .slice(0, 5)
-                  .map((sp) => {
-                    const studentInfo = students.find((s) => s.id === sp.student_id);
-                    const displayName = studentInfo?.full_name ?? studentInfo?.notes ?? studentInfo?.level ?? sp.student_id;
-                    return (
-                      <li key={sp.id} className="py-2 px-3 border rounded-lg bg-white flex flex-col md:flex-row md:items-center md:justify-between gap-1">
-                        <div>
-                          <div className="font-medium text-[#31435d]">{displayName}</div>
-                          <div className="text-xs text-gray-600">
-                            <span className="font-semibold">Plan:</span> {sp.plans?.name ?? sp.plan_id}
-                            {' • '}
-                            <span className="font-semibold">Incluye:</span> {sp.plans?.classes_included ?? '?'} clases
-                            {' • '}
-                            <span className="font-semibold">Restantes:</span> {sp.remaining_classes}
+              <>
+                <div className="mb-2">
+                  <label className="block text-xs mb-1 text-gray-600">Buscar por alumno o plan</label>
+                  <input
+                    type="text"
+                    className="border rounded p-2 w-full text-xs"
+                    placeholder="Ej.: Juan Pérez o Plan Adultos"
+                    value={recentPlansSearch}
+                    onChange={(e) => setRecentPlansSearch(e.target.value)}
+                  />
+                </div>
+                <ul className="text-sm space-y-2">
+                  {studentPlans
+                    .filter((sp) => sp.remaining_classes > 0)
+                    .filter((sp) => {
+                      if (!recentPlansSearch.trim()) return true;
+                      const term = recentPlansSearch.toLowerCase();
+                      const studentInfo = students.find((s) => s.id === sp.student_id);
+                      const displayName = (studentInfo?.full_name ?? studentInfo?.notes ?? studentInfo?.level ?? sp.student_id).toLowerCase();
+                      const planName = (sp.plans?.name ?? sp.plan_id ?? '').toLowerCase();
+                      return displayName.includes(term) || planName.includes(term);
+                    })
+                    .slice(0, 5)
+                    .map((sp) => {
+                      const studentInfo = students.find((s) => s.id === sp.student_id);
+                      const displayName = studentInfo?.full_name ?? studentInfo?.notes ?? studentInfo?.level ?? sp.student_id;
+                      return (
+                        <li key={sp.id} className="py-2 px-3 border rounded-lg bg-white flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+                          <div>
+                            <div className="font-medium text-[#31435d]">{displayName}</div>
+                            <div className="text-xs text-gray-600">
+                              <span className="font-semibold">Plan:</span> {sp.plans?.name ?? sp.plan_id}
+                              {' • '}
+                              <span className="font-semibold">Incluye:</span> {sp.plans?.classes_included ?? '?'} clases
+                              {' • '}
+                              <span className="font-semibold">Restantes:</span> {sp.remaining_classes}
+                            </div>
                           </div>
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          <span className="font-semibold">Asignado:</span> {new Date(sp.purchased_at).toLocaleString()}
-                        </div>
-                      </li>
-                    );
-                  })}
-              </ul>
+                          <div className="text-xs text-gray-500">
+                            <span className="font-semibold">Asignado:</span> {new Date(sp.purchased_at).toLocaleString()}
+                          </div>
+                        </li>
+                      );
+                    })}
+                </ul>
+                {!recentPlansSearch.trim() && (
+                  <p className="mt-2 text-xs text-gray-500">Mostrando los 5 planes más recientes con clases pendientes.</p>
+                )}
+              </>
             )}
           </div>
         </div>
