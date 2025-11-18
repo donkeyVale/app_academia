@@ -848,7 +848,7 @@ export default function SchedulePage() {
         )}
       </div>
 
-      <div className="border rounded-lg bg-white shadow-sm">
+      <div className="border rounded-lg bg-white shadow-sm overflow-x-hidden">
         <button
           type="button"
           className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
