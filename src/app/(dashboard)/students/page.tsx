@@ -181,7 +181,6 @@ export default function StudentsPage() {
         .from('bookings')
         .select('class_id, class_sessions!inner(id,date,court_id,coach_id)')
         .eq('student_id', studentId)
-        .order('class_sessions.date', { ascending: false })
         .limit(50);
 
       if (bookingsErr) throw bookingsErr;
