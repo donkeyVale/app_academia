@@ -966,14 +966,14 @@ export default function SchedulePage() {
                 <p className="text-xs text-gray-500">
                   Usá esta lista para marcar asistencia en clases que ya terminaron pero aún son recientes.
                 </p>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm border-collapse">
+                <div>
+                  <table className="w-full text-sm border-collapse">
                     <thead>
                       <tr className="border-b bg-gray-50 text-xs">
                         <th className="text-left py-2 px-3">Fecha</th>
                         <th className="text-left py-2 px-3">Hora</th>
                         <th className="text-left py-2 px-3">Cancha</th>
-                        <th className="text-left py-2 px-3">Profesor</th>
+                        <th className="text-left py-2 px-3">Alumno(s)</th>
                         <th className="text-left py-2 px-3">Acciones</th>
                       </tr>
                     </thead>
@@ -986,13 +986,13 @@ export default function SchedulePage() {
                         const hh = String(d.getHours()).padStart(2, '0');
                         const min = String(d.getMinutes()).padStart(2, '0');
                         const court = cls.court_id ? courtsMap[cls.court_id] : undefined;
-                        const coach = cls.coach_id ? coachesMap[cls.coach_id] : undefined;
+                        const studentsCount = bookingsCount[cls.id] ?? 0;
                         return (
                           <tr key={cls.id} className="border-b last:border-b-0 hover:bg-gray-50">
                             <td className="py-1.5 px-3 text-xs">{`${dd}/${mm}/${yyyy}`}</td>
                             <td className="py-1.5 px-3 text-xs">{`${hh}:${min}`}</td>
                             <td className="py-1.5 px-3 text-xs">{court?.name ?? '-'}</td>
-                            <td className="py-1.5 px-3 text-xs">{coach?.full_name ?? 'Profesor'}</td>
+                            <td className="py-1.5 px-3 text-xs">{studentsCount ? `${studentsCount} alumno(s)` : '-'}</td>
                             <td className="py-1.5 px-3 text-xs">
                               <button
                                 type="button"
