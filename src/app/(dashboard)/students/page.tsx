@@ -40,6 +40,7 @@ type ProfileRow = {
 
 export default function StudentsPage() {
   const router = useRouter();
+  const supabase = createClientBrowser();
   const [checking, setChecking] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,10 +48,14 @@ export default function StudentsPage() {
   const [plansByStudent, setPlansByStudent] = useState<Record<string, StudentPlanRow | undefined>>({});
   const [planNamesById, setPlanNamesById] = useState<Record<string, string>>({});
   const [profilesByUser, setProfilesByUser] = useState<Record<string, ProfileRow | undefined>>({});
+  const [historyStudent, setHistoryStudent] = useState<{ id: string; name: string } | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyItems, setHistoryItems] = useState<
+    { id: string; date: string; courtName: string | null; coachName: string | null }[]
+  >([]);
 
   useEffect(() => {
-    const supabase = createClientBrowser();
-
     (async () => {
       const { data } = await supabase.auth.getUser();
       if (!data.user) {
@@ -163,7 +168,132 @@ export default function StudentsPage() {
         setLoading(false);
       }
     })();
-  }, [router]);
+  }, [router, supabase]);
+
+  const openHistory = async (studentId: string, displayName: string) => {
+    setHistoryStudent({ id: studentId, name: displayName });
+    setHistoryLoading(true);
+    setHistoryError(null);
+    setHistoryItems([]);
+    try {
+      // Buscar clases del alumno a través de bookings
+      const { data: bookingsData, error: bookingsErr } = await supabase
+        .from('bookings')
+        .select('class_id, class_sessions!inner(id,date,court_id,coach_id)')
+        .eq('student_id', studentId)
+        .order('class_sessions.date', { ascending: false })
+        .limit(50);
+
+      if (bookingsErr) throw bookingsErr;
+
+      const classSessionsRaw = (bookingsData ?? [])
+        .map((b: any) => b.class_sessions as any)
+        .filter((c) => !!c);
+
+      // Quitar duplicados por id
+      const byId: Record<string, any> = {};
+      classSessionsRaw.forEach((c: any) => {
+        if (!byId[c.id]) byId[c.id] = c;
+      });
+      const classSessions = Object.values(byId) as {
+        id: string;
+        date: string;
+        court_id: string | null;
+        coach_id: string | null;
+      }[];
+
+      if (!classSessions.length) {
+        setHistoryItems([]);
+        return;
+      }
+
+      const courtIds = Array.from(
+        new Set(
+          classSessions
+            .map((c) => c.court_id)
+            .filter((id): id is string => !!id)
+        )
+      );
+      const coachIds = Array.from(
+        new Set(
+          classSessions
+            .map((c) => c.coach_id)
+            .filter((id): id is string => !!id)
+        )
+      );
+
+      let courtsMap: Record<string, { id: string; name: string }> = {};
+      let coachesMap: Record<string, { id: string; user_id: string | null }> = {};
+      let coachNamesMap: Record<string, string | null> = {};
+
+      if (courtIds.length) {
+        const { data: courtsData, error: courtsErr } = await supabase
+          .from('courts')
+          .select('id,name')
+          .in('id', courtIds);
+        if (courtsErr) throw courtsErr;
+        courtsMap = (courtsData ?? []).reduce<Record<string, { id: string; name: string }>>((acc, c: any) => {
+          acc[c.id] = { id: c.id, name: c.name };
+          return acc;
+        }, {});
+      }
+
+      if (coachIds.length) {
+        const { data: coachesData, error: coachesErr } = await supabase
+          .from('coaches')
+          .select('id,user_id')
+          .in('id', coachIds);
+        if (coachesErr) throw coachesErr;
+        coachesMap = (coachesData ?? []).reduce<Record<string, { id: string; user_id: string | null }>>(
+          (acc, c: any) => {
+            acc[c.id] = { id: c.id, user_id: c.user_id };
+            return acc;
+          },
+          {}
+        );
+
+        const coachUserIds = Array.from(
+          new Set(
+            (coachesData ?? [])
+              .map((c: any) => c.user_id)
+              .filter((id: string | null): id is string => !!id)
+          )
+        );
+
+        if (coachUserIds.length) {
+          const { data: profilesData, error: profErr } = await supabase
+            .from('profiles')
+            .select('id, full_name')
+            .in('id', coachUserIds);
+          if (profErr) throw profErr;
+          coachNamesMap = (profilesData ?? []).reduce<Record<string, string | null>>((acc, p: any) => {
+            acc[p.id] = p.full_name;
+            return acc;
+          }, {});
+        }
+      }
+
+      const items = classSessions.map((cls) => {
+        const court = cls.court_id ? courtsMap[cls.court_id] : undefined;
+        const coach = cls.coach_id ? coachesMap[cls.coach_id] : undefined;
+        const coachName = coach?.user_id ? coachNamesMap[coach.user_id] ?? null : null;
+        return {
+          id: cls.id,
+          date: cls.date,
+          courtName: court?.name ?? null,
+          coachName: coachName,
+        };
+      });
+
+      // Ordenar por fecha descendente por si acaso
+      items.sort((a, b) => b.date.localeCompare(a.date));
+      setHistoryItems(items);
+    } catch (err: any) {
+      setHistoryError(err?.message ?? 'Error cargando historial de clases.');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
 
   if (checking) {
     return (
@@ -215,7 +345,11 @@ export default function StudentsPage() {
                   const displayName = profile?.full_name || '(Sin nombre vinculado)';
 
                   return (
-                    <tr key={s.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                    <tr
+                      key={s.id}
+                      className="border-b last:border-b-0 hover:bg-gray-50 cursor-pointer"
+                      onClick={() => openHistory(s.id, displayName)}
+                    >
                       <td className="py-2 px-3">{displayName}</td>
                       <td className="py-2 px-3">{planName}</td>
                       <td className="py-2 px-3 text-center">{remaining !== null ? remaining : '-'}</td>
@@ -227,6 +361,67 @@ export default function StudentsPage() {
           </div>
         )}
       </div>
+
+      {historyStudent && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-lg rounded-lg shadow-lg flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b">
+              <div>
+                <h2 className="text-lg font-semibold text-[#31435d]">Historial de clases</h2>
+                <p className="text-xs text-gray-600">{historyStudent.name}</p>
+              </div>
+              <button
+                type="button"
+                className="text-xs text-gray-600 hover:underline"
+                onClick={() => {
+                  setHistoryStudent(null);
+                  setHistoryItems([]);
+                  setHistoryError(null);
+                }}
+              >
+                Cerrar
+              </button>
+            </div>
+            <div className="px-4 py-3 overflow-y-auto text-sm">
+              {historyLoading && <p className="text-xs text-gray-600">Cargando historial...</p>}
+              {historyError && <p className="text-xs text-red-600 mb-2">{historyError}</p>}
+              {!historyLoading && !historyError && historyItems.length === 0 && (
+                <p className="text-xs text-gray-600">Este alumno aún no tiene clases registradas.</p>
+              )}
+              {!historyLoading && !historyError && historyItems.length > 0 && (
+                <table className="w-full text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b bg-gray-50">
+                      <th className="text-left py-1 px-2">Fecha</th>
+                      <th className="text-left py-1 px-2">Hora</th>
+                      <th className="text-left py-1 px-2">Cancha</th>
+                      <th className="text-left py-1 px-2">Profesor</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historyItems.map((item) => {
+                      const d = new Date(item.date);
+                      const yyyy = d.getFullYear();
+                      const mm = String(d.getMonth() + 1).padStart(2, '0');
+                      const dd = String(d.getDate()).padStart(2, '0');
+                      const hh = String(d.getHours()).padStart(2, '0');
+                      const min = String(d.getMinutes()).padStart(2, '0');
+                      return (
+                        <tr key={item.id} className="border-b last:border-b-0">
+                          <td className="py-1 px-2">{`${dd}/${mm}/${yyyy}`}</td>
+                          <td className="py-1 px-2">{`${hh}:${min}`}</td>
+                          <td className="py-1 px-2">{item.courtName ?? '-'}</td>
+                          <td className="py-1 px-2">{item.coachName ?? '-'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
