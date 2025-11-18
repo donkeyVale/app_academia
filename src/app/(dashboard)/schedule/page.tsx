@@ -751,7 +751,7 @@ export default function SchedulePage() {
           className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
           onClick={() => setShowCreateSection((v) => !v)}
         >
-          <span>Crear clase</span>
+          <span className="font-semibold">Crear clase</span>
           <span className="text-xs text-gray-500">{showCreateSection ? '▼' : '▲'}</span>
         </button>
         {showCreateSection && (
@@ -855,7 +855,7 @@ export default function SchedulePage() {
           className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
           onClick={() => setShowUpcomingSection((v) => !v)}
         >
-          <span>Próximas clases</span>
+          <span className="font-semibold">Próximas clases</span>
           <span className="text-xs text-gray-500">{showUpcomingSection ? '▼' : '▲'}</span>
         </button>
         {showUpcomingSection && (
@@ -981,7 +981,7 @@ export default function SchedulePage() {
             className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
             onClick={() => setShowRecentSection((v) => !v)}
           >
-            <span>Clases recientes (últimas 24 horas)</span>
+            <span className="font-semibold">Clases recientes (últimas 24 horas)</span>
             <span className="text-xs text-gray-500">{showRecentSection ? '▼' : '▲'}</span>
           </button>
           {showRecentSection && (
