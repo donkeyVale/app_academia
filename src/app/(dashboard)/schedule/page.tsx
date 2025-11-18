@@ -155,9 +155,9 @@ export default function SchedulePage() {
 
       setStudents(enrichedStudents);
 
-      // Load classes in a safe window (from 1h ago to next 14 days) to avoid TZ edge cases
+      // Load classes in a safe window (from last 24h to next 14 days) to evitar problemas de zona horaria
       const now = new Date();
-      const from = new Date(now.getTime() - 60 * 60 * 1000);
+      const from = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       const to = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
       const { data: clsData, error: e3 } = await supabase
         .from('class_sessions')
