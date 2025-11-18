@@ -975,7 +975,7 @@ export default function SchedulePage() {
       </div>
 
       {recentClasses.length > 0 && (
-        <div className="border rounded-lg bg-white shadow-sm overflow-x-hidden">
+        <div className="border rounded-lg bg-white shadow-sm overflow-x-hidden max-w-full">
           <button
             type="button"
             className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
@@ -985,12 +985,12 @@ export default function SchedulePage() {
             <span className="text-xs text-gray-500">{showRecentSection ? '▼' : '▲'}</span>
           </button>
           {showRecentSection && (
-            <div className="space-y-3 p-4">
+            <div className="space-y-3 p-4 max-w-full">
               <p className="text-xs text-gray-500">
                 Usá esta lista para marcar asistencia en clases que ya terminaron pero aún son recientes.
               </p>
-              <div className="overflow-x-auto">
-                <table className="min-w-[600px] text-sm border-collapse">
+              <div className="w-full">
+                <table className="w-full table-fixed text-sm border-collapse">
                   <thead>
                     <tr className="border-b bg-gray-50 text-xs">
                       <th className="text-left py-2 px-3">Fecha</th>
