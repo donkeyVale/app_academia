@@ -25,7 +25,7 @@ export const metadata: Metadata = {
       {
         url:
           (process.env.NEXT_PUBLIC_BASE_URL ?? "https://agendo.nativatech.com.py") +
-          "/icons/logoAgendo.jpg",
+          "/icons/icon-512.png",
         width: 512,
         height: 512,
         alt: "Logo Academia Padel",
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     description: "Gestión de agenda, alumnos, planes y finanzas para tu academia de pádel.",
     images: [
       (process.env.NEXT_PUBLIC_BASE_URL ?? "https://agendo.nativatech.com.py") +
-        "/icons/logoAgendo.jpg",
+        "/icons/icon-512.png",
     ],
   },
 };
