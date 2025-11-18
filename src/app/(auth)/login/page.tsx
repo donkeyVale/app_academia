@@ -33,16 +33,15 @@ export default function LoginPage() {
         <div className="mb-6 text-center text-white">
           <div className="mx-auto mb-3 h-16 w-16 rounded-full bg-white/10 border border-white/30 flex items-center justify-center overflow-hidden">
             <Image
-              src="/icons/logoAgendo.jpg"
-              alt="Logo AGENDO"
+              src="/icons/icon-512.png"
+              alt="Icono de la app"
               width={64}
               height={64}
               className="object-cover"
             />
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">AGENDO</h1>
           <p className="text-sm text-white/80">
-            Gestioná la agenda de tu academia de pádel en un solo lugar.
+            Gestioná tu agenda en un solo lugar.
           </p>
         </div>
 

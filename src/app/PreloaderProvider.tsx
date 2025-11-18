@@ -20,16 +20,15 @@ export default function PreloaderProvider({ children }: { children: React.ReactN
           <div className="flex flex-col items-center gap-3">
             <div className="h-16 w-16 rounded-full bg-white/10 border border-white/40 flex items-center justify-center overflow-hidden animate-pulse">
               <Image
-                src="/icons/logoAgendo.jpg"
-                alt="Logo AGENDO"
+                src="/icons/icon-512.png"
+                alt="Icono de la app"
                 width={64}
                 height={64}
                 className="object-cover"
               />
             </div>
             <div className="text-center">
-              <div className="text-xl font-semibold tracking-tight">AGENDO</div>
-              <div className="text-xs text-white/70 mt-1">Cargando tu agenda...</div>
+              <div className="text-xs text-white/80 mt-1">Gestioná tu agenda en un solo lugar.</div>
             </div>
           </div>
         </div>
