@@ -195,8 +195,8 @@ export default function StudentsPage() {
         ) : students.length === 0 ? (
           <p className="text-sm text-gray-600">Todavía no hay alumnos registrados.</p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm border-collapse">
+          <div>
+            <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="border-b bg-gray-50">
                   <th className="text-left py-2 px-3">Alumno</th>

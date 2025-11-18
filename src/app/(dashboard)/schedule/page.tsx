@@ -357,6 +357,21 @@ export default function SchedulePage() {
     });
   }, [classes, courtsMap, filterLocationId, filterCourtId, filterCoachId, filterFrom, filterTo]);
 
+  // Clases recientes (últimas 24h) que ya terminaron, para poder marcar asistencia aunque pasaron los 60 minutos
+  const recentClasses = useMemo(() => {
+    const now = new Date();
+    const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    return classes.filter((cls) => {
+      const startTs = new Date(cls.date).getTime();
+      const endTs = startTs + 60 * 60 * 1000;
+      // ya terminadas
+      if (endTs >= now.getTime()) return false;
+      // solo últimas 24h
+      if (startTs < cutoff.getTime()) return false;
+      return true;
+    });
+  }, [classes]);
+
   // Edit modal state
   const [editing, setEditing] = useState<ClassSession | null>(null);
   const [editCourtId, setEditCourtId] = useState<string>('');
@@ -834,8 +849,9 @@ export default function SchedulePage() {
           <span className="text-xs text-gray-500">{showUpcomingSection ? '▼' : '▲'}</span>
         </button>
         {showUpcomingSection && (
-          <div className="space-y-3 p-4">
-            <h2 className="text-lg font-semibold text-[#31435d]">Próximas clases</h2>
+          <div className="space-y-6 p-4">
+            <div className="space-y-3">
+              <h2 className="text-lg font-semibold text-[#31435d]">Próximas clases</h2>
         <div className="grid gap-3 md:grid-cols-5 p-3 border rounded-lg bg-[#f0f9fb]">
           <div>
             <label className="block text-xs mb-1">Sede</label>
@@ -942,6 +958,58 @@ export default function SchedulePage() {
             })}
           </ul>
         )}
+            </div>
+
+            {recentClasses.length > 0 && (
+              <div className="space-y-3">
+                <h2 className="text-base font-semibold text-[#31435d]">Clases recientes (últimas 24 horas)</h2>
+                <p className="text-xs text-gray-500">
+                  Usá esta lista para marcar asistencia en clases que ya terminaron pero aún son recientes.
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="border-b bg-gray-50 text-xs">
+                        <th className="text-left py-2 px-3">Fecha</th>
+                        <th className="text-left py-2 px-3">Hora</th>
+                        <th className="text-left py-2 px-3">Cancha</th>
+                        <th className="text-left py-2 px-3">Profesor</th>
+                        <th className="text-left py-2 px-3">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recentClasses.map((cls) => {
+                        const d = new Date(cls.date);
+                        const yyyy = d.getFullYear();
+                        const mm = String(d.getMonth() + 1).padStart(2, '0');
+                        const dd = String(d.getDate()).padStart(2, '0');
+                        const hh = String(d.getHours()).padStart(2, '0');
+                        const min = String(d.getMinutes()).padStart(2, '0');
+                        const court = cls.court_id ? courtsMap[cls.court_id] : undefined;
+                        const coach = cls.coach_id ? coachesMap[cls.coach_id] : undefined;
+                        return (
+                          <tr key={cls.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                            <td className="py-1.5 px-3 text-xs">{`${dd}/${mm}/${yyyy}`}</td>
+                            <td className="py-1.5 px-3 text-xs">{`${hh}:${min}`}</td>
+                            <td className="py-1.5 px-3 text-xs">{court?.name ?? '-'}</td>
+                            <td className="py-1.5 px-3 text-xs">{coach?.full_name ?? 'Profesor'}</td>
+                            <td className="py-1.5 px-3 text-xs">
+                              <button
+                                type="button"
+                                className="text-xs px-3 py-1 rounded bg-[#3cadaf] text-white hover:bg-[#31435d]"
+                                onClick={() => openAttendance(cls)}
+                              >
+                                Marcar asistencia
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
