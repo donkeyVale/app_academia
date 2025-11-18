@@ -989,53 +989,47 @@ export default function SchedulePage() {
               <p className="text-xs text-gray-500">
                 Usá esta lista para marcar asistencia en clases que ya terminaron pero aún son recientes.
               </p>
-              <div className="w-full">
-                <table className="w-full table-fixed text-sm border-collapse">
-                  <thead>
-                    <tr className="border-b bg-gray-50 text-xs">
-                      <th className="text-left py-2 px-3">Fecha</th>
-                      <th className="text-left py-2 px-3">Hora</th>
-                      <th className="text-left py-2 px-3">Cancha</th>
-                      <th className="text-left py-2 px-3">Alumno(s)</th>
-                      <th className="text-left py-2 px-3">Acciones</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {recentClasses.map((cls) => {
-                      const d = new Date(cls.date);
-                      const yyyy = d.getFullYear();
-                      const mm = String(d.getMonth() + 1).padStart(2, '0');
-                      const dd = String(d.getDate()).padStart(2, '0');
-                      const hh = String(d.getHours()).padStart(2, '0');
-                      const min = String(d.getMinutes()).padStart(2, '0');
-                      const court = cls.court_id ? courtsMap[cls.court_id] : undefined;
-                      const studentIds = studentsByClass[cls.id] ?? [];
-                      const studentsLabel = studentIds.length === 0
-                        ? '-'
-                        : studentIds.length === 1
-                          ? '1 alumno'
-                          : `${studentIds.length} alumnos`;
-                      return (
-                        <tr key={cls.id} className="border-b last:border-b-0 hover:bg-gray-50">
-                          <td className="py-1.5 px-3 text-xs">{`${dd}/${mm}/${yyyy}`}</td>
-                          <td className="py-1.5 px-3 text-xs">{`${hh}:${min}`}</td>
-                          <td className="py-1.5 px-3 text-xs">{court?.name ?? '-'}</td>
-                          <td className="py-1.5 px-3 text-xs">{studentsLabel}</td>
-                          <td className="py-1.5 px-3 text-xs">
-                            <button
-                              type="button"
-                              className="text-xs px-3 py-1 rounded bg-[#3cadaf] text-white hover:bg-[#31435d]"
-                              onClick={() => openAttendance(cls)}
-                            >
-                              Asistencia
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              <ul className="space-y-3">
+                {recentClasses.map((cls) => {
+                  const d = new Date(cls.date);
+                  const yyyy = d.getFullYear();
+                  const mm = String(d.getMonth() + 1).padStart(2, '0');
+                  const dd = String(d.getDate()).padStart(2, '0');
+                  const hh = String(d.getHours()).padStart(2, '0');
+                  const min = String(d.getMinutes()).padStart(2, '0');
+                  const court = cls.court_id ? courtsMap[cls.court_id] : undefined;
+                  const studentIds = studentsByClass[cls.id] ?? [];
+                  const studentsCountLabel = studentIds.length === 0
+                    ? '-'
+                    : `${studentIds.length}`;
+                  return (
+                    <li key={cls.id} className="border rounded-lg p-3 bg-white shadow-sm text-xs sm:text-sm">
+                      <div className="flex flex-col sm:flex-row justify-between gap-2">
+                        <div className="space-y-0.5">
+                          <div className="font-semibold text-[#31435d]">
+                            {`${dd}/${mm}/${yyyy}`} • {`${hh}:${min}`}
+                          </div>
+                          <div className="text-gray-600">
+                            <span className="font-medium">Cancha:</span> {court?.name ?? '-'}
+                          </div>
+                          <div className="text-gray-600">
+                            <span className="font-medium">Alumnos:</span> {studentsCountLabel}
+                          </div>
+                        </div>
+                        <div className="sm:self-center">
+                          <button
+                            type="button"
+                            className="text-xs px-3 py-1 rounded bg-[#3cadaf] text-white hover:bg-[#31435d]"
+                            onClick={() => openAttendance(cls)}
+                          >
+                            Asistencia
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
           )}
         </div>
