@@ -653,6 +653,7 @@ export default function PlansClient() {
               <ul className="text-sm space-y-2">
                 {studentPlans
                   .filter((sp) => sp.remaining_classes > 0)
+                  .slice(0, 5)
                   .map((sp) => {
                     const studentInfo = students.find((s) => s.id === sp.student_id);
                     const displayName = studentInfo?.full_name ?? studentInfo?.notes ?? studentInfo?.level ?? sp.student_id;
@@ -661,11 +662,15 @@ export default function PlansClient() {
                         <div>
                           <div className="font-medium text-[#31435d]">{displayName}</div>
                           <div className="text-xs text-gray-600">
-                            Plan: {sp.plans?.name ?? sp.plan_id} • Incluye: {sp.plans?.classes_included ?? '?'} clases • Restantes: {sp.remaining_classes}
+                            <span className="font-semibold">Plan:</span> {sp.plans?.name ?? sp.plan_id}
+                            {' • '}
+                            <span className="font-semibold">Incluye:</span> {sp.plans?.classes_included ?? '?'} clases
+                            {' • '}
+                            <span className="font-semibold">Restantes:</span> {sp.remaining_classes}
                           </div>
                         </div>
                         <div className="text-xs text-gray-500">
-                          Asignado: {new Date(sp.purchased_at).toLocaleString()}
+                          <span className="font-semibold">Asignado:</span> {new Date(sp.purchased_at).toLocaleString()}
                         </div>
                       </li>
                     );
