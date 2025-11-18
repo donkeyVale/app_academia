@@ -859,9 +859,9 @@ export default function SchedulePage() {
         </button>
         {showUpcomingSection && (
           <div className="space-y-6 p-4">
-            <div className="space-y-3">
+            <div className="space-y-3 max-w-full">
               <h2 className="text-lg font-semibold text-[#31435d]">Próximas clases</h2>
-        <div className="grid gap-3 md:grid-cols-5 p-3 border rounded-lg bg-[#f0f9fb]">
+        <div className="grid gap-3 md:grid-cols-5 p-3 border rounded-lg bg-[#f0f9fb] max-w-full">
           <div>
             <label className="block text-xs mb-1">Sede</label>
             <select className="border rounded p-2 w-full" value={filterLocationId} onChange={(e) => setFilterLocationId(e.target.value)}>
@@ -903,7 +903,7 @@ export default function SchedulePage() {
         ) : filteredClasses.length === 0 ? (
           <p className="text-sm text-gray-600">No hay clases programadas.</p>
         ) : (
-          <ul className="space-y-3">
+          <ul className="space-y-3 max-w-full">
             {filteredClasses.map((cls) => {
               const court = courtsMap[cls.court_id || ''];
               const location = court ? locationsMap[court.location_id] : undefined;
