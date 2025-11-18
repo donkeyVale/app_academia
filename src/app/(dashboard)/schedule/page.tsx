@@ -406,6 +406,7 @@ export default function SchedulePage() {
   // UI: secciones plegables para reducir scroll
   const [showCreateSection, setShowCreateSection] = useState(true);
   const [showUpcomingSection, setShowUpcomingSection] = useState(false);
+  const [showRecentSection, setShowRecentSection] = useState(false);
 
   // Aplicar filtros iniciales según scope=today|week en la URL (lado cliente)
   useEffect(() => {
@@ -969,70 +970,82 @@ export default function SchedulePage() {
         )}
             </div>
 
-            {recentClasses.length > 0 && (
-              <div className="space-y-3">
-                <h2 className="text-base font-semibold text-[#31435d]">Clases recientes (últimas 24 horas)</h2>
-                <p className="text-xs text-gray-500">
-                  Usá esta lista para marcar asistencia en clases que ya terminaron pero aún son recientes.
-                </p>
-                <div>
-                  <table className="w-full text-sm border-collapse">
-                    <thead>
-                      <tr className="border-b bg-gray-50 text-xs">
-                        <th className="text-left py-2 px-3">Fecha</th>
-                        <th className="text-left py-2 px-3">Hora</th>
-                        <th className="text-left py-2 px-3">Cancha</th>
-                        <th className="text-left py-2 px-3">Alumno(s)</th>
-                        <th className="text-left py-2 px-3">Acciones</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {recentClasses.map((cls) => {
-                        const d = new Date(cls.date);
-                        const yyyy = d.getFullYear();
-                        const mm = String(d.getMonth() + 1).padStart(2, '0');
-                        const dd = String(d.getDate()).padStart(2, '0');
-                        const hh = String(d.getHours()).padStart(2, '0');
-                        const min = String(d.getMinutes()).padStart(2, '0');
-                        const court = cls.court_id ? courtsMap[cls.court_id] : undefined;
-                        const studentIds = studentsByClass[cls.id] ?? [];
-                        const labels = studentIds.map((sid) => {
-                          const stu = studentsMap[sid];
-                          return (
-                            stu?.full_name || stu?.notes || stu?.level || sid
-                          );
-                        });
-                        const studentsLabel = labels.length === 0
-                          ? '-'
-                          : labels.length <= 2
-                            ? labels.join(', ')
-                            : `${labels.slice(0, 2).join(', ')} y ${labels.length - 2} más`;
-                        return (
-                          <tr key={cls.id} className="border-b last:border-b-0 hover:bg-gray-50">
-                            <td className="py-1.5 px-3 text-xs">{`${dd}/${mm}/${yyyy}`}</td>
-                            <td className="py-1.5 px-3 text-xs">{`${hh}:${min}`}</td>
-                            <td className="py-1.5 px-3 text-xs">{court?.name ?? '-'}</td>
-                            <td className="py-1.5 px-3 text-xs">{studentsLabel}</td>
-                            <td className="py-1.5 px-3 text-xs">
-                              <button
-                                type="button"
-                                className="text-xs px-3 py-1 rounded bg-[#3cadaf] text-white hover:bg-[#31435d]"
-                                onClick={() => openAttendance(cls)}
-                              >
-                                Marcar asistencia
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
+
+      {recentClasses.length > 0 && (
+        <div className="border rounded-lg bg-white shadow-sm overflow-x-hidden">
+          <button
+            type="button"
+            className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+            onClick={() => setShowRecentSection((v) => !v)}
+          >
+            <span>Clases recientes (últimas 24 horas)</span>
+            <span className="text-xs text-gray-500">{showRecentSection ? '▼' : '▲'}</span>
+          </button>
+          {showRecentSection && (
+            <div className="space-y-3 p-4">
+              <p className="text-xs text-gray-500">
+                Usá esta lista para marcar asistencia en clases que ya terminaron pero aún son recientes.
+              </p>
+              <div className="overflow-x-auto">
+                <table className="min-w-[600px] text-sm border-collapse">
+                  <thead>
+                    <tr className="border-b bg-gray-50 text-xs">
+                      <th className="text-left py-2 px-3">Fecha</th>
+                      <th className="text-left py-2 px-3">Hora</th>
+                      <th className="text-left py-2 px-3">Cancha</th>
+                      <th className="text-left py-2 px-3">Alumno(s)</th>
+                      <th className="text-left py-2 px-3">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recentClasses.map((cls) => {
+                      const d = new Date(cls.date);
+                      const yyyy = d.getFullYear();
+                      const mm = String(d.getMonth() + 1).padStart(2, '0');
+                      const dd = String(d.getDate()).padStart(2, '0');
+                      const hh = String(d.getHours()).padStart(2, '0');
+                      const min = String(d.getMinutes()).padStart(2, '0');
+                      const court = cls.court_id ? courtsMap[cls.court_id] : undefined;
+                      const studentIds = studentsByClass[cls.id] ?? [];
+                      const labels = studentIds.map((sid) => {
+                        const stu = studentsMap[sid];
+                        return (
+                          stu?.full_name || stu?.notes || stu?.level || sid
+                        );
+                      });
+                      const studentsLabel = labels.length === 0
+                        ? '-'
+                        : labels.length <= 2
+                          ? labels.join(', ')
+                          : `${labels.slice(0, 2).join(', ')} y ${labels.length - 2} más`;
+                      return (
+                        <tr key={cls.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                          <td className="py-1.5 px-3 text-xs">{`${dd}/${mm}/${yyyy}`}</td>
+                          <td className="py-1.5 px-3 text-xs">{`${hh}:${min}`}</td>
+                          <td className="py-1.5 px-3 text-xs">{court?.name ?? '-'}</td>
+                          <td className="py-1.5 px-3 text-xs">{studentsLabel}</td>
+                          <td className="py-1.5 px-3 text-xs">
+                            <button
+                              type="button"
+                              className="text-xs px-3 py-1 rounded bg-[#3cadaf] text-white hover:bg-[#31435d]"
+                              onClick={() => openAttendance(cls)}
+                            >
+                              Marcar asistencia
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {editing && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
