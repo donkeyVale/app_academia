@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { createClientBrowser } from '@/lib/supabase';
 import { logAudit } from '@/lib/audit';
 
@@ -44,7 +43,6 @@ type Student = {
 
 export default function SchedulePage() {
   const supabase = createClientBrowser();
-  const searchParams = useSearchParams();
   const [locations, setLocations] = useState<Location[]>([]);
   const [courts, setCourts] = useState<Court[]>([]);
   const [coaches, setCoaches] = useState<Coach[]>([]);
@@ -385,9 +383,12 @@ export default function SchedulePage() {
   const [showCreateSection, setShowCreateSection] = useState(true);
   const [showUpcomingSection, setShowUpcomingSection] = useState(false);
 
-  // Aplicar filtros iniciales según scope=today|week en la URL
+  // Aplicar filtros iniciales según scope=today|week en la URL (lado cliente)
   useEffect(() => {
-    const scope = searchParams.get('scope');
+    if (typeof window === 'undefined') return;
+
+    const params = new URLSearchParams(window.location.search);
+    const scope = params.get('scope');
     if (!scope) return;
 
     const now = new Date();
@@ -417,7 +418,7 @@ export default function SchedulePage() {
       setFilterTo(toLocalInput(weekEnd));
       setShowUpcomingSection(true);
     }
-  }, [searchParams]);
+  }, []);
 
   // Open edit with prefill
   const openEdit = (cls: ClassSession) => {
