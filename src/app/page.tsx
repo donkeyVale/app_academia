@@ -81,6 +81,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [role, setRole] = useState<'admin' | 'coach' | 'student' | null>(null);
 
   const [activePlansCount, setActivePlansCount] = useState(0);
   const [studentsWithPlanCount, setStudentsWithPlanCount] = useState(0);
@@ -88,6 +89,15 @@ export default function HomePage() {
   const [coachesCount, setCoachesCount] = useState(0);
   const [studentsCount, setStudentsCount] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // métricas específicas para coach
+  const [coachTodayClasses, setCoachTodayClasses] = useState(0);
+  const [coachWeekClasses, setCoachWeekClasses] = useState(0);
+  const [coachActiveStudents, setCoachActiveStudents] = useState(0);
+
+  // métricas específicas para alumno
+  const [studentUpcomingClasses, setStudentUpcomingClasses] = useState(0);
+  const [studentRemainingClasses, setStudentRemainingClasses] = useState<number | null>(null);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -117,6 +127,11 @@ export default function HomePage() {
         } else {
           setIsAdmin(false);
         }
+        if (profile?.role === 'admin' || profile?.role === 'coach' || profile?.role === 'student') {
+          setRole(profile.role as 'admin' | 'coach' | 'student');
+        } else {
+          setRole(null);
+        }
       }
       setUserName(displayName);
 
@@ -130,42 +145,167 @@ export default function HomePage() {
         const end = new Date(today);
         end.setHours(23, 59, 59, 999);
 
-        const [spRes, clsRes, coachRes, studRes] = await Promise.all([
-          supabase
-            .from('student_plans')
-            .select('student_id,plan_id,remaining_classes')
-            .gt('remaining_classes', 0),
-          supabase
-            .from('class_sessions')
-            .select('id', { count: 'exact', head: true })
-            .gte('date', start.toISOString())
-            .lte('date', end.toISOString()),
-          supabase
+        if (role === 'admin' || role === null) {
+          // Dashboard global para admin (y fallback cuando aún no se cargó role)
+          const [spRes, clsRes, coachRes, studRes] = await Promise.all([
+            supabase
+              .from('student_plans')
+              .select('student_id,plan_id,remaining_classes')
+              .gt('remaining_classes', 0),
+            supabase
+              .from('class_sessions')
+              .select('id', { count: 'exact', head: true })
+              .gte('date', start.toISOString())
+              .lte('date', end.toISOString()),
+            supabase
+              .from('coaches')
+              .select('id', { count: 'exact', head: true }),
+            supabase
+              .from('students')
+              .select('id', { count: 'exact', head: true }),
+          ]);
+
+          if (spRes.error) throw spRes.error;
+          if (clsRes.error) throw clsRes.error;
+          if (coachRes.error) throw coachRes.error;
+          if (studRes.error) throw studRes.error;
+
+          const spRows = spRes.data ?? [];
+          const planIds = new Set<string>();
+          const studentIds = new Set<string>();
+          (spRows as any[]).forEach((sp) => {
+            planIds.add(sp.plan_id as string);
+            studentIds.add(sp.student_id as string);
+          });
+
+          setActivePlansCount(planIds.size);
+          setStudentsWithPlanCount(studentIds.size);
+          setTodayClassesCount(clsRes.count ?? 0);
+          setCoachesCount(coachRes.count ?? 0);
+          setStudentsCount(studRes.count ?? 0);
+        } else if (role === 'coach' && userId) {
+          // Dashboard específico para coach
+          // 1) Obtener id de coach vinculado al usuario
+          const { data: coachRow, error: coachRowErr } = await supabase
             .from('coaches')
-            .select('id', { count: 'exact', head: true }),
-          supabase
+            .select('id')
+            .eq('user_id', userId)
+            .maybeSingle();
+          if (coachRowErr) throw coachRowErr;
+          const coachId = coachRow?.id as string | undefined;
+
+          if (!coachId) {
+            setCoachTodayClasses(0);
+            setCoachWeekClasses(0);
+            setCoachActiveStudents(0);
+          } else {
+            // Clases de hoy para este coach
+            const { count: todayCount, error: todayErr } = await supabase
+              .from('class_sessions')
+              .select('id', { count: 'exact', head: true })
+              .eq('coach_id', coachId)
+              .gte('date', start.toISOString())
+              .lte('date', end.toISOString());
+            if (todayErr) throw todayErr;
+            setCoachTodayClasses(todayCount ?? 0);
+
+            // Clases de esta semana (Lunes-Domingo) para este coach
+            const weekStart = new Date(today);
+            const dayOfWeek = weekStart.getDay(); // 0=Domingo
+            const diffToMonday = (dayOfWeek + 6) % 7; // 0->6,1->0,...
+            weekStart.setDate(weekStart.getDate() - diffToMonday);
+            weekStart.setHours(0, 0, 0, 0);
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekEnd.getDate() + 6);
+            weekEnd.setHours(23, 59, 59, 999);
+
+            const { count: weekCount, error: weekErr } = await supabase
+              .from('class_sessions')
+              .select('id', { count: 'exact', head: true })
+              .eq('coach_id', coachId)
+              .gte('date', weekStart.toISOString())
+              .lte('date', weekEnd.toISOString());
+            if (weekErr) throw weekErr;
+            setCoachWeekClasses(weekCount ?? 0);
+
+            // Alumnos activos: alumnos con reservas en clases futuras de este coach
+            const futureFrom = new Date();
+            const futureTo = new Date(futureFrom.getTime() + 14 * 24 * 60 * 60 * 1000);
+            const { data: futureClasses, error: futureErr } = await supabase
+              .from('class_sessions')
+              .select('id,date')
+              .eq('coach_id', coachId)
+              .gte('date', futureFrom.toISOString())
+              .lte('date', futureTo.toISOString());
+            if (futureErr) throw futureErr;
+
+            const classIds = (futureClasses ?? []).map((c) => c.id as string);
+            if (!classIds.length) {
+              setCoachActiveStudents(0);
+            } else {
+              const { data: bookingsData, error: bookingsErr } = await supabase
+                .from('bookings')
+                .select('student_id,class_id')
+                .in('class_id', classIds);
+              if (bookingsErr) throw bookingsErr;
+              const studentSet = new Set<string>();
+              (bookingsData ?? []).forEach((b: any) => {
+                studentSet.add(b.student_id as string);
+              });
+              setCoachActiveStudents(studentSet.size);
+            }
+          }
+        } else if (role === 'student' && userId) {
+          // Dashboard específico para alumno
+          // 1) Obtener id de student vinculado al usuario
+          const { data: studentRow, error: studentRowErr } = await supabase
             .from('students')
-            .select('id', { count: 'exact', head: true }),
-        ]);
+            .select('id')
+            .eq('user_id', userId)
+            .maybeSingle();
+          if (studentRowErr) throw studentRowErr;
+          const studentId = studentRow?.id as string | undefined;
 
-        if (spRes.error) throw spRes.error;
-        if (clsRes.error) throw clsRes.error;
-        if (coachRes.error) throw coachRes.error;
-        if (studRes.error) throw studRes.error;
+          if (!studentId) {
+            setStudentUpcomingClasses(0);
+            setStudentRemainingClasses(null);
+          } else {
+            // Próximas clases: reservas futuras de este alumno
+            const nowIso = new Date().toISOString();
+            const { data: upcomingData, error: upcomingErr } = await supabase
+              .from('bookings')
+              .select('class_id,class_sessions!inner(id,date)')
+              .eq('student_id', studentId)
+              .gte('class_sessions.date', nowIso);
+            if (upcomingErr) throw upcomingErr;
+            setStudentUpcomingClasses((upcomingData ?? []).length);
 
-        const spRows = spRes.data ?? [];
-        const planIds = new Set<string>();
-        const studentIds = new Set<string>();
-        (spRows as any[]).forEach((sp) => {
-          planIds.add(sp.plan_id as string);
-          studentIds.add(sp.student_id as string);
-        });
+            // Clases restantes del plan actual (último plan asignado)
+            const { data: spData, error: spErr } = await supabase
+              .from('student_plans')
+              .select('id, remaining_classes, purchased_at, plans(name,classes_included)')
+              .eq('student_id', studentId)
+              .order('purchased_at', { ascending: false })
+              .limit(1);
+            if (spErr) throw spErr;
 
-        setActivePlansCount(planIds.size);
-        setStudentsWithPlanCount(studentIds.size);
-        setTodayClassesCount(clsRes.count ?? 0);
-        setCoachesCount(coachRes.count ?? 0);
-        setStudentsCount(studRes.count ?? 0);
+            if (!spData || spData.length === 0) {
+              setStudentRemainingClasses(null);
+            } else {
+              const planRow = spData[0] as any;
+              const { data: usagesData, error: usagesErr } = await supabase
+                .from('plan_usages')
+                .select('id')
+                .eq('student_plan_id', planRow.id)
+                .eq('student_id', studentId);
+              if (usagesErr) throw usagesErr;
+              const used = (usagesData ?? []).length;
+              const total = planRow.remaining_classes as number;
+              const remaining = Math.max(0, total - used);
+              setStudentRemainingClasses(remaining);
+            }
+          }
+        }
       } catch (err: any) {
         if (!active) return;
         setError(err.message || 'Error cargando métricas');
@@ -175,7 +315,7 @@ export default function HomePage() {
       }
     })();
     return () => { active = false; };
-  }, [supabase]);
+  }, [supabase, role]);
 
   return (
     <section className="space-y-6 max-w-5xl mx-auto px-4 py-6">
@@ -254,48 +394,112 @@ export default function HomePage() {
         </nav>
       )}
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#3cadaf]">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
-              <IconMoney />
+      {(!role || role === 'admin') && (
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#3cadaf]">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
+                <IconMoney />
+              </div>
+              <p className="text-xs uppercase text-gray-500">Planes activos</p>
             </div>
-            <p className="text-xs uppercase text-gray-500">Planes activos</p>
+            <p className="text-2xl font-semibold">{loading ? '...' : activePlansCount}</p>
+            <p className="text-xs text-gray-500 mt-1">Planes con al menos un alumno con clases disponibles</p>
           </div>
-          <p className="text-2xl font-semibold">{loading ? '...' : activePlansCount}</p>
-          <p className="text-xs text-gray-500 mt-1">Planes con al menos un alumno con clases disponibles</p>
-        </div>
-        <div className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#22c55e]">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
-              <IconStudents />
+          <div className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#22c55e]">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
+                <IconStudents />
+              </div>
+              <p className="text-xs uppercase text-gray-500">Alumnos con plan</p>
             </div>
-            <p className="text-xs uppercase text-gray-500">Alumnos con plan</p>
+            <p className="text-2xl font-semibold">{loading ? '...' : studentsWithPlanCount}</p>
+            <p className="text-xs text-gray-500 mt-1">Alumnos que aún tienen clases en algún plan</p>
           </div>
-          <p className="text-2xl font-semibold">{loading ? '...' : studentsWithPlanCount}</p>
-          <p className="text-xs text-gray-500 mt-1">Alumnos que aún tienen clases en algún plan</p>
-        </div>
-        <div className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#3b82f6]">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
-              <IconCalendar />
+          <div className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#3b82f6]">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
+                <IconCalendar />
+              </div>
+              <p className="text-xs uppercase text-gray-500">Clases de hoy</p>
             </div>
-            <p className="text-xs uppercase text-gray-500">Clases de hoy</p>
+            <p className="text-2xl font-semibold">{loading ? '...' : todayClassesCount}</p>
+            <p className="text-xs text-gray-500 mt-1">Clases programadas para el día de hoy</p>
           </div>
-          <p className="text-2xl font-semibold">{loading ? '...' : todayClassesCount}</p>
-          <p className="text-xs text-gray-500 mt-1">Clases programadas para el día de hoy</p>
-        </div>
-        <div className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#f97316]">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
-              <IconUsers />
+          <div className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#f97316]">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
+                <IconUsers />
+              </div>
+              <p className="text-xs uppercase text-gray-500">Profesores / Alumnos</p>
             </div>
-            <p className="text-xs uppercase text-gray-500">Profesores / Alumnos</p>
+            <p className="text-2xl font-semibold">{loading ? '...' : `${coachesCount} / ${studentsCount}`}</p>
+            <p className="text-xs text-gray-500 mt-1">Total de profesores y alumnos en la academia</p>
           </div>
-          <p className="text-2xl font-semibold">{loading ? '...' : `${coachesCount} / ${studentsCount}`}</p>
-          <p className="text-xs text-gray-500 mt-1">Total de profesores y alumnos en la academia</p>
         </div>
-      </div>
+      )}
+
+      {role === 'coach' && (
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#3b82f6]">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
+                <IconCalendar />
+              </div>
+              <p className="text-xs uppercase text-gray-500">Clases de hoy</p>
+            </div>
+            <p className="text-2xl font-semibold">{loading ? '...' : coachTodayClasses}</p>
+            <p className="text-xs text-gray-500 mt-1">Clases donde sos profesor en el día de hoy</p>
+          </div>
+          <div className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#22c55e]">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
+                <IconCalendar />
+              </div>
+              <p className="text-xs uppercase text-gray-500">Clases esta semana</p>
+            </div>
+            <p className="text-2xl font-semibold">{loading ? '...' : coachWeekClasses}</p>
+            <p className="text-xs text-gray-500 mt-1">Total de clases asignadas esta semana</p>
+          </div>
+          <div className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#3cadaf]">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
+                <IconStudents />
+              </div>
+              <p className="text-xs uppercase text-gray-500">Alumnos activos</p>
+            </div>
+            <p className="text-2xl font-semibold">{loading ? '...' : coachActiveStudents}</p>
+            <p className="text-xs text-gray-500 mt-1">Alumnos con clases futuras reservadas con vos</p>
+          </div>
+        </div>
+      )}
+
+      {role === 'student' && (
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+          <div className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#3b82f6]">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
+                <IconCalendar />
+              </div>
+              <p className="text-xs uppercase text-gray-500">Próximas clases</p>
+            </div>
+            <p className="text-2xl font-semibold">{loading ? '...' : studentUpcomingClasses}</p>
+            <p className="text-xs text-gray-500 mt-1">Clases futuras en las que estás reservado</p>
+          </div>
+          <div className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#3cadaf]">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
+                <IconMoney />
+              </div>
+              <p className="text-xs uppercase text-gray-500">Clases restantes del plan</p>
+            </div>
+            <p className="text-2xl font-semibold">
+              {loading ? '...' : studentRemainingClasses === null ? '-' : studentRemainingClasses}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">Clases que aún tenés disponibles en tu plan actual</p>
+          </div>
+        </div>
+      )}
 
       <div className="border rounded-lg p-4 bg-[#f0f9fb] text-sm space-y-3 shadow-sm border border-[#3cadaf]/20">
         <h2 className="text-base font-semibold mb-1">¿Cómo instalar esta app en tu celular?</h2>
