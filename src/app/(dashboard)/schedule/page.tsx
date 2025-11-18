@@ -1010,17 +1010,11 @@ export default function SchedulePage() {
                       const min = String(d.getMinutes()).padStart(2, '0');
                       const court = cls.court_id ? courtsMap[cls.court_id] : undefined;
                       const studentIds = studentsByClass[cls.id] ?? [];
-                      const labels = studentIds.map((sid) => {
-                        const stu = studentsMap[sid];
-                        return (
-                          stu?.full_name || stu?.notes || stu?.level || sid
-                        );
-                      });
-                      const studentsLabel = labels.length === 0
+                      const studentsLabel = studentIds.length === 0
                         ? '-'
-                        : labels.length <= 2
-                          ? labels.join(', ')
-                          : `${labels.slice(0, 2).join(', ')} y ${labels.length - 2} más`;
+                        : studentIds.length === 1
+                          ? '1 alumno'
+                          : `${studentIds.length} alumnos`;
                       return (
                         <tr key={cls.id} className="border-b last:border-b-0 hover:bg-gray-50">
                           <td className="py-1.5 px-3 text-xs">{`${dd}/${mm}/${yyyy}`}</td>
@@ -1033,7 +1027,7 @@ export default function SchedulePage() {
                               className="text-xs px-3 py-1 rounded bg-[#3cadaf] text-white hover:bg-[#31435d]"
                               onClick={() => openAttendance(cls)}
                             >
-                              Marcar asistencia
+                              Asistencia
                             </button>
                           </td>
                         </tr>
