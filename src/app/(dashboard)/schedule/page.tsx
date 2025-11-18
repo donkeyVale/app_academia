@@ -910,9 +910,9 @@ export default function SchedulePage() {
               const coach = coachesMap[cls.coach_id || ''];
               const alumnos = bookingsCount[cls.id] ?? 0;
               return (
-                <li key={cls.id} className="text-sm border rounded-lg p-3 bg-white shadow-sm">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-1">
+                <li key={cls.id} className="text-sm border rounded-lg p-3 bg-white shadow-sm max-w-full overflow-hidden">
+                  <div className="flex flex-col sm:flex-row items-start justify-between gap-3 max-w-full">
+                    <div className="space-y-1 min-w-0">
                       <div className="font-semibold text-[#31435d]">
                         {new Date(cls.date).toLocaleString()}
                       </div>
@@ -922,7 +922,7 @@ export default function SchedulePage() {
                         <p><span className="font-medium">Tipo:</span> {cls.type} • <span className="font-medium">Alumnos/Cupo:</span> {alumnos}/{cls.capacity}</p>
                       </div>
                     </div>
-                    <div className="shrink-0 flex flex-col sm:flex-row gap-2 items-end sm:items-center">
+                    <div className="shrink-0 flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full sm:w-auto">
                       <button
                         className="text-xs px-3 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50"
                         onClick={async () => {
