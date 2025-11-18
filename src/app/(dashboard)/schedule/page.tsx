@@ -915,12 +915,12 @@ export default function SchedulePage() {
                   <div className="flex flex-col sm:flex-row items-start justify-between gap-3 max-w-full">
                     <div className="space-y-1 min-w-0">
                       <div className="font-semibold text-[#31435d]">
-                        {new Date(cls.date).toLocaleString()}
+                        <span className="font-bold">Fecha y hora:</span> {new Date(cls.date).toLocaleString()}
                       </div>
                       <div className="text-xs text-gray-600 space-y-0.5">
-                        <p><span className="font-medium">Sede:</span> {location?.name ?? '-'}</p>
-                        <p><span className="font-medium">Cancha:</span> {court?.name ?? '-'} • <span className="font-medium">Profesor:</span> {coach?.full_name ?? 'Coach'}</p>
-                        <p><span className="font-medium">Tipo:</span> {cls.type} • <span className="font-medium">Alumnos/Cupo:</span> {alumnos}/{cls.capacity}</p>
+                        <p><span className="font-bold">Sede:</span> {location?.name ?? '-'}</p>
+                        <p><span className="font-bold">Cancha:</span> {court?.name ?? '-'} • <span className="font-bold">Profesor:</span> {coach?.full_name ?? 'Coach'}</p>
+                        <p><span className="font-bold">Tipo:</span> {cls.type} • <span className="font-bold">Alumnos/Cupo:</span> {alumnos}/{cls.capacity}</p>
                       </div>
                     </div>
                     <div className="shrink-0 flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full sm:w-auto">
@@ -1007,13 +1007,13 @@ export default function SchedulePage() {
                       <div className="flex flex-col sm:flex-row justify-between gap-2">
                         <div className="space-y-0.5">
                           <div className="font-semibold text-[#31435d]">
-                            {`${dd}/${mm}/${yyyy}`} • {`${hh}:${min}`}
+                            <span className="font-bold">Fecha y hora:</span> {`${dd}/${mm}/${yyyy}`} • {`${hh}:${min}`}
                           </div>
                           <div className="text-gray-600">
-                            <span className="font-medium">Cancha:</span> {court?.name ?? '-'}
+                            <span className="font-bold">Cancha:</span> {court?.name ?? '-'}
                           </div>
                           <div className="text-gray-600">
-                            <span className="font-medium">Alumnos:</span> {studentsCountLabel}
+                            <span className="font-bold">Alumnos:</span> {studentsCountLabel}
                           </div>
                         </div>
                         <div className="sm:self-center">
