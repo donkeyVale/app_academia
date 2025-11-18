@@ -19,12 +19,12 @@ export const metadata: Metadata = {
   openGraph: {
     title: "AGENDO",
     description: "Gestión de agenda, alumnos, planes y finanzas para tu academia de pádel.",
-    url: process.env.NEXT_PUBLIC_BASE_URL ?? "https://app_academia.nativatech.com.py",
+    url: process.env.NEXT_PUBLIC_BASE_URL ?? "https://agendo.nativatech.com.py",
     siteName: "Academia Padel",
     images: [
       {
         url:
-          (process.env.NEXT_PUBLIC_BASE_URL ?? "https://app_academia.nativatech.com.py") +
+          (process.env.NEXT_PUBLIC_BASE_URL ?? "https://agendo.nativatech.com.py") +
           "/icons/logoAgendo.jpg",
         width: 512,
         height: 512,
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     title: "AGENDO",
     description: "Gestión de agenda, alumnos, planes y finanzas para tu academia de pádel.",
     images: [
-      (process.env.NEXT_PUBLIC_BASE_URL ?? "https://app_academia.nativatech.com.py") +
+      (process.env.NEXT_PUBLIC_BASE_URL ?? "https://agendo.nativatech.com.py") +
         "/icons/logoAgendo.jpg",
     ],
   },
