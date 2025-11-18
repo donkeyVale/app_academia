@@ -1,6 +1,7 @@
 "use client";
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { createClientBrowser } from '@/lib/supabase';
 
 const iconColor = "#3cadaf";
@@ -77,6 +78,7 @@ const IconUsers = (props: React.SVGProps<SVGSVGElement>) => (
 
 export default function HomePage() {
   const supabase = createClientBrowser();
+  const router = useRouter();
   const [userName, setUserName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -396,7 +398,10 @@ export default function HomePage() {
 
       {(!role || role === 'admin') && (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#3cadaf]">
+          <div
+            className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#3cadaf] cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => router.push('/students')}
+          >
             <div className="flex items-center gap-2 mb-1">
               <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
                 <IconMoney />
@@ -441,7 +446,10 @@ export default function HomePage() {
 
       {role === 'coach' && (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-          <div className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#3b82f6]">
+          <div
+            className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#3b82f6] cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => router.push('/schedule?scope=today')}
+          >
             <div className="flex items-center gap-2 mb-1">
               <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
                 <IconCalendar />
@@ -451,7 +459,10 @@ export default function HomePage() {
             <p className="text-2xl font-semibold">{loading ? '...' : coachTodayClasses}</p>
             <p className="text-xs text-gray-500 mt-1">Clases donde sos profesor en el día de hoy</p>
           </div>
-          <div className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#22c55e]">
+          <div
+            className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#22c55e] cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => router.push('/schedule?scope=week')}
+          >
             <div className="flex items-center gap-2 mb-1">
               <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
                 <IconCalendar />
@@ -461,7 +472,10 @@ export default function HomePage() {
             <p className="text-2xl font-semibold">{loading ? '...' : coachWeekClasses}</p>
             <p className="text-xs text-gray-500 mt-1">Total de clases asignadas esta semana</p>
           </div>
-          <div className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#3cadaf]">
+          <div
+            className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#3cadaf] cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => router.push('/students')}
+          >
             <div className="flex items-center gap-2 mb-1">
               <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
                 <IconStudents />
@@ -476,7 +490,10 @@ export default function HomePage() {
 
       {role === 'student' && (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
-          <div className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#3b82f6]">
+          <div
+            className="border rounded-lg p-4 bg-white shadow-sm border-t-4 border-[#3b82f6] cursor-pointer hover:shadow-md transition-shadow"
+            onClick={() => router.push('/schedule')}
+          >
             <div className="flex items-center gap-2 mb-1">
               <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
                 <IconCalendar />

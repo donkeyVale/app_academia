@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { createClientBrowser } from '@/lib/supabase';
 import { logAudit } from '@/lib/audit';
 
@@ -43,6 +44,7 @@ type Student = {
 
 export default function SchedulePage() {
   const supabase = createClientBrowser();
+  const searchParams = useSearchParams();
   const [locations, setLocations] = useState<Location[]>([]);
   const [courts, setCourts] = useState<Court[]>([]);
   const [coaches, setCoaches] = useState<Coach[]>([]);
@@ -382,6 +384,40 @@ export default function SchedulePage() {
   // UI: secciones plegables para reducir scroll
   const [showCreateSection, setShowCreateSection] = useState(true);
   const [showUpcomingSection, setShowUpcomingSection] = useState(false);
+
+  // Aplicar filtros iniciales según scope=today|week en la URL
+  useEffect(() => {
+    const scope = searchParams.get('scope');
+    if (!scope) return;
+
+    const now = new Date();
+
+    if (scope === 'today') {
+      const start = new Date(now);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(now);
+      end.setHours(23, 59, 59, 999);
+
+      const toLocalInput = (d: Date) => d.toISOString().slice(0, 16);
+      setFilterFrom(toLocalInput(start));
+      setFilterTo(toLocalInput(end));
+      setShowUpcomingSection(true);
+    } else if (scope === 'week') {
+      const weekStart = new Date(now);
+      const dayOfWeek = weekStart.getDay(); // 0=Domingo
+      const diffToMonday = (dayOfWeek + 6) % 7; // lunes como inicio
+      weekStart.setDate(weekStart.getDate() - diffToMonday);
+      weekStart.setHours(0, 0, 0, 0);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+
+      const toLocalInput = (d: Date) => d.toISOString().slice(0, 16);
+      setFilterFrom(toLocalInput(weekStart));
+      setFilterTo(toLocalInput(weekEnd));
+      setShowUpcomingSection(true);
+    }
+  }, [searchParams]);
 
   // Open edit with prefill
   const openEdit = (cls: ClassSession) => {
