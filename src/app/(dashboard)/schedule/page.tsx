@@ -49,6 +49,7 @@ export default function SchedulePage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<ClassSession[]>([]);
   const [bookingsCount, setBookingsCount] = useState<Record<string, number>>({});
+  const [studentsByClass, setStudentsByClass] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -168,22 +169,29 @@ export default function SchedulePage() {
         .limit(100);
       if (e3) setError(e3.message);
       setClasses(clsData ?? []);
-      // Fetch bookings for these classes to compute alumnos count
+      // Fetch bookings for these classes to compute alumnos count y mapear alumnos por clase
       if ((clsData ?? []).length) {
         const classIds = (clsData ?? []).map((c) => c.id);
         const { data: bData, error: bErr } = await supabase
           .from('bookings')
-          .select('id,class_id')
+          .select('id,class_id,student_id')
           .in('class_id', classIds);
         if (!bErr) {
           const map: Record<string, number> = {};
+          const byClass: Record<string, string[]> = {};
           (bData ?? []).forEach((b: any) => {
-            map[b.class_id] = (map[b.class_id] || 0) + 1;
+            const cid = b.class_id as string;
+            const sid = b.student_id as string;
+            map[cid] = (map[cid] || 0) + 1;
+            if (!byClass[cid]) byClass[cid] = [];
+            if (sid) byClass[cid].push(sid);
           });
           setBookingsCount(map);
+          setStudentsByClass(byClass);
         }
       } else {
         setBookingsCount({});
+        setStudentsByClass({});
       }
       setLoading(false);
     })();
@@ -332,6 +340,7 @@ export default function SchedulePage() {
   const locationsMap = useMemo(() => Object.fromEntries(locations.map((x) => [x.id, x] as const)), [locations]);
   const courtsMap = useMemo(() => Object.fromEntries(courts.map((x) => [x.id, x] as const)), [courts]);
   const coachesMap = useMemo(() => Object.fromEntries(coaches.map((x) => [x.id, x] as const)), [coaches]);
+  const studentsMap = useMemo(() => Object.fromEntries(students.map((x) => [x.id, x] as const)), [students]);
   const filteredClasses = useMemo(() => {
     const now = new Date();
     return classes.filter((cls) => {
@@ -729,7 +738,7 @@ export default function SchedulePage() {
   };
 
   return (
-    <section className="space-y-6 max-w-5xl mx-auto px-4 py-6">
+    <section className="space-y-6 max-w-5xl mx-auto px-4 py-6 overflow-x-hidden">
       <div className="flex items-center gap-2">
         <IconCalendar />
         <h1 className="text-2xl font-semibold text-[#31435d]">Agenda</h1>
@@ -986,13 +995,24 @@ export default function SchedulePage() {
                         const hh = String(d.getHours()).padStart(2, '0');
                         const min = String(d.getMinutes()).padStart(2, '0');
                         const court = cls.court_id ? courtsMap[cls.court_id] : undefined;
-                        const studentsCount = bookingsCount[cls.id] ?? 0;
+                        const studentIds = studentsByClass[cls.id] ?? [];
+                        const labels = studentIds.map((sid) => {
+                          const stu = studentsMap[sid];
+                          return (
+                            stu?.full_name || stu?.notes || stu?.level || sid
+                          );
+                        });
+                        const studentsLabel = labels.length === 0
+                          ? '-'
+                          : labels.length <= 2
+                            ? labels.join(', ')
+                            : `${labels.slice(0, 2).join(', ')} y ${labels.length - 2} más`;
                         return (
                           <tr key={cls.id} className="border-b last:border-b-0 hover:bg-gray-50">
                             <td className="py-1.5 px-3 text-xs">{`${dd}/${mm}/${yyyy}`}</td>
                             <td className="py-1.5 px-3 text-xs">{`${hh}:${min}`}</td>
                             <td className="py-1.5 px-3 text-xs">{court?.name ?? '-'}</td>
-                            <td className="py-1.5 px-3 text-xs">{studentsCount ? `${studentsCount} alumno(s)` : '-'}</td>
+                            <td className="py-1.5 px-3 text-xs">{studentsLabel}</td>
                             <td className="py-1.5 px-3 text-xs">
                               <button
                                 type="button"

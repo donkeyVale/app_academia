@@ -218,7 +218,7 @@ export default function StudentsPage() {
                     <tr key={s.id} className="border-b last:border-b-0 hover:bg-gray-50">
                       <td className="py-2 px-3">{displayName}</td>
                       <td className="py-2 px-3">{planName}</td>
-                      <td className="py-2 px-3">{remaining !== null ? remaining : '-'}</td>
+                      <td className="py-2 px-3 text-center">{remaining !== null ? remaining : '-'}</td>
                     </tr>
                   );
                 })}
