@@ -870,7 +870,7 @@ export default function SchedulePage() {
             <div className="space-y-3 max-w-full">
               <h2 className="text-lg font-semibold text-[#31435d]">Próximas clases</h2>
         <div className="space-y-2 p-3 border rounded-lg bg-[#f0f9fb] max-w-full w-full overflow-hidden">
-          <div className="grid gap-2 md:grid-cols-5 items-end">
+          <div className="grid gap-2 md:grid-cols-5 items-end w-full max-w-full">
             <div>
               <label className="block text-xs mb-1 font-semibold">Filtrar por</label>
               <select
@@ -1012,7 +1012,7 @@ export default function SchedulePage() {
                     </button>
                   </div>
                 </div>
-                <div>
+                <div className="min-w-0 w-full">
                   <label className="block text-xs mb-1">Desde</label>
                   <input
                     type="datetime-local"
@@ -1021,7 +1021,7 @@ export default function SchedulePage() {
                     onChange={(e) => setFilterFrom(e.target.value)}
                   />
                 </div>
-                <div>
+                <div className="min-w-0 w-full">
                   <label className="block text-xs mb-1">Hasta</label>
                   <input
                     type="datetime-local"
