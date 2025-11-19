@@ -91,6 +91,33 @@ export default function LoginPage() {
             Si no tenés acceso, solicitá un usuario a tu administrador.
           </p>
         </form>
+
+        <div className="mt-6 text-[11px] text-white/80 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span>Diseñado por</span>
+            <div className="h-6 w-auto flex items-center">
+              <Image
+                src="/icons/AlvicLogo.png"
+                alt="Alvic"
+                width={72}
+                height={24}
+                className="h-6 w-auto object-contain"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span>Desarrollado por</span>
+            <div className="h-6 w-auto flex items-center">
+              <Image
+                src="/icons/NativaLogo.png"
+                alt="Nativa"
+                width={72}
+                height={24}
+                className="h-6 w-auto object-contain"
+              />
+            </div>
+          </div>
+        </div>
       </div>
     </main>
   );
