@@ -71,8 +71,10 @@ export default function SchedulePage() {
   const [filterLocationId, setFilterLocationId] = useState<string>('');
   const [filterCourtId, setFilterCourtId] = useState<string>('');
   const [filterCoachId, setFilterCoachId] = useState<string>('');
+  const [filterStudentId, setFilterStudentId] = useState<string>('');
   const [filterFrom, setFilterFrom] = useState<string>('');
   const [filterTo, setFilterTo] = useState<string>('');
+  const [filterMode, setFilterMode] = useState<'none' | 'sede' | 'profesor' | 'alumno' | 'fecha'>('none');
 
   useEffect(() => {
     (async () => {
@@ -354,6 +356,10 @@ export default function SchedulePage() {
       }
       if (filterCourtId && cls.court_id !== filterCourtId) return false;
       if (filterCoachId && cls.coach_id !== filterCoachId) return false;
+      if (filterStudentId) {
+        const studentsForClass = studentsByClass[cls.id] ?? [];
+        if (!studentsForClass.includes(filterStudentId)) return false;
+      }
       if (filterFrom) {
         const fromTs = new Date(filterFrom).getTime();
         if (new Date(cls.date).getTime() < fromTs) return false;
@@ -407,6 +413,7 @@ export default function SchedulePage() {
   const [showCreateSection, setShowCreateSection] = useState(true);
   const [showUpcomingSection, setShowUpcomingSection] = useState(false);
   const [showRecentSection, setShowRecentSection] = useState(false);
+  const [showAllUpcoming, setShowAllUpcoming] = useState(false);
 
   // Aplicar filtros iniciales según scope=today|week en la URL (lado cliente)
   useEffect(() => {
@@ -862,41 +869,169 @@ export default function SchedulePage() {
           <div className="space-y-6 p-4">
             <div className="space-y-3 max-w-full">
               <h2 className="text-lg font-semibold text-[#31435d]">Próximas clases</h2>
-        <div className="grid gap-3 md:grid-cols-5 p-3 border rounded-lg bg-[#f0f9fb] max-w-full">
-          <div>
-            <label className="block text-xs mb-1">Sede</label>
-            <select className="border rounded p-2 w-full" value={filterLocationId} onChange={(e) => setFilterLocationId(e.target.value)}>
-              <option value="">Todas</option>
-              {locations.map((l) => (
-                <option key={l.id} value={l.id}>{l.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs mb-1">Cancha</label>
-            <select className="border rounded p-2 w-full" value={filterCourtId} onChange={(e) => setFilterCourtId(e.target.value)}>
-              <option value="">Todas</option>
-              {courts.filter((c) => !filterLocationId || c.location_id === filterLocationId).map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs mb-1">Profesor</label>
-            <select className="border rounded p-2 w-full" value={filterCoachId} onChange={(e) => setFilterCoachId(e.target.value)}>
-              <option value="">Todos</option>
-              {coaches.map((c) => (
-                <option key={c.id} value={c.id}>{c.full_name ?? 'Coach'}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs mb-1">Desde</label>
-            <input type="datetime-local" className="border rounded p-2 w-full" value={filterFrom} onChange={(e) => setFilterFrom(e.target.value)} />
-          </div>
-          <div>
-            <label className="block text-xs mb-1">Hasta</label>
-            <input type="datetime-local" className="border rounded p-2 w-full" value={filterTo} onChange={(e) => setFilterTo(e.target.value)} />
+        <div className="space-y-2 p-3 border rounded-lg bg-[#f0f9fb] max-w-full">
+          <div className="grid gap-2 md:grid-cols-5 items-end">
+            <div>
+              <label className="block text-xs mb-1 font-semibold">Filtrar por</label>
+              <select
+                className="border rounded p-2 w-full text-xs"
+                value={filterMode}
+                onChange={(e) => {
+                  const mode = e.target.value as typeof filterMode;
+                  setFilterMode(mode);
+                  // Al cambiar de modo, limpiamos filtros específicos
+                  setFilterLocationId('');
+                  setFilterCourtId('');
+                  setFilterCoachId('');
+                  setFilterStudentId('');
+                  setFilterFrom('');
+                  setFilterTo('');
+                }}
+              >
+                <option value="none">Sin filtro</option>
+                <option value="sede">Sede / Cancha</option>
+                <option value="profesor">Profesor</option>
+                <option value="alumno">Alumno</option>
+                <option value="fecha">Fecha</option>
+              </select>
+            </div>
+            {filterMode === 'sede' && (
+              <>
+                <div>
+                  <label className="block text-xs mb-1">Sede</label>
+                  <select
+                    className="border rounded p-2 w-full text-xs"
+                    value={filterLocationId}
+                    onChange={(e) => {
+                      setFilterLocationId(e.target.value);
+                      setFilterCourtId('');
+                    }}
+                  >
+                    <option value="">Todas</option>
+                    {locations.map((l) => (
+                      <option key={l.id} value={l.id}>{l.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs mb-1">Cancha</label>
+                  <select
+                    className="border rounded p-2 w-full text-xs"
+                    value={filterCourtId}
+                    onChange={(e) => setFilterCourtId(e.target.value)}
+                  >
+                    <option value="">Todas</option>
+                    {courts
+                      .filter((c) => !filterLocationId || c.location_id === filterLocationId)
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                  </select>
+                </div>
+              </>
+            )}
+            {filterMode === 'profesor' && (
+              <div>
+                <label className="block text-xs mb-1">Profesor</label>
+                <select
+                  className="border rounded p-2 w-full text-xs"
+                  value={filterCoachId}
+                  onChange={(e) => setFilterCoachId(e.target.value)}
+                >
+                  <option value="">Todos</option>
+                  {coaches.map((c) => (
+                    <option key={c.id} value={c.id}>{c.full_name ?? 'Coach'}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {filterMode === 'alumno' && (
+              <div>
+                <label className="block text-xs mb-1">Alumno</label>
+                <select
+                  className="border rounded p-2 w-full text-xs"
+                  value={filterStudentId}
+                  onChange={(e) => setFilterStudentId(e.target.value)}
+                >
+                  <option value="">Todos</option>
+                  {students.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.full_name ?? s.notes ?? s.level ?? s.id}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {filterMode === 'fecha' && (
+              <>
+                <div className="flex flex-col gap-1">
+                  <label className="block text-xs mb-1">Rápido</label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="px-2 py-1 text-xs rounded border border-[#3cadaf] text-[#3cadaf] hover:bg-[#e6f5f6]"
+                      onClick={() => {
+                        const now = new Date();
+                        const start = new Date(now);
+                        start.setHours(0, 0, 0, 0);
+                        const end = new Date(now);
+                        end.setHours(23, 59, 59, 999);
+                        const toLocalInput = (d: Date) => d.toISOString().slice(0, 16);
+                        setFilterFrom(toLocalInput(start));
+                        setFilterTo(toLocalInput(end));
+                      }}
+                    >
+                      Hoy
+                    </button>
+                    <button
+                      type="button"
+                      className="px-2 py-1 text-xs rounded border border-[#3cadaf] text-[#3cadaf] hover:bg-[#e6f5f6]"
+                      onClick={() => {
+                        const now = new Date();
+                        const start = new Date(now);
+                        start.setHours(0, 0, 0, 0);
+                        const end = new Date(now);
+                        end.setDate(end.getDate() + 7);
+                        end.setHours(23, 59, 59, 999);
+                        const toLocalInput = (d: Date) => d.toISOString().slice(0, 16);
+                        setFilterFrom(toLocalInput(start));
+                        setFilterTo(toLocalInput(end));
+                      }}
+                    >
+                      Próximos 7 días
+                    </button>
+                    <button
+                      type="button"
+                      className="px-2 py-1 text-xs rounded border border-gray-300 text-gray-600 hover:bg-gray-50"
+                      onClick={() => {
+                        setFilterFrom('');
+                        setFilterTo('');
+                      }}
+                    >
+                      Quitar rango
+                    </button>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs mb-1">Desde</label>
+                  <input
+                    type="datetime-local"
+                    className="border rounded p-2 w-full text-xs"
+                    value={filterFrom}
+                    onChange={(e) => setFilterFrom(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs mb-1">Hasta</label>
+                  <input
+                    type="datetime-local"
+                    className="border rounded p-2 w-full text-xs"
+                    value={filterTo}
+                    onChange={(e) => setFilterTo(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
           </div>
         </div>
         {loading ? (
@@ -904,8 +1039,9 @@ export default function SchedulePage() {
         ) : filteredClasses.length === 0 ? (
           <p className="text-sm text-gray-600">No hay clases programadas.</p>
         ) : (
+          <>
           <ul className="space-y-3 max-w-full">
-            {filteredClasses.map((cls) => {
+            {(showAllUpcoming ? filteredClasses : filteredClasses.slice(0, 5)).map((cls) => {
               const court = courtsMap[cls.court_id || ''];
               const location = court ? locationsMap[court.location_id] : undefined;
               const coach = coachesMap[cls.coach_id || ''];
@@ -967,6 +1103,21 @@ export default function SchedulePage() {
               );
             })}
           </ul>
+          {filteredClasses.length > 5 && (
+            <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+              {!showAllUpcoming && (
+                <p>Mostrando las 5 próximas clases filtradas.</p>
+              )}
+              <button
+                type="button"
+                className="text-[#3cadaf] hover:underline"
+                onClick={() => setShowAllUpcoming((v) => !v)}
+              >
+                {showAllUpcoming ? 'Ver menos' : 'Ver todas'}
+              </button>
+            </div>
+          )}
+          </>
         )}
             </div>
 
