@@ -31,12 +31,12 @@ export default function LoginPage() {
 
       <div className="relative z-10 w-full max-w-md">
         <div className="mb-6 text-center text-white">
-          <div className="mx-auto mb-3 h-20 w-20 rounded-full bg-white/10 border border-white/30 flex items-center justify-center overflow-hidden">
+          <div className="mx-auto mb-3 h-24 w-24 rounded-full bg-white/10 border border-white/30 flex items-center justify-center overflow-hidden">
             <Image
               src="/icons/LogoAgendo1024.png"
               alt="Icono de la app"
-              width={96}
-              height={96}
+              width={120}
+              height={120}
               className="object-cover"
             />
           </div>
@@ -92,23 +92,23 @@ export default function LoginPage() {
           </p>
         </form>
 
-        <div className="mt-6 flex items-center justify-between gap-4">
-          <div className="h-20 w-auto flex items-center">
+        <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="h-24 w-auto flex items-center">
             <Image
               src="/icons/AlvicLogo.png"
               alt="Alvic"
-              width={320}
-              height={90}
-              className="h-20 w-auto object-contain"
+              width={360}
+              height={110}
+              className="h-24 w-auto object-contain"
             />
           </div>
-          <div className="h-20 w-auto flex items-center">
+          <div className="h-24 w-auto flex items-center">
             <Image
               src="/icons/NativaLogo.png"
               alt="Nativa"
-              width={320}
-              height={90}
-              className="h-20 w-auto object-contain"
+              width={360}
+              height={110}
+              className="h-24 w-auto object-contain"
             />
           </div>
         </div>
