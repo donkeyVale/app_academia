@@ -80,9 +80,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-dvh grid grid-rows-[auto,1fr]">
-      <header className="border-b">
-        <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
+    <div className="min-h-dvh grid grid-rows-[auto,1fr] bg-gray-50">
+      <header className="border-b bg-white">
+        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
           <Link href="/" className="font-semibold">
             Inicio
           </Link>
@@ -145,7 +145,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </nav>
         )}
       </header>
-      <main className="w-full flex justify-center px-4 py-4">
+      <main className="w-full flex justify-center px-4 py-3">
         <div className="w-full max-w-5xl">{children}</div>
       </main>
     </div>
