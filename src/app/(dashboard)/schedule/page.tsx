@@ -1304,12 +1304,12 @@ export default function SchedulePage() {
                   {attendanceList.map((row, idx) => (
                     <li
                       key={row.student_id}
-                      className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-b pb-2 max-w-full"
+                      className="flex flex-row flex-wrap items-center justify-between gap-2 border-b pb-2 max-w-full text-xs"
                     >
-                      <span className="font-medium text-sm break-words max-w-full">
+                      <span className="font-medium break-words max-w-full">
                         {row.label}
                       </span>
-                      <label className="flex items-center gap-1 text-xs">
+                      <label className="flex items-center gap-1">
                         <input
                           type="checkbox"
                           checked={row.present}
