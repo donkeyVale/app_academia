@@ -370,7 +370,17 @@ export default function SchedulePage() {
       }
       return true;
     });
-  }, [classes, courtsMap, filterLocationId, filterCourtId, filterCoachId, filterFrom, filterTo]);
+  }, [
+    classes,
+    courtsMap,
+    studentsByClass,
+    filterLocationId,
+    filterCourtId,
+    filterCoachId,
+    filterStudentId,
+    filterFrom,
+    filterTo,
+  ]);
 
   // Clases recientes (últimas 24h) que ya terminaron, para poder marcar asistencia aunque pasaron los 60 minutos
   const recentClasses = useMemo(() => {
