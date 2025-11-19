@@ -1012,7 +1012,7 @@ export default function SchedulePage() {
                     </button>
                   </div>
                 </div>
-                <div className="min-w-0 w-full">
+                <div className="min-w-0 w-full pr-1">
                   <label className="block text-xs mb-1">Desde</label>
                   <input
                     type="datetime-local"
@@ -1021,7 +1021,7 @@ export default function SchedulePage() {
                     onChange={(e) => setFilterFrom(e.target.value)}
                   />
                 </div>
-                <div className="min-w-0 w-full">
+                <div className="min-w-0 w-full pr-1">
                   <label className="block text-xs mb-1">Hasta</label>
                   <input
                     type="datetime-local"
