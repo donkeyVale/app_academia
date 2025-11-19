@@ -93,27 +93,27 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-6 text-[11px] text-white/80 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <span className="font-semibold">Diseñado por</span>
-            <div className="h-14 w-auto flex items-center">
+            <div className="h-16 w-auto flex items-center">
               <Image
                 src="/icons/AlvicLogo.png"
                 alt="Alvic"
-                width={200}
-                height={55}
-                className="h-14 w-auto object-contain"
+                width={240}
+                height={64}
+                className="h-16 w-auto object-contain"
               />
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <span className="font-semibold">Desarrollado por</span>
-            <div className="h-14 w-auto flex items-center">
+            <div className="h-16 w-auto flex items-center">
               <Image
                 src="/icons/NativaLogo.png"
                 alt="Nativa"
-                width={200}
-                height={55}
-                className="h-14 w-auto object-contain"
+                width={240}
+                height={64}
+                className="h-16 w-auto object-contain"
               />
             </div>
           </div>
