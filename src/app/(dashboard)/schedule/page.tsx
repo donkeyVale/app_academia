@@ -869,7 +869,7 @@ export default function SchedulePage() {
           <div className="space-y-6 p-4">
             <div className="space-y-3 max-w-full">
               <h2 className="text-lg font-semibold text-[#31435d]">Próximas clases</h2>
-        <div className="space-y-2 p-3 border rounded-lg bg-[#f0f9fb] max-w-full">
+        <div className="space-y-2 p-3 border rounded-lg bg-[#f0f9fb] max-w-full w-full overflow-hidden">
           <div className="grid gap-2 md:grid-cols-5 items-end">
             <div>
               <label className="block text-xs mb-1 font-semibold">Filtrar por</label>
