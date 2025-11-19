@@ -31,12 +31,12 @@ export default function LoginPage() {
 
       <div className="relative z-10 w-full max-w-md">
         <div className="mb-6 text-center text-white">
-          <div className="mx-auto mb-3 h-16 w-16 rounded-full bg-white/10 border border-white/30 flex items-center justify-center overflow-hidden">
+          <div className="mx-auto mb-3 h-20 w-20 rounded-full bg-white/10 border border-white/30 flex items-center justify-center overflow-hidden">
             <Image
               src="/icons/LogoAgendo1024.png"
               alt="Icono de la app"
-              width={64}
-              height={64}
+              width={96}
+              height={96}
               className="object-cover"
             />
           </div>
@@ -92,30 +92,24 @@ export default function LoginPage() {
           </p>
         </form>
 
-        <div className="mt-6 text-[11px] text-white/80 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-0.5">
-            <span className="font-semibold">Diseñado por</span>
-            <div className="h-20 w-auto flex items-center">
-              <Image
-                src="/icons/AlvicLogo.png"
-                alt="Alvic"
-                width={280}
-                height={80}
-                className="h-20 w-auto object-contain"
-              />
-            </div>
+        <div className="mt-6 flex items-center justify-between gap-4">
+          <div className="h-20 w-auto flex items-center">
+            <Image
+              src="/icons/AlvicLogo.png"
+              alt="Alvic"
+              width={320}
+              height={90}
+              className="h-20 w-auto object-contain"
+            />
           </div>
-          <div className="flex items-center gap-0.5">
-            <span className="font-semibold">Desarrollado por</span>
-            <div className="h-20 w-auto flex items-center">
-              <Image
-                src="/icons/NativaLogo.png"
-                alt="Nativa"
-                width={280}
-                height={80}
-                className="h-20 w-auto object-contain"
-              />
-            </div>
+          <div className="h-20 w-auto flex items-center">
+            <Image
+              src="/icons/NativaLogo.png"
+              alt="Nativa"
+              width={320}
+              height={90}
+              className="h-20 w-auto object-contain"
+            />
           </div>
         </div>
       </div>
