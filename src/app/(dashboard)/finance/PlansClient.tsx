@@ -656,7 +656,7 @@ export default function PlansClient() {
                   <label className="block text-xs mb-1 text-gray-600">Buscar por alumno o plan</label>
                   <input
                     type="text"
-                    className="border rounded p-2 w-full text-sm"
+                    className="border rounded p-2 w-full text-base md:text-sm"
                     placeholder="Ej.: Juan Pérez o Plan Adultos"
                     value={recentPlansSearch}
                     onChange={(e) => setRecentPlansSearch(e.target.value)}
