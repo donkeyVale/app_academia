@@ -1016,7 +1016,7 @@ export default function SchedulePage() {
                   <label className="block text-xs mb-1">Desde</label>
                   <input
                     type="datetime-local"
-                    className="border rounded p-2 w-full text-xs mr-1"
+                    className="border rounded p-2 w-full text-xs"
                     value={filterFrom}
                     onChange={(e) => setFilterFrom(e.target.value)}
                   />
@@ -1025,7 +1025,7 @@ export default function SchedulePage() {
                   <label className="block text-xs mb-1">Hasta</label>
                   <input
                     type="datetime-local"
-                    className="border rounded p-2 w-full text-xs mr-1"
+                    className="border rounded p-2 w-full text-xs"
                     value={filterTo}
                     onChange={(e) => setFilterTo(e.target.value)}
                   />
