@@ -382,10 +382,10 @@ export default function SchedulePage() {
     filterTo,
   ]);
 
-  // Clases recientes (últimas 24h) que ya terminaron, para poder marcar asistencia aunque pasaron los 60 minutos
+  // Clases recientes (últimas 6h) que ya terminaron, para poder marcar asistencia aunque pasaron los 60 minutos
   const recentClasses = useMemo(() => {
     const now = new Date();
-    const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const cutoff = new Date(now.getTime() - 6 * 60 * 60 * 1000);
     return classes.filter((cls) => {
       const startTs = new Date(cls.date).getTime();
       const endTs = startTs + 60 * 60 * 1000;
@@ -424,6 +424,7 @@ export default function SchedulePage() {
   const [showUpcomingSection, setShowUpcomingSection] = useState(false);
   const [showRecentSection, setShowRecentSection] = useState(false);
   const [showAllUpcoming, setShowAllUpcoming] = useState(false);
+  const [showAllRecent, setShowAllRecent] = useState(false);
 
   // Aplicar filtros iniciales según scope=today|week en la URL (lado cliente)
   useEffect(() => {
@@ -1142,16 +1143,16 @@ export default function SchedulePage() {
             className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
             onClick={() => setShowRecentSection((v) => !v)}
           >
-            <span className="font-semibold">Clases recientes (últimas 24 horas)</span>
+            <span className="font-semibold">Clases recientes (últimas 6 horas)</span>
             <span className="text-xs text-gray-500">{showRecentSection ? '▼' : '▲'}</span>
           </button>
           {showRecentSection && (
             <div className="space-y-3 p-4 max-w-full">
               <p className="text-xs text-gray-500">
-                Usá esta lista para marcar asistencia en clases que ya terminaron pero aún son recientes.
+                Usá esta lista para marcar asistencia en clases que ya terminaron pero aún son recientes (últimas 6 horas).
               </p>
               <ul className="space-y-3">
-                {recentClasses.map((cls) => {
+                {(showAllRecent ? recentClasses : recentClasses.slice(0, 5)).map((cls) => {
                   const d = new Date(cls.date);
                   const yyyy = d.getFullYear();
                   const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -1191,6 +1192,20 @@ export default function SchedulePage() {
                   );
                 })}
               </ul>
+              {recentClasses.length > 5 && (
+                <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+                  {!showAllRecent && (
+                    <p>Mostrando las 5 clases recientes más cercanas.</p>
+                  )}
+                  <button
+                    type="button"
+                    className="text-[#3cadaf] hover:underline"
+                    onClick={() => setShowAllRecent((v) => !v)}
+                  >
+                    {showAllRecent ? 'Ver menos' : 'Ver más'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
