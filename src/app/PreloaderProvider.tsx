@@ -23,7 +23,7 @@ export default function PreloaderProvider({ children }: { children: React.ReactN
               style={{ animationDuration: '1.5s' }}
             >
               <Image
-                src="/icons/icon-512.png"
+                src="/icons/LogoAgendo1024.png"
                 alt="Icono de la app"
                 width={64}
                 height={64}

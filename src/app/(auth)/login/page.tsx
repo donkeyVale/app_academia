@@ -33,7 +33,7 @@ export default function LoginPage() {
         <div className="mb-6 text-center text-white">
           <div className="mx-auto mb-3 h-16 w-16 rounded-full bg-white/10 border border-white/30 flex items-center justify-center overflow-hidden">
             <Image
-              src="/icons/icon-512.png"
+              src="/icons/LogoAgendo1024.png"
               alt="Icono de la app"
               width={64}
               height={64}
