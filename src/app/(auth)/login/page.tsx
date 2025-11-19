@@ -92,8 +92,8 @@ export default function LoginPage() {
           </p>
         </form>
 
-        <div className="mt-6 flex flex-row flex-wrap items-center justify-center gap-4">
-          <div className="h-24 w-64 flex items-center justify-center">
+        <div className="mt-6 flex flex-row items-center justify-center gap-4">
+          <div className="h-24 w-1/2 flex items-center justify-center">
             <Image
               src="/icons/AlvicLogo.png"
               alt="Alvic"
@@ -102,7 +102,7 @@ export default function LoginPage() {
               className="h-full w-full object-contain"
             />
           </div>
-          <div className="h-24 w-64 flex items-center justify-center">
+          <div className="h-24 w-1/2 flex items-center justify-center">
             <Image
               src="/icons/NativaLogo.png"
               alt="Nativa"
