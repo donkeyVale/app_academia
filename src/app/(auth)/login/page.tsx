@@ -93,22 +93,22 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-4">
-          <div className="h-24 w-auto flex items-center">
+          <div className="h-28 w-auto flex items-center">
             <Image
               src="/icons/AlvicLogo.png"
               alt="Alvic"
-              width={360}
-              height={110}
-              className="h-24 w-auto object-contain"
+              width={420}
+              height={130}
+              className="h-28 w-auto object-contain"
             />
           </div>
-          <div className="h-24 w-auto flex items-center">
+          <div className="h-28 w-auto flex items-center">
             <Image
               src="/icons/NativaLogo.png"
               alt="Nativa"
-              width={360}
-              height={110}
-              className="h-24 w-auto object-contain"
+              width={420}
+              height={130}
+              className="h-28 w-auto object-contain"
             />
           </div>
         </div>

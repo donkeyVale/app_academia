@@ -19,14 +19,14 @@ export default function PreloaderProvider({ children }: { children: React.ReactN
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-to-br from-[#0f172a] via-[#1d3b4f] to-[#3cadaf] text-white">
           <div className="flex flex-col items-center gap-3">
             <div
-              className="h-20 w-20 rounded-full bg-white/10 border border-white/40 flex items-center justify-center overflow-hidden animate-spin"
+              className="h-24 w-24 rounded-full bg-white/10 border border-white/40 flex items-center justify-center overflow-hidden animate-spin"
               style={{ animationDuration: '1.5s' }}
             >
               <Image
                 src="/icons/LogoAgendo1024.png"
                 alt="Icono de la app"
-                width={96}
-                height={96}
+                width={128}
+                height={128}
                 className="object-cover"
               />
             </div>
