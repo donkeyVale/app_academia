@@ -92,7 +92,7 @@ export default function LoginPage() {
           </p>
         </form>
 
-        <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-4">
+        <div className="mt-6 flex flex-row flex-wrap items-center justify-center gap-4">
           <div className="h-28 w-auto flex items-center">
             <Image
               src="/icons/AlvicLogo.png"
