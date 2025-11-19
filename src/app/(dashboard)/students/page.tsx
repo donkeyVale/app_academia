@@ -307,7 +307,7 @@ export default function StudentsPage() {
   }
 
   return (
-    <section className="space-y-4 max-w-5xl mx-auto px-4 py-6">
+    <section className="space-y-4 py-4">
       <div className="flex items-center gap-2">
         <IconStudents />
         <h1 className="text-2xl font-semibold text-[#31435d]">Alumnos</h1>

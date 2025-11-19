@@ -756,7 +756,7 @@ export default function SchedulePage() {
   };
 
   return (
-    <section className="space-y-6 max-w-5xl mx-auto px-4 py-6 overflow-x-hidden">
+    <section className="space-y-6 py-4 overflow-x-hidden">
       <div className="flex items-center gap-2">
         <IconCalendar />
         <h1 className="text-2xl font-semibold text-[#31435d]">Agenda</h1>

@@ -420,7 +420,7 @@ export default function PlansClient() {
   };
 
   return (
-    <section className="mt-6 space-y-6 max-w-5xl mx-auto px-4">
+    <section className="mt-4 space-y-6">
       <div className="flex items-center gap-2">
         <IconMoney />
         <h1 className="text-2xl font-semibold text-[#31435d]">Finanzas / Planes</h1>
