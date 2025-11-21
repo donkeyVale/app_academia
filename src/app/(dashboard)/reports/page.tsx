@@ -303,8 +303,7 @@ export default function ReportsPage() {
         .select("class_id,student_id,present,class_sessions!inner(id,date,coach_id,court_id)")
         .eq("student_id", attendanceStudentId)
         .gte("class_sessions.date", attendanceFrom)
-        .lte("class_sessions.date", attendanceTo)
-        .order("date", { referencedTable: "class_sessions", ascending: true });
+        .lte("class_sessions.date", attendanceTo);
       if (attErr) throw attErr;
 
       const rowsRaw = (attData ?? []) as any[];
