@@ -554,6 +554,12 @@ export default function ReportsPage() {
               )}
             </div>
             <div className="flex justify-end gap-2 px-4 py-3 border-t bg-white text-xs">
+              {studentDetailRows.length > 0 && (
+                <div className="mr-auto text-[11px] text-gray-600">
+                  <span className="font-semibold">Total en este periodo:</span>{' '}
+                  {studentDetailRows.reduce((acc, r) => acc + (r.amount || 0), 0)} PYG
+                </div>
+              )}
               <button
                 type="button"
                 className="px-3 py-2 border rounded"
@@ -607,6 +613,12 @@ export default function ReportsPage() {
               )}
             </div>
             <div className="flex justify-end gap-2 px-4 py-3 border-t bg-white text-xs">
+              {planDetailRows.length > 0 && (
+                <div className="mr-auto text-[11px] text-gray-600">
+                  <span className="font-semibold">Total en este periodo:</span>{' '}
+                  {planDetailRows.reduce((acc, r) => acc + (r.amount || 0), 0)} PYG
+                </div>
+              )}
               <button
                 type="button"
                 className="px-3 py-2 border rounded"
