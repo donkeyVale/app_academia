@@ -524,6 +524,14 @@ export default function PlansClient() {
       });
       if (insErr) throw insErr;
 
+      // actualizar totales de pago por plan en memoria para reflejar el saldo sin recargar
+      if (paymentStatus === 'pagado') {
+        setPaymentsByPlan((prev) => ({
+          ...prev,
+          [paymentStudentPlanId]: (prev[paymentStudentPlanId] ?? 0) + amountNum,
+        }));
+      }
+
       const { data: payData, error: payErr } = await supabase
         .from('payments')
         .select('id,student_id,student_plan_id,amount,currency,payment_date,method,status,notes')
@@ -824,7 +832,7 @@ export default function PlansClient() {
               <div>
                 <label className="block text-sm mb-1">Tipo de descuento</label>
                 <select
-                  className="border rounded p-2 w-full text-sm"
+                  className="border rounded p-2 w-full text-base md:text-sm"
                   value={discountType}
                   onChange={(e) => setDiscountType(e.target.value as 'none' | 'percent' | 'amount')}
                 >
@@ -838,7 +846,7 @@ export default function PlansClient() {
                 <input
                   type="number"
                   min={0}
-                  className="border rounded p-2 w-full text-sm"
+                  className="border rounded p-2 w-full text-base md:text-sm"
                   value={discountValue}
                   onChange={(e) => setDiscountValue(e.target.value)}
                   disabled={discountType === 'none'}
@@ -1057,7 +1065,7 @@ export default function PlansClient() {
             <div>
               <label className="block text-sm mb-1">Alumno</label>
               <select
-                className="border rounded p-2 w-full text-sm"
+                className="border rounded p-2 w-full text-base md:text-sm"
                 value={paymentStudentId}
                 onChange={(e) => {
                   const id = e.target.value;
@@ -1076,7 +1084,7 @@ export default function PlansClient() {
             <div>
               <label className="block text-sm mb-1">Plan del alumno</label>
               <select
-                className="border rounded p-2 w-full text-sm"
+                className="border rounded p-2 w-full text-base md:text-sm"
                 value={paymentStudentPlanId}
                 onChange={(e) => setPaymentStudentPlanId(e.target.value)}
               >
@@ -1119,7 +1127,7 @@ export default function PlansClient() {
                 <input
                   type="number"
                   min={1}
-                  className="border rounded p-2 w-full text-sm"
+                  className="border rounded p-2 w-full text-base md:text-sm"
                   value={paymentAmount}
                   onChange={(e) => setPaymentAmount(e.target.value)}
                 />
@@ -1128,7 +1136,7 @@ export default function PlansClient() {
                 <label className="block text-sm mb-1">Fecha de pago</label>
                 <input
                   type="date"
-                  className="border rounded p-2 w-full text-sm"
+                  className="border rounded p-2 w-full text-base md:text-sm"
                   value={paymentDate}
                   onChange={(e) => setPaymentDate(e.target.value)}
                 />
@@ -1138,7 +1146,7 @@ export default function PlansClient() {
               <div>
                 <label className="block text-sm mb-1">Método</label>
                 <select
-                  className="border rounded p-2 w-full text-sm"
+                  className="border rounded p-2 w-full text-base md:text-sm"
                   value={paymentMethod}
                   onChange={(e) => setPaymentMethod(e.target.value)}
                 >
@@ -1152,7 +1160,7 @@ export default function PlansClient() {
               <div>
                 <label className="block text-sm mb-1">Estado</label>
                 <select
-                  className="border rounded p-2 w-full text-sm"
+                  className="border rounded p-2 w-full text-base md:text-sm"
                   value={paymentStatus}
                   onChange={(e) => setPaymentStatus(e.target.value as 'pagado' | 'pendiente')}
                 >
@@ -1164,7 +1172,7 @@ export default function PlansClient() {
             <div>
               <label className="block text-sm mb-1">Notas (opcional)</label>
               <textarea
-                className="border rounded p-2 w-full text-sm min-h-[60px]"
+                className="border rounded p-2 w-full text-base md:text-sm min-h-[60px]"
                 value={paymentNotes}
                 onChange={(e) => setPaymentNotes(e.target.value)}
               />
