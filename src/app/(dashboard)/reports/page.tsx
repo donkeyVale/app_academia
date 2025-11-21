@@ -45,31 +45,94 @@ export default function ReportsPage() {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: qErr } = await supabase
+      // 1) Traer pagos simples del rango
+      const { data: paymentsData, error: payErr } = await supabase
         .from("payments")
-        .select(
-          `id, amount, currency, payment_date, method, status,
-           student_id,
-           student_plans!inner(plan_id, plans(name)),
-           students!inner(id, user_id),
-           profiles!inner(id, full_name)`
-        )
+        .select("id, student_id, student_plan_id, amount, currency, payment_date, method, status")
         .eq("status", "pagado")
         .gte("payment_date", fromDate)
         .lte("payment_date", toDate)
         .order("payment_date", { ascending: true });
 
-      if (qErr) throw qErr;
+      if (payErr) throw payErr;
 
-      const mapped: PaymentReportRow[] = (data as any[]).map((row) => ({
-        id: row.id as string,
-        student_id: row.student_id as string,
-        student_name: row.profiles?.full_name ?? null,
-        plan_name: row.student_plans?.plans?.name ?? null,
-        amount: row.amount as number,
-        currency: row.currency as string,
-        payment_date: row.payment_date as string,
-        method: row.method as string,
+      const payments = (paymentsData ?? []) as {
+        id: string;
+        student_id: string;
+        student_plan_id: string;
+        amount: number;
+        currency: string;
+        payment_date: string;
+        method: string;
+        status: string;
+      }[];
+
+      if (payments.length === 0) {
+        setRows([]);
+        setTotalAmount(0);
+        return;
+      }
+
+      // 2) Obtener nombres de alumnos (students + profiles)
+      const studentIds = Array.from(new Set(payments.map((p) => p.student_id)));
+      const { data: studentsData, error: studentsErr } = await supabase
+        .from("students")
+        .select("id, user_id");
+      if (studentsErr) throw studentsErr;
+
+      const students = (studentsData ?? []) as { id: string; user_id: string | null }[];
+      const profileIds = Array.from(
+        new Set(students.map((s) => s.user_id).filter((id): id is string => !!id))
+      );
+
+      let profilesMap: Record<string, string | null> = {};
+      if (profileIds.length > 0) {
+        const { data: profilesData, error: profilesErr } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", profileIds);
+        if (profilesErr) throw profilesErr;
+        profilesMap = (profilesData ?? []).reduce<Record<string, string | null>>(
+          (acc, p: any) => {
+            acc[p.id as string] = (p.full_name as string | null) ?? null;
+            return acc;
+          },
+          {}
+        );
+      }
+
+      const studentNameMap: Record<string, string | null> = {};
+      students.forEach((s) => {
+        studentNameMap[s.id] = s.user_id ? profilesMap[s.user_id] ?? null : null;
+      });
+
+      // 3) Obtener nombres de planes (student_plans + plans)
+      const studentPlanIds = Array.from(new Set(payments.map((p) => p.student_plan_id)));
+      let planNameMap: Record<string, string | null> = {};
+      if (studentPlanIds.length > 0) {
+        const { data: spData, error: spErr } = await supabase
+          .from("student_plans")
+          .select("id, plan_id, plans(name)")
+          .in("id", studentPlanIds);
+        if (spErr) throw spErr;
+        planNameMap = (spData ?? []).reduce<Record<string, string | null>>(
+          (acc, row: any) => {
+            acc[row.id as string] = (row.plans?.name as string | null) ?? null;
+            return acc;
+          },
+          {}
+        );
+      }
+
+      const mapped: PaymentReportRow[] = payments.map((p) => ({
+        id: p.id,
+        student_id: p.student_id,
+        student_name: studentNameMap[p.student_id] ?? null,
+        plan_name: planNameMap[p.student_plan_id] ?? null,
+        amount: p.amount,
+        currency: p.currency,
+        payment_date: p.payment_date,
+        method: p.method,
       }));
 
       setRows(mapped);
