@@ -51,6 +51,7 @@ export default function ReportsPage() {
   const [totalAmount, setTotalAmount] = useState(0);
   const [studentSummary, setStudentSummary] = useState<StudentSummaryRow[]>([]);
   const [planSummary, setPlanSummary] = useState<PlanSummaryRow[]>([]);
+  const [showIncome, setShowIncome] = useState(true);
   const [showStudentSummary, setShowStudentSummary] = useState(true);
   const [showPlanSummary, setShowPlanSummary] = useState(false);
   const [studentDetailModalOpen, setStudentDetailModalOpen] = useState(false);
@@ -429,164 +430,32 @@ export default function ReportsPage() {
   return (
     <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4">
       <div className="space-y-1">
-        <h1 className="text-2xl font-semibold text-[#31435d]">Reportes / Ingresos</h1>
-        <p className="text-sm text-gray-600">
-          Consulta los ingresos registrados por pagos en un rango de fechas.
-        </p>
+        <h1 className="text-2xl font-semibold text-[#31435d]">Reportes</h1>
+        <p className="text-sm text-gray-600">Consulta ingresos y uso de clases.</p>
       </div>
 
-      {/* Filtro de ingresos por fecha */}
-      <div className="border rounded-lg bg-white shadow-sm">
-        <form onSubmit={loadReport} className="p-4 space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-sm mb-1">Desde</label>
-              <input
-                type="date"
-                className="border rounded p-2 w-full text-base md:text-sm"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-sm mb-1">Hasta</label>
-              <input
-                type="date"
-                className="border rounded p-2 w-full text-base md:text-sm"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-              />
-            </div>
-            <div className="flex items-end">
-              <button
-                type="submit"
-                className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 w-full md:w-auto disabled:opacity-50 text-sm"
-                disabled={loading}
-              >
-                {loading ? "Cargando..." : "Ver ingresos"}
-              </button>
-            </div>
-          </div>
-          {error && <p className="text-sm text-red-600 mt-1">{error}</p>}
-        </form>
-      </div>
-
-      {/* Resumen y detalle de ingresos */}
-      <div className="border rounded-lg bg-white shadow-sm p-4 space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-          <div>
-            <p className="text-sm text-gray-600">Total ingresado en el periodo seleccionado</p>
-            <p className="text-2xl font-semibold text-[#31435d]">
-              {loading ? "..." : `${totalAmount} PYG`}
-            </p>
-          </div>
-          <div className="text-xs text-gray-500">
-            {rows.length > 0
-              ? `Mostrando ${rows.length} pagos`
-              : "Sin pagos en el rango seleccionado"}
-          </div>
-        </div>
-
-        {rows.length > 0 && (
-          <>
-            {/* Vista mobile: tarjetas apiladas */}
-            <div className="mt-3 space-y-2 md:hidden">
-              {rows.map((r) => (
-                <div
-                  key={r.id}
-                  className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1"
-                >
-                  <div className="flex justify-between gap-2">
-                    <span className="font-semibold text-[#31435d]">
-                      {r.student_name ?? r.student_id}
-                    </span>
-                    <span className="text-gray-500">
-                      {new Date(r.payment_date).toLocaleDateString()}
-                    </span>
-                  </div>
-                  <div className="text-gray-600">
-                    <span className="font-semibold">Plan:</span>{" "}
-                    {r.plan_name ?? "-"}
-                  </div>
-                  <div className="flex justify-between items-center gap-2">
-                    <span className="capitalize text-gray-600">{r.method}</span>
-                    <span className="font-semibold text-[#31435d]">
-                      {r.amount} {r.currency}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Vista desktop: tabla clásica */}
-            <div className="overflow-x-auto mt-3 hidden md:block">
-              <table className="min-w-full text-xs md:text-sm">
-                <thead>
-                  <tr className="bg-gray-50 text-left">
-                    <th className="px-3 py-2 border-b">Fecha</th>
-                    <th className="px-3 py-2 border-b">Alumno</th>
-                    <th className="px-3 py-2 border-b">Plan</th>
-                    <th className="px-3 py-2 border-b">Método</th>
-                    <th className="px-3 py-2 border-b text-right">Monto</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r) => (
-                    <tr key={r.id} className="border-b last:border-b-0">
-                      <td className="px-3 py-2 align-top">
-                        {new Date(r.payment_date).toLocaleDateString()}
-                      </td>
-                      <td className="px-3 py-2 align-top">{r.student_name ?? r.student_id}</td>
-                      <td className="px-3 py-2 align-top">{r.plan_name ?? "-"}</td>
-                      <td className="px-3 py-2 align-top capitalize">{r.method}</td>
-                      <td className="px-3 py-2 align-top text-right">
-                        {r.amount} {r.currency}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Asistencia / Uso de clases por alumno */}
+      {/* Ingresos */}
       <div className="border rounded-lg bg-white shadow-sm">
         <button
           type="button"
           className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
-          onClick={() => setShowAttendanceStudent((v) => !v)}
+          onClick={() => setShowIncome((v) => !v)}
         >
-          <span>Asistencia / Uso de clases por alumno</span>
-          <span className="text-xs text-gray-500">{showAttendanceStudent ? '▼' : '▲'}</span>
+          <span>Ingresos</span>
+          <span className="text-xs text-gray-500">{showIncome ? '▼' : '▲'}</span>
         </button>
-        {showAttendanceStudent && (
+        {showIncome && (
           <div className="p-4 space-y-4">
-            <form onSubmit={loadAttendanceByStudent} className="space-y-3">
+            {/* Filtro de ingresos por fecha */}
+            <form onSubmit={loadReport} className="space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-sm mb-1">Alumno</label>
-                  <select
-                    className="border rounded p-2 w-full text-base md:text-sm"
-                    value={attendanceStudentId}
-                    onChange={(e) => setAttendanceStudentId(e.target.value)}
-                  >
-                    <option value="">Selecciona un alumno</option>
-                    {attendanceStudents.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
                 <div>
                   <label className="block text-sm mb-1">Desde</label>
                   <input
                     type="date"
                     className="border rounded p-2 w-full text-base md:text-sm"
-                    value={attendanceFrom}
-                    onChange={(e) => setAttendanceFrom(e.target.value)}
+                    value={fromDate}
+                    onChange={(e) => setFromDate(e.target.value)}
                   />
                 </div>
                 <div>
@@ -594,125 +463,119 @@ export default function ReportsPage() {
                   <input
                     type="date"
                     className="border rounded p-2 w-full text-base md:text-sm"
-                    value={attendanceTo}
-                    onChange={(e) => setAttendanceTo(e.target.value)}
+                    value={toDate}
+                    onChange={(e) => setToDate(e.target.value)}
                   />
                 </div>
+                <div className="flex items-end gap-2 justify-end md:justify-start">
+                  <button
+                    type="button"
+                    className="border rounded px-3 py-2 text-xs text-gray-700 bg-white hover:bg-gray-50"
+                    onClick={() => {
+                      const today = new Date();
+                      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
+                        .toISOString()
+                        .slice(0, 10);
+                      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+                        .toISOString()
+                        .slice(0, 10);
+                      setFromDate(firstDay);
+                      setToDate(lastDay);
+                    }}
+                  >
+                    Limpiar
+                  </button>
+                  <button
+                    type="submit"
+                    className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 w-full md:w-auto disabled:opacity-50 text-sm"
+                    disabled={loading}
+                  >
+                    {loading ? "Cargando..." : "Ver ingresos"}
+                  </button>
+                </div>
               </div>
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50 text-sm"
-                  disabled={attendanceLoading}
-                >
-                  {attendanceLoading ? 'Cargando asistencia...' : 'Ver asistencia'}
-                </button>
-              </div>
+              {error && <p className="text-sm text-red-600 mt-1">{error}</p>}
             </form>
 
-            {attendanceSummary && (
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-sm">
-                <div className="space-y-1">
-                  <p className="text-gray-700">
-                    <span className="font-semibold">Total clases en el periodo:</span>{' '}
-                    {attendanceSummary.total}
+            {/* Resumen y detalle de ingresos */}
+            <div className="border rounded-lg bg-white p-4 space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                <div>
+                  <p className="text-sm text-gray-600">Total ingresado en el periodo seleccionado</p>
+                  <p className="text-2xl font-semibold text-[#31435d]">
+                    {loading ? "..." : `${totalAmount} PYG`}
                   </p>
-                  <p className="text-green-700 text-sm">
-                    <span className="font-semibold">Presentes:</span>{' '}
-                    {attendanceSummary.present}
-                  </p>
-                  <p className="text-red-700 text-sm">
-                    <span className="font-semibold">Ausentes:</span>{' '}
-                    {attendanceSummary.absent}
-                  </p>
+                </div>
+                <div className="text-xs text-gray-500">
+                  {rows.length > 0
+                    ? `Mostrando ${rows.length} pagos`
+                    : "Sin pagos en el rango seleccionado"}
                 </div>
               </div>
-            )}
 
-            {attendanceRows.length > 0 && (
-              <>
-                {/* Mobile: tarjetas */}
-                <div className="mt-2 space-y-2 md:hidden">
-                  {attendanceRows.map((r) => (
-                    <div
-                      key={r.class_id + r.date}
-                      className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1"
-                    >
-                      <div className="flex justify-between gap-2">
-                        <span className="font-semibold text-[#31435d]">
-                          {new Date(r.date).toLocaleString()}
-                        </span>
-                        <span
-                          className={
-                            r.present
-                              ? 'text-green-700 font-semibold'
-                              : 'text-red-700 font-semibold'
-                          }
-                        >
-                          {r.present ? 'Presente' : 'Ausente'}
-                        </span>
+              {rows.length > 0 && (
+                <>
+                  {/* Vista mobile: tarjetas apiladas */}
+                  <div className="mt-3 space-y-2 md:hidden">
+                    {rows.map((r) => (
+                      <div
+                        key={r.id}
+                        className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1"
+                      >
+                        <div className="flex justify-between gap-2">
+                          <span className="font-semibold text-[#31435d]">
+                            {r.student_name ?? r.student_id}
+                          </span>
+                          <span className="text-gray-500">
+                            {new Date(r.payment_date).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <div className="text-gray-600">
+                          <span className="font-semibold">Plan:</span>{" "}
+                          {r.plan_name ?? "-"}
+                        </div>
+                        <div className="flex justify-between items-center gap-2">
+                          <span className="capitalize text-gray-600">{r.method}</span>
+                          <span className="font-semibold text-[#31435d]">
+                            {r.amount} {r.currency}
+                          </span>
+                        </div>
                       </div>
-                      {r.location_name && (
-                        <div className="text-gray-600">
-                          <span className="font-semibold">Sede:</span>{' '}
-                          {r.location_name}
-                        </div>
-                      )}
-                      {r.court_name && (
-                        <div className="text-gray-600">
-                          <span className="font-semibold">Cancha:</span>{' '}
-                          {r.court_name}
-                        </div>
-                      )}
-                      {r.coach_name && (
-                        <div className="text-gray-600">
-                          <span className="font-semibold">Profesor:</span>{' '}
-                          {r.coach_name}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
 
-                {/* Desktop: tabla */}
-                <div className="overflow-x-auto mt-2 hidden md:block">
-                  <table className="min-w-full text-xs md:text-sm">
-                    <thead>
-                      <tr className="bg-gray-50 text-left">
-                        <th className="px-3 py-2 border-b">Fecha</th>
-                        <th className="px-3 py-2 border-b">Sede</th>
-                        <th className="px-3 py-2 border-b">Cancha</th>
-                        <th className="px-3 py-2 border-b">Profesor</th>
-                        <th className="px-3 py-2 border-b">Estado</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {attendanceRows.map((r) => (
-                        <tr key={r.class_id + r.date} className="border-b last:border-b-0">
-                          <td className="px-3 py-2 align-top">
-                            {new Date(r.date).toLocaleString()}
-                          </td>
-                          <td className="px-3 py-2 align-top">{r.location_name ?? '-'}</td>
-                          <td className="px-3 py-2 align-top">{r.court_name ?? '-'}</td>
-                          <td className="px-3 py-2 align-top">{r.coach_name ?? '-'}</td>
-                          <td className="px-3 py-2 align-top">
-                            <span
-                              className={
-                                r.present
-                                  ? 'inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-green-50 text-green-700'
-                                  : 'inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 text-red-700'
-                              }
-                            >
-                              {r.present ? 'Presente' : 'Ausente'}
-                            </span>
-                          </td>
+                  {/* Vista desktop: tabla clásica */}
+                  <div className="overflow-x-auto mt-3 hidden md:block">
+                    <table className="min-w-full text-xs md:text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 text-left">
+                          <th className="px-3 py-2 border-b">Fecha</th>
+                          <th className="px-3 py-2 border-b">Alumno</th>
+                          <th className="px-3 py-2 border-b">Plan</th>
+                          <th className="px-3 py-2 border-b">Método</th>
+                          <th className="px-3 py-2 border-b text-right">Monto</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
+                      </thead>
+                      <tbody>
+                        {rows.map((r) => (
+                          <tr key={r.id} className="border-b last:border-b-0">
+                            <td className="px-3 py-2 align-top">
+                              {new Date(r.payment_date).toLocaleDateString()}
+                            </td>
+                            <td className="px-3 py-2 align-top">{r.student_name ?? r.student_id}</td>
+                            <td className="px-3 py-2 align-top">{r.plan_name ?? "-"}</td>
+                            <td className="px-3 py-2 align-top capitalize">{r.method}</td>
+                            <td className="px-3 py-2 align-top text-right">
+                              {r.amount} {r.currency}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>
