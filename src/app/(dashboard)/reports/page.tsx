@@ -27,6 +27,20 @@ interface PlanSummaryRow {
   payments_count: number;
 }
 
+interface AttendanceStudentRow {
+  class_id: string;
+  date: string;
+  present: boolean;
+  coach_name: string | null;
+  court_name: string | null;
+  location_name: string | null;
+}
+
+interface StudentOption {
+  id: string;
+  label: string;
+}
+
 export default function ReportsPage() {
   const supabase = createClientBrowser();
   const [fromDate, setFromDate] = useState("");
@@ -46,6 +60,16 @@ export default function ReportsPage() {
   const [planDetailName, setPlanDetailName] = useState<string | null>(null);
   const [planDetailRows, setPlanDetailRows] = useState<PaymentReportRow[]>([]);
 
+  // Asistencia por alumno
+  const [attendanceStudents, setAttendanceStudents] = useState<StudentOption[]>([]);
+  const [attendanceStudentId, setAttendanceStudentId] = useState("");
+  const [attendanceFrom, setAttendanceFrom] = useState("");
+  const [attendanceTo, setAttendanceTo] = useState("");
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [attendanceRows, setAttendanceRows] = useState<AttendanceStudentRow[]>([]);
+  const [attendanceSummary, setAttendanceSummary] = useState<{ total: number; present: number; absent: number } | null>(null);
+  const [showAttendanceStudent, setShowAttendanceStudent] = useState(false);
+
   useEffect(() => {
     // Por defecto: mes actual
     const today = new Date();
@@ -58,6 +82,57 @@ export default function ReportsPage() {
     setFromDate(firstDay);
     setToDate(lastDay);
   }, []);
+
+  // Cargar alumnos y catálogos para reportes de asistencia
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: studs, error: sErr } = await supabase
+          .from("students")
+          .select("id,user_id,level,notes");
+        if (sErr) throw sErr;
+        const studentsRaw = (studs ?? []) as { id: string; user_id: string | null; level: string | null; notes: string | null }[];
+        const userIds = Array.from(
+          new Set(
+            studentsRaw
+              .map((s) => s.user_id)
+              .filter((id): id is string => !!id)
+          )
+        );
+
+        let profilesMap: Record<string, string | null> = {};
+        if (userIds.length > 0) {
+          const { data: profilesData, error: profErr } = await supabase
+            .from("profiles")
+            .select("id,full_name")
+            .in("id", userIds);
+          if (profErr) throw profErr;
+          profilesMap = (profilesData ?? []).reduce<Record<string, string | null>>(
+            (acc, p: any) => {
+              acc[p.id as string] = (p.full_name as string | null) ?? null;
+              return acc;
+            },
+            {}
+          );
+        }
+
+        const options: StudentOption[] = studentsRaw.map((s) => {
+          const label =
+            (s.user_id ? profilesMap[s.user_id] ?? null : null) ??
+            s.notes ??
+            s.level ??
+            s.id;
+          return { id: s.id, label };
+        });
+        options.sort((a, b) => a.label.localeCompare(b.label));
+        setAttendanceStudents(options);
+      } catch (e) {
+        // usamos el mismo error general
+        const msg = (e as any)?.message || "Error cargando datos para reportes de asistencia";
+        setError(msg);
+      }
+    })();
+  }, [supabase]);
 
   const loadReport = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -210,6 +285,148 @@ export default function ReportsPage() {
     }
   };
 
+  const loadAttendanceByStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!attendanceStudentId) {
+      setError("Selecciona un alumno para ver asistencia");
+      return;
+    }
+    if (!attendanceFrom || !attendanceTo) {
+      setError("Selecciona un rango de fechas para asistencia");
+      return;
+    }
+    setAttendanceLoading(true);
+    setError(null);
+    try {
+      const { data: attData, error: attErr } = await supabase
+        .from("attendance")
+        .select("class_id,student_id,present,class_sessions!inner(id,date,coach_id,court_id)")
+        .eq("student_id", attendanceStudentId)
+        .gte("class_sessions.date", attendanceFrom)
+        .lte("class_sessions.date", attendanceTo)
+        .order("class_sessions.date", { ascending: true });
+      if (attErr) throw attErr;
+
+      const rowsRaw = (attData ?? []) as any[];
+      if (rowsRaw.length === 0) {
+        setAttendanceRows([]);
+        setAttendanceSummary({ total: 0, present: 0, absent: 0 });
+        return;
+      }
+
+      const coachIds = Array.from(
+        new Set(rowsRaw.map((r) => r.class_sessions?.coach_id).filter((id: string | null): id is string => !!id))
+      );
+      const courtIds = Array.from(
+        new Set(rowsRaw.map((r) => r.class_sessions?.court_id).filter((id: string | null): id is string => !!id))
+      );
+
+      let coachMap: Record<string, string | null> = {};
+      if (coachIds.length > 0) {
+        const { data: coachesData, error: cErr } = await supabase
+          .from("coaches")
+          .select("id,user_id");
+        if (cErr) throw cErr;
+        const coachesRaw = (coachesData ?? []) as { id: string; user_id: string | null }[];
+        const coachUserIds = Array.from(
+          new Set(coachesRaw.map((c) => c.user_id).filter((id): id is string => !!id))
+        );
+        let profilesMap: Record<string, string | null> = {};
+        if (coachUserIds.length > 0) {
+          const { data: profilesData, error: pErr } = await supabase
+            .from("profiles")
+            .select("id,full_name")
+            .in("id", coachUserIds);
+          if (pErr) throw pErr;
+          profilesMap = (profilesData ?? []).reduce<Record<string, string | null>>(
+            (acc, p: any) => {
+              acc[p.id as string] = (p.full_name as string | null) ?? null;
+              return acc;
+            },
+            {}
+          );
+        }
+        coachesRaw.forEach((c) => {
+          if (!coachIds.includes(c.id)) return;
+          coachMap[c.id] = c.user_id ? profilesMap[c.user_id] ?? null : null;
+        });
+      }
+
+      let courtMap: Record<string, { court_name: string | null; location_id: string | null }> = {};
+      if (courtIds.length > 0) {
+        const { data: courtsData, error: ctErr } = await supabase
+          .from("courts")
+          .select("id,name,location_id")
+          .in("id", courtIds);
+        if (ctErr) throw ctErr;
+        courtMap = (courtsData ?? []).reduce<
+          Record<string, { court_name: string | null; location_id: string | null }>
+        >(
+          (acc, c: any) => {
+            acc[c.id as string] = {
+              court_name: (c.name as string | null) ?? null,
+              location_id: (c.location_id as string | null) ?? null,
+            };
+            return acc;
+          },
+          {}
+        );
+      }
+
+      const locationIds = Array.from(
+        new Set(
+          Object.values(courtMap)
+            .map((c) => c.location_id)
+            .filter((id): id is string => !!id)
+        )
+      );
+      let locationMap: Record<string, string | null> = {};
+      if (locationIds.length > 0) {
+        const { data: locData, error: locErr } = await supabase
+          .from("locations")
+          .select("id,name")
+          .in("id", locationIds);
+        if (locErr) throw locErr;
+        locationMap = (locData ?? []).reduce<Record<string, string | null>>(
+          (acc, l: any) => {
+            acc[l.id as string] = (l.name as string | null) ?? null;
+            return acc;
+          },
+          {}
+        );
+      }
+
+      const mapped: AttendanceStudentRow[] = rowsRaw.map((r) => {
+        const cls = r.class_sessions;
+        const courtInfo = cls?.court_id ? courtMap[cls.court_id] : undefined;
+        const locationName = courtInfo?.location_id
+          ? locationMap[courtInfo.location_id] ?? null
+          : null;
+        return {
+          class_id: r.class_id as string,
+          date: cls?.date as string,
+          present: !!r.present,
+          coach_name: cls?.coach_id ? coachMap[cls.coach_id] ?? null : null,
+          court_name: courtInfo?.court_name ?? null,
+          location_name: locationName,
+        };
+      }).sort((a, b) => a.date.localeCompare(b.date));
+
+      const total = mapped.length;
+      const present = mapped.filter((r) => r.present).length;
+      const absent = total - present;
+      setAttendanceRows(mapped);
+      setAttendanceSummary({ total, present, absent });
+    } catch (e) {
+      const msg = (e as any)?.message || "Error cargando asistencia";
+      setError(msg);
+      setAttendanceRows([]);
+      setAttendanceSummary(null);
+    } finally {
+      setAttendanceLoading(false);
+    }
+  };
+
   return (
     <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4">
       <div className="space-y-1">
@@ -333,6 +550,172 @@ export default function ReportsPage() {
         )}
       </div>
 
+      {/* Asistencia / Uso de clases por alumno */}
+      <div className="border rounded-lg bg-white shadow-sm">
+        <button
+          type="button"
+          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+          onClick={() => setShowAttendanceStudent((v) => !v)}
+        >
+          <span>Asistencia / Uso de clases por alumno</span>
+          <span className="text-xs text-gray-500">{showAttendanceStudent ? '▼' : '▲'}</span>
+        </button>
+        {showAttendanceStudent && (
+          <div className="p-4 space-y-4">
+            <form onSubmit={loadAttendanceByStudent} className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm mb-1">Alumno</label>
+                  <select
+                    className="border rounded p-2 w-full text-base md:text-sm"
+                    value={attendanceStudentId}
+                    onChange={(e) => setAttendanceStudentId(e.target.value)}
+                  >
+                    <option value="">Selecciona un alumno</option>
+                    {attendanceStudents.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">Desde</label>
+                  <input
+                    type="date"
+                    className="border rounded p-2 w-full text-base md:text-sm"
+                    value={attendanceFrom}
+                    onChange={(e) => setAttendanceFrom(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">Hasta</label>
+                  <input
+                    type="date"
+                    className="border rounded p-2 w-full text-base md:text-sm"
+                    value={attendanceTo}
+                    onChange={(e) => setAttendanceTo(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50 text-sm"
+                  disabled={attendanceLoading}
+                >
+                  {attendanceLoading ? 'Cargando asistencia...' : 'Ver asistencia'}
+                </button>
+              </div>
+            </form>
+
+            {attendanceSummary && (
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-sm">
+                <div className="space-y-1">
+                  <p className="text-gray-700">
+                    <span className="font-semibold">Total clases en el periodo:</span>{' '}
+                    {attendanceSummary.total}
+                  </p>
+                  <p className="text-green-700 text-sm">
+                    <span className="font-semibold">Presentes:</span>{' '}
+                    {attendanceSummary.present}
+                  </p>
+                  <p className="text-red-700 text-sm">
+                    <span className="font-semibold">Ausentes:</span>{' '}
+                    {attendanceSummary.absent}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {attendanceRows.length > 0 && (
+              <>
+                {/* Mobile: tarjetas */}
+                <div className="mt-2 space-y-2 md:hidden">
+                  {attendanceRows.map((r) => (
+                    <div
+                      key={r.class_id + r.date}
+                      className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1"
+                    >
+                      <div className="flex justify-between gap-2">
+                        <span className="font-semibold text-[#31435d]">
+                          {new Date(r.date).toLocaleString()}
+                        </span>
+                        <span
+                          className={
+                            r.present
+                              ? 'text-green-700 font-semibold'
+                              : 'text-red-700 font-semibold'
+                          }
+                        >
+                          {r.present ? 'Presente' : 'Ausente'}
+                        </span>
+                      </div>
+                      {r.location_name && (
+                        <div className="text-gray-600">
+                          <span className="font-semibold">Sede:</span>{' '}
+                          {r.location_name}
+                        </div>
+                      )}
+                      {r.court_name && (
+                        <div className="text-gray-600">
+                          <span className="font-semibold">Cancha:</span>{' '}
+                          {r.court_name}
+                        </div>
+                      )}
+                      {r.coach_name && (
+                        <div className="text-gray-600">
+                          <span className="font-semibold">Profesor:</span>{' '}
+                          {r.coach_name}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop: tabla */}
+                <div className="overflow-x-auto mt-2 hidden md:block">
+                  <table className="min-w-full text-xs md:text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 text-left">
+                        <th className="px-3 py-2 border-b">Fecha</th>
+                        <th className="px-3 py-2 border-b">Sede</th>
+                        <th className="px-3 py-2 border-b">Cancha</th>
+                        <th className="px-3 py-2 border-b">Profesor</th>
+                        <th className="px-3 py-2 border-b">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {attendanceRows.map((r) => (
+                        <tr key={r.class_id + r.date} className="border-b last:border-b-0">
+                          <td className="px-3 py-2 align-top">
+                            {new Date(r.date).toLocaleString()}
+                          </td>
+                          <td className="px-3 py-2 align-top">{r.location_name ?? '-'}</td>
+                          <td className="px-3 py-2 align-top">{r.court_name ?? '-'}</td>
+                          <td className="px-3 py-2 align-top">{r.coach_name ?? '-'}</td>
+                          <td className="px-3 py-2 align-top">
+                            <span
+                              className={
+                                r.present
+                                  ? 'inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-green-50 text-green-700'
+                                  : 'inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 text-red-700'
+                              }
+                            >
+                              {r.present ? 'Presente' : 'Ausente'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Resumen por alumno */}
       {studentSummary.length > 0 && (
         <div className="border rounded-lg bg-white shadow-sm">
@@ -422,6 +805,10 @@ export default function ReportsPage() {
           )}
         </div>
       )}
+    </section>
+  );
+}
+
 
       {/* Resumen por plan */}
       {planSummary.length > 0 && (
