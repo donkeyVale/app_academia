@@ -510,6 +510,24 @@ export default function PlansClient() {
         setSaving(false);
         return;
       }
+
+      // Validar que la suma de pagos no supere el precio final del plan
+      const sp = studentPlans.find((sp) => sp.id === paymentStudentPlanId);
+      const basePrice = sp?.base_price ?? null;
+      const finalPrice = sp?.final_price ?? basePrice;
+      if (finalPrice != null) {
+        const alreadyPaid = paymentsByPlan[paymentStudentPlanId] ?? 0;
+        const newTotalPaid = alreadyPaid + amountNum;
+        if (newTotalPaid > finalPrice) {
+          const mensaje = `El total pagado (${newTotalPaid} PYG) no puede superar el valor del plan (${finalPrice} PYG). Ajusta el monto del pago.`;
+          setError(mensaje);
+          if (typeof window !== 'undefined') {
+            window.alert(mensaje);
+          }
+          setSaving(false);
+          return;
+        }
+      }
       const dateToUse = paymentDate || new Date().toISOString().slice(0, 10);
 
       const { error: insErr } = await supabase.from('payments').insert({
