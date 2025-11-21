@@ -37,6 +37,11 @@ export default function ReportsPage() {
   const [totalAmount, setTotalAmount] = useState(0);
   const [studentSummary, setStudentSummary] = useState<StudentSummaryRow[]>([]);
   const [planSummary, setPlanSummary] = useState<PlanSummaryRow[]>([]);
+  const [showStudentSummary, setShowStudentSummary] = useState(true);
+  const [showPlanSummary, setShowPlanSummary] = useState(false);
+  const [studentDetailModalOpen, setStudentDetailModalOpen] = useState(false);
+  const [studentDetailName, setStudentDetailName] = useState<string | null>(null);
+  const [studentDetailRows, setStudentDetailRows] = useState<PaymentReportRow[]>([]);
 
   useEffect(() => {
     // Por defecto: mes actual
@@ -327,126 +332,220 @@ export default function ReportsPage() {
 
       {/* Resumen por alumno */}
       {studentSummary.length > 0 && (
-        <div className="border rounded-lg bg-white shadow-sm p-4 space-y-3">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-            <h2 className="text-lg font-semibold text-[#31435d]">Resumen por alumno</h2>
-            <p className="text-xs text-gray-500">
-              Ordenado por monto total pagado (de mayor a menor).
-            </p>
-          </div>
-
-          {/* Mobile: tarjetas */}
-          <div className="mt-2 space-y-2 md:hidden">
-            {studentSummary.map((s) => (
-              <div
-                key={s.student_id}
-                className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1"
-              >
-                <div className="flex justify-between gap-2">
-                  <span className="font-semibold text-[#31435d]">
-                    {s.student_name ?? s.student_id}
-                  </span>
-                  <span className="text-gray-500">
-                    {s.payments_count} pago{s.payments_count !== 1 ? 's' : ''}
-                  </span>
-                </div>
-                <div className="text-gray-600">
-                  <span className="font-semibold">Total:</span>{' '}
-                  {s.total_amount} PYG
-                </div>
+        <div className="border rounded-lg bg-white shadow-sm">
+          <button
+            type="button"
+            className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+            onClick={() => setShowStudentSummary((v) => !v)}
+          >
+            <span>Resumen por alumno</span>
+            <span className="text-xs text-gray-500">{showStudentSummary ? '▼' : '▲'}</span>
+          </button>
+          {showStudentSummary && (
+            <div className="p-4 space-y-3">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                <p className="text-xs text-gray-500">
+                  Ordenado por monto total pagado (de mayor a menor).
+                </p>
               </div>
-            ))}
-          </div>
 
-          {/* Desktop: tabla */}
-          <div className="overflow-x-auto mt-2 hidden md:block">
-            <table className="min-w-full text-xs md:text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-left">
-                  <th className="px-3 py-2 border-b">Alumno</th>
-                  <th className="px-3 py-2 border-b text-right">Total pagado</th>
-                  <th className="px-3 py-2 border-b text-right">Pagos</th>
-                </tr>
-              </thead>
-              <tbody>
+              {/* Mobile: tarjetas */}
+              <div className="mt-2 space-y-2 md:hidden">
                 {studentSummary.map((s) => (
-                  <tr key={s.student_id} className="border-b last:border-b-0">
-                    <td className="px-3 py-2 align-top">
-                      {s.student_name ?? s.student_id}
-                    </td>
-                    <td className="px-3 py-2 align-top text-right">
+                  <button
+                    key={s.student_id}
+                    type="button"
+                    className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1 text-left w-full"
+                    onClick={() => {
+                      const detail = rows.filter((r) => r.student_id === s.student_id);
+                      setStudentDetailRows(detail);
+                      setStudentDetailName(s.student_name ?? s.student_id);
+                      setStudentDetailModalOpen(true);
+                    }}
+                  >
+                    <div className="flex justify-between gap-2">
+                      <span className="font-semibold text-[#31435d]">
+                        {s.student_name ?? s.student_id}
+                      </span>
+                      <span className="text-gray-500">
+                        {s.payments_count} pago{s.payments_count !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <div className="text-gray-600">
+                      <span className="font-semibold">Total:</span>{' '}
                       {s.total_amount} PYG
-                    </td>
-                    <td className="px-3 py-2 align-top text-right">
-                      {s.payments_count}
-                    </td>
-                  </tr>
+                    </div>
+                  </button>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </div>
+
+              {/* Desktop: tabla */}
+              <div className="overflow-x-auto mt-2 hidden md:block">
+                <table className="min-w-full text-xs md:text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-left">
+                      <th className="px-3 py-2 border-b">Alumno</th>
+                      <th className="px-3 py-2 border-b text-right">Total pagado</th>
+                      <th className="px-3 py-2 border-b text-right">Pagos</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {studentSummary.map((s) => (
+                      <tr
+                        key={s.student_id}
+                        className="border-b last:border-b-0 cursor-pointer hover:bg-gray-50"
+                        onClick={() => {
+                          const detail = rows.filter((r) => r.student_id === s.student_id);
+                          setStudentDetailRows(detail);
+                          setStudentDetailName(s.student_name ?? s.student_id);
+                          setStudentDetailModalOpen(true);
+                        }}
+                      >
+                        <td className="px-3 py-2 align-top">
+                          {s.student_name ?? s.student_id}
+                        </td>
+                        <td className="px-3 py-2 align-top text-right">
+                          {s.total_amount} PYG
+                        </td>
+                        <td className="px-3 py-2 align-top text-right">
+                          {s.payments_count}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
       {/* Resumen por plan */}
       {planSummary.length > 0 && (
-        <div className="border rounded-lg bg-white shadow-sm p-4 space-y-3">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-            <h2 className="text-lg font-semibold text-[#31435d]">Resumen por plan</h2>
-            <p className="text-xs text-gray-500">
-              Ordenado por monto total ingresado (de mayor a menor).
-            </p>
-          </div>
-
-          {/* Mobile: tarjetas */}
-          <div className="mt-2 space-y-2 md:hidden">
-            {planSummary.map((p, idx) => (
-              <div
-                key={`${p.plan_name ?? 'sin-plan'}-${idx}`}
-                className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1"
-              >
-                <div className="flex justify-between gap-2">
-                  <span className="font-semibold text-[#31435d]">
-                    {p.plan_name ?? 'Sin nombre'}
-                  </span>
-                  <span className="text-gray-500">
-                    {p.payments_count} pago{p.payments_count !== 1 ? 's' : ''}
-                  </span>
-                </div>
-                <div className="text-gray-600">
-                  <span className="font-semibold">Total:</span>{' '}
-                  {p.total_amount} PYG
-                </div>
+        <div className="border rounded-lg bg-white shadow-sm">
+          <button
+            type="button"
+            className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+            onClick={() => setShowPlanSummary((v) => !v)}
+          >
+            <span>Resumen por plan</span>
+            <span className="text-xs text-gray-500">{showPlanSummary ? '▼' : '▲'}</span>
+          </button>
+          {showPlanSummary && (
+            <div className="p-4 space-y-3">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                <p className="text-xs text-gray-500">
+                  Ordenado por monto total ingresado (de mayor a menor).
+                </p>
               </div>
-            ))}
-          </div>
 
-          {/* Desktop: tabla */}
-          <div className="overflow-x-auto mt-2 hidden md:block">
-            <table className="min-w-full text-xs md:text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-left">
-                  <th className="px-3 py-2 border-b">Plan</th>
-                  <th className="px-3 py-2 border-b text-right">Total ingresado</th>
-                  <th className="px-3 py-2 border-b text-right">Pagos</th>
-                </tr>
-              </thead>
-              <tbody>
+              {/* Mobile: tarjetas */}
+              <div className="mt-2 space-y-2 md:hidden">
                 {planSummary.map((p, idx) => (
-                  <tr key={`${p.plan_name ?? 'sin-plan'}-${idx}`} className="border-b last:border-b-0">
-                    <td className="px-3 py-2 align-top">
-                      {p.plan_name ?? 'Sin nombre'}
-                    </td>
-                    <td className="px-3 py-2 align-top text-right">
+                  <div
+                    key={`${p.plan_name ?? 'sin-plan'}-${idx}`}
+                    className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1"
+                  >
+                    <div className="flex justify-between gap-2">
+                      <span className="font-semibold text-[#31435d]">
+                        {p.plan_name ?? 'Sin nombre'}
+                      </span>
+                      <span className="text-gray-500">
+                        {p.payments_count} pago{p.payments_count !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    <div className="text-gray-600">
+                      <span className="font-semibold">Total:</span>{' '}
                       {p.total_amount} PYG
-                    </td>
-                    <td className="px-3 py-2 align-top text-right">
-                      {p.payments_count}
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+
+              {/* Desktop: tabla */}
+              <div className="overflow-x-auto mt-2 hidden md:block">
+                <table className="min-w-full text-xs md:text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 text-left">
+                      <th className="px-3 py-2 border-b">Plan</th>
+                      <th className="px-3 py-2 border-b text-right">Total ingresado</th>
+                      <th className="px-3 py-2 border-b text-right">Pagos</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {planSummary.map((p, idx) => (
+                      <tr
+                        key={`${p.plan_name ?? 'sin-plan'}-${idx}`}
+                        className="border-b last:border-b-0"
+                      >
+                        <td className="px-3 py-2 align-top">
+                          {p.plan_name ?? 'Sin nombre'}
+                        </td>
+                        <td className="px-3 py-2 align-top text-right">
+                          {p.total_amount} PYG
+                        </td>
+                        <td className="px-3 py-2 align-top text-right">
+                          {p.payments_count}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {studentDetailModalOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md rounded-lg shadow-lg flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b">
+              <h2 className="text-lg font-semibold text-[#31435d]">Pagos del alumno</h2>
+            </div>
+            <div className="px-4 pt-2 pb-3 text-sm text-[#31435d] font-semibold border-b">
+              {studentDetailName}
+            </div>
+            <div className="px-4 py-3 overflow-y-auto text-sm space-y-2">
+              {studentDetailRows.length === 0 ? (
+                <p className="text-xs text-gray-600">No hay pagos registrados en este periodo.</p>
+              ) : (
+                <ul className="text-xs space-y-2">
+                  {studentDetailRows.map((r) => (
+                    <li
+                      key={r.id}
+                      className="border rounded-lg px-3 py-2 bg-white flex flex-col gap-1"
+                    >
+                      <div className="flex justify-between gap-2">
+                        <span className="font-semibold text-[#31435d]">
+                          {new Date(r.payment_date).toLocaleDateString()}
+                        </span>
+                        <span className="font-semibold text-[#31435d]">
+                          {r.amount} {r.currency}
+                        </span>
+                      </div>
+                      <div className="text-gray-600">
+                        <span className="font-semibold">Plan:</span>{' '}
+                        {r.plan_name ?? '-'}
+                      </div>
+                      <div className="text-gray-600">
+                        <span className="font-semibold">Método:</span>{' '}
+                        <span className="capitalize">{r.method}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 px-4 py-3 border-t bg-white text-xs">
+              <button
+                type="button"
+                className="px-3 py-2 border rounded"
+                onClick={() => setStudentDetailModalOpen(false)}
+              >
+                Cerrar
+              </button>
+            </div>
           </div>
         </div>
       )}
