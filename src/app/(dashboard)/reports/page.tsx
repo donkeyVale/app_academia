@@ -14,6 +14,19 @@ interface PaymentReportRow {
   method: string;
 }
 
+interface StudentSummaryRow {
+  student_id: string;
+  student_name: string | null;
+  total_amount: number;
+  payments_count: number;
+}
+
+interface PlanSummaryRow {
+  plan_name: string | null;
+  total_amount: number;
+  payments_count: number;
+}
+
 export default function ReportsPage() {
   const supabase = createClientBrowser();
   const [fromDate, setFromDate] = useState("");
@@ -22,6 +35,8 @@ export default function ReportsPage() {
   const [error, setError] = useState<string | null>(null);
   const [rows, setRows] = useState<PaymentReportRow[]>([]);
   const [totalAmount, setTotalAmount] = useState(0);
+  const [studentSummary, setStudentSummary] = useState<StudentSummaryRow[]>([]);
+  const [planSummary, setPlanSummary] = useState<PlanSummaryRow[]>([]);
 
   useEffect(() => {
     // Por defecto: mes actual
@@ -137,10 +152,51 @@ export default function ReportsPage() {
 
       setRows(mapped);
       setTotalAmount(mapped.reduce((acc, r) => acc + (r.amount || 0), 0));
+
+      // 4) Resumen por alumno
+      const studentAgg: Record<string, StudentSummaryRow> = {};
+      mapped.forEach((r) => {
+        const key = r.student_id;
+        if (!studentAgg[key]) {
+          studentAgg[key] = {
+            student_id: r.student_id,
+            student_name: r.student_name,
+            total_amount: 0,
+            payments_count: 0,
+          };
+        }
+        studentAgg[key].total_amount += r.amount || 0;
+        studentAgg[key].payments_count += 1;
+      });
+      const studentSummaryRows = Object.values(studentAgg).sort(
+        (a, b) => b.total_amount - a.total_amount
+      );
+      setStudentSummary(studentSummaryRows);
+
+      // 5) Resumen por plan
+      const planAgg: Record<string, PlanSummaryRow> = {};
+      mapped.forEach((r) => {
+        const key = r.plan_name ?? 'Sin nombre';
+        if (!planAgg[key]) {
+          planAgg[key] = {
+            plan_name: r.plan_name,
+            total_amount: 0,
+            payments_count: 0,
+          };
+        }
+        planAgg[key].total_amount += r.amount || 0;
+        planAgg[key].payments_count += 1;
+      });
+      const planSummaryRows = Object.values(planAgg).sort(
+        (a, b) => b.total_amount - a.total_amount
+      );
+      setPlanSummary(planSummaryRows);
     } catch (err: any) {
       setError(err.message || "Error cargando reporte de ingresos");
       setRows([]);
       setTotalAmount(0);
+      setStudentSummary([]);
+      setPlanSummary([]);
     } finally {
       setLoading(false);
     }
@@ -190,7 +246,7 @@ export default function ReportsPage() {
         </form>
       </div>
 
-      <div className="border rounded-lg bg-white shadow-sm p-4 space-y-3">
+      <div className="border rounded-lg bg-white shadow-sm p-4 space-y-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
           <div>
             <p className="text-sm text-gray-600">Total ingresado en el periodo seleccionado</p>
@@ -268,6 +324,132 @@ export default function ReportsPage() {
           </>
         )}
       </div>
+
+      {/* Resumen por alumno */}
+      {studentSummary.length > 0 && (
+        <div className="border rounded-lg bg-white shadow-sm p-4 space-y-3">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+            <h2 className="text-lg font-semibold text-[#31435d]">Resumen por alumno</h2>
+            <p className="text-xs text-gray-500">
+              Ordenado por monto total pagado (de mayor a menor).
+            </p>
+          </div>
+
+          {/* Mobile: tarjetas */}
+          <div className="mt-2 space-y-2 md:hidden">
+            {studentSummary.map((s) => (
+              <div
+                key={s.student_id}
+                className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1"
+              >
+                <div className="flex justify-between gap-2">
+                  <span className="font-semibold text-[#31435d]">
+                    {s.student_name ?? s.student_id}
+                  </span>
+                  <span className="text-gray-500">
+                    {s.payments_count} pago{s.payments_count !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div className="text-gray-600">
+                  <span className="font-semibold">Total:</span>{' '}
+                  {s.total_amount} PYG
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop: tabla */}
+          <div className="overflow-x-auto mt-2 hidden md:block">
+            <table className="min-w-full text-xs md:text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-left">
+                  <th className="px-3 py-2 border-b">Alumno</th>
+                  <th className="px-3 py-2 border-b text-right">Total pagado</th>
+                  <th className="px-3 py-2 border-b text-right">Pagos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {studentSummary.map((s) => (
+                  <tr key={s.student_id} className="border-b last:border-b-0">
+                    <td className="px-3 py-2 align-top">
+                      {s.student_name ?? s.student_id}
+                    </td>
+                    <td className="px-3 py-2 align-top text-right">
+                      {s.total_amount} PYG
+                    </td>
+                    <td className="px-3 py-2 align-top text-right">
+                      {s.payments_count}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Resumen por plan */}
+      {planSummary.length > 0 && (
+        <div className="border rounded-lg bg-white shadow-sm p-4 space-y-3">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+            <h2 className="text-lg font-semibold text-[#31435d]">Resumen por plan</h2>
+            <p className="text-xs text-gray-500">
+              Ordenado por monto total ingresado (de mayor a menor).
+            </p>
+          </div>
+
+          {/* Mobile: tarjetas */}
+          <div className="mt-2 space-y-2 md:hidden">
+            {planSummary.map((p, idx) => (
+              <div
+                key={`${p.plan_name ?? 'sin-plan'}-${idx}`}
+                className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1"
+              >
+                <div className="flex justify-between gap-2">
+                  <span className="font-semibold text-[#31435d]">
+                    {p.plan_name ?? 'Sin nombre'}
+                  </span>
+                  <span className="text-gray-500">
+                    {p.payments_count} pago{p.payments_count !== 1 ? 's' : ''}
+                  </span>
+                </div>
+                <div className="text-gray-600">
+                  <span className="font-semibold">Total:</span>{' '}
+                  {p.total_amount} PYG
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop: tabla */}
+          <div className="overflow-x-auto mt-2 hidden md:block">
+            <table className="min-w-full text-xs md:text-sm">
+              <thead>
+                <tr className="bg-gray-50 text-left">
+                  <th className="px-3 py-2 border-b">Plan</th>
+                  <th className="px-3 py-2 border-b text-right">Total ingresado</th>
+                  <th className="px-3 py-2 border-b text-right">Pagos</th>
+                </tr>
+              </thead>
+              <tbody>
+                {planSummary.map((p, idx) => (
+                  <tr key={`${p.plan_name ?? 'sin-plan'}-${idx}`} className="border-b last:border-b-0">
+                    <td className="px-3 py-2 align-top">
+                      {p.plan_name ?? 'Sin nombre'}
+                    </td>
+                    <td className="px-3 py-2 align-top text-right">
+                      {p.total_amount} PYG
+                    </td>
+                    <td className="px-3 py-2 align-top text-right">
+                      {p.payments_count}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
