@@ -436,6 +436,7 @@ export default function ReportsPage() {
         </p>
       </div>
 
+      {/* Filtro de ingresos por fecha */}
       <div className="border rounded-lg bg-white shadow-sm">
         <form onSubmit={loadReport} className="p-4 space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -471,6 +472,7 @@ export default function ReportsPage() {
         </form>
       </div>
 
+      {/* Resumen y detalle de ingresos */}
       <div className="border rounded-lg bg-white shadow-sm p-4 space-y-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
           <div>
@@ -718,10 +720,10 @@ export default function ReportsPage() {
 
       {/* Resumen por alumno */}
       {studentSummary.length > 0 && (
-        <div className="border rounded-lg bg-white shadow-sm">
+        <div className="border rounded-lg bg-white shadow_sm">
           <button
             type="button"
-            className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+            className="w-full flex items-center justify_between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
             onClick={() => setShowStudentSummary((v) => !v)}
           >
             <span>Resumen por alumno</span>
@@ -805,17 +807,13 @@ export default function ReportsPage() {
           )}
         </div>
       )}
-    </section>
-  );
-}
-
 
       {/* Resumen por plan */}
       {planSummary.length > 0 && (
-        <div className="border rounded-lg bg-white shadow-sm">
+        <div className="border rounded-lg bg-white shadow_sm">
           <button
             type="button"
-            className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+            className="w_full flex items-center justify_between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
             onClick={() => setShowPlanSummary((v) => !v)}
           >
             <span>Resumen por plan</span>
@@ -900,6 +898,7 @@ export default function ReportsPage() {
         </div>
       )}
 
+      {/* Modal: detalle por alumno */}
       {studentDetailModalOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-md rounded-lg shadow-lg flex flex-col max-h-[90vh]">
@@ -959,6 +958,7 @@ export default function ReportsPage() {
         </div>
       )}
 
+      {/* Modal: detalle por plan */}
       {planDetailModalOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-md rounded-lg shadow-lg flex flex-col max-h-[90vh]">
