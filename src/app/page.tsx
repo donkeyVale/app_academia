@@ -91,6 +91,9 @@ export default function HomePage() {
   const [coachesCount, setCoachesCount] = useState(0);
   const [studentsCount, setStudentsCount] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showInstallHelpOpen, setShowInstallHelpOpen] = useState(false);
+  const [showInstallPopup, setShowInstallPopup] = useState(false);
+  const [popupDontShowAgain, setPopupDontShowAgain] = useState(false);
 
   // métricas específicas para coach
   const [coachTodayClasses, setCoachTodayClasses] = useState(0);
@@ -319,6 +322,21 @@ export default function HomePage() {
     return () => { active = false; };
   }, [supabase, role]);
 
+  // Popup de recordatorio para leer cómo instalar la app en el celular
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const stored = window.localStorage.getItem('hide_install_help_reminder');
+      if (stored === 'true') {
+        setShowInstallPopup(false);
+      } else {
+        setShowInstallPopup(true);
+      }
+    } catch {
+      // si localStorage falla, simplemente no mostramos el popup
+    }
+  }, []);
+
   return (
     <section className="space-y-6 max-w-5xl mx-auto px-4 py-6">
       <div className="flex items-center justify-between gap-4">
@@ -518,39 +536,119 @@ export default function HomePage() {
         </div>
       )}
 
-      <div className="border rounded-lg p-4 bg-[#f0f9fb] text-sm space-y-3 shadow-sm border border-[#3cadaf]/20">
-        <h2 className="text-base font-semibold mb-1">¿Cómo instalar esta app en tu celular?</h2>
-        <p className="text-gray-600">
-          Seguí estos pasos para tener acceso rápido desde la pantalla de inicio de tu celular.
-        </p>
+      <div className="border rounded-lg bg-white shadow-sm">
+        <button
+          type="button"
+          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-[#f0f9fb] hover:bg-[#e1f3f7] rounded-t-lg"
+          onClick={() => setShowInstallHelpOpen((v) => !v)}
+        >
+          <span className="font-semibold text-[#31435d]">¿Cómo instalar esta app en tu celular?</span>
+          <span className="text-xs text-gray-500">{showInstallHelpOpen ? '▼' : '▲'}</span>
+        </button>
+        {showInstallHelpOpen && (
+          <div id="install-app-help" className="p-4 text-sm space-y-3 bg-[#f0f9fb] border-t border-[#3cadaf]/20">
+            <p className="text-gray-600">
+              Seguí estos pasos para tener acceso rápido desde la pantalla de inicio de tu celular.
+            </p>
 
-        <div>
-          <h3 className="font-semibold text-[#31435d]">iPhone (Safari)</h3>
-          <ol className="list-decimal list-inside text-gray-700 space-y-1 mt-1">
-            <li>Abrí este enlace en Safari.</li>
-            <li>Tocá el botón <strong>Compartir</strong> (icono de cuadrado con flecha hacia arriba).</li>
-            <li>En el menú que se abre, tocá los <strong>tres puntitos</strong> (Más opciones).</li>
-            <li>Elegí <strong>"Agregar a inicio"</strong> o <strong>"Agregar a pantalla de inicio"</strong>.</li>
-            <li>Confirmá con <strong>Agregar</strong>.</li>
-          </ol>
-        </div>
+            <div>
+              <h3 className="font-semibold text-[#31435d]">iPhone (Safari)</h3>
+              <ol className="list-decimal list-inside text-gray-700 space-y-1 mt-1">
+                <li>Abrí este enlace en Safari.</li>
+                <li>Tocá el botón <strong>Compartir</strong> (icono de cuadrado con flecha hacia arriba).</li>
+                <li>En el menú que se abre, tocá los <strong>tres puntitos</strong> (Más opciones).</li>
+                <li>Elegí <strong>"Agregar a inicio"</strong> o <strong>"Agregar a pantalla de inicio"</strong>.</li>
+                <li>Confirmá con <strong>Agregar</strong>.</li>
+              </ol>
+            </div>
 
-        <div>
-          <h3 className="font-semibold text-[#31435d]">Android (Chrome)</h3>
-          <ol className="list-decimal list-inside text-gray-700 space-y-1 mt-1">
-            <li>Abrí este enlace en Chrome.</li>
-            <li>Tocá el botón de <strong>tres puntos</strong> arriba a la derecha.</li>
-            <li>Elegí <strong>"Agregar a pantalla principal"</strong> o <strong>"Instalar app"</strong>.</li>
-            <li>Confirmá cuando aparezca el mensaje.</li>
-          </ol>
-        </div>
+            <div>
+              <h3 className="font-semibold text-[#31435d]">Android (Chrome)</h3>
+              <ol className="list-decimal list-inside text-gray-700 space-y-1 mt-1">
+                <li>Abrí este enlace en Chrome.</li>
+                <li>Tocá el botón de <strong>tres puntos</strong> arriba a la derecha.</li>
+                <li>Elegí <strong>"Agregar a pantalla principal"</strong> o <strong>"Instalar app"</strong>.</li>
+                <li>Confirmá cuando aparezca el mensaje.</li>
+              </ol>
+            </div>
 
-        <p className="text-gray-600">
-          Una vez instalado, vas a ver el icono de la academia en tu pantalla de inicio y podés entrar directo como si fuera una app.
-        </p>
+            <p className="text-gray-600">
+              Una vez instalado, vas a ver el icono de la academia en tu pantalla de inicio y podés entrar directo como si fuera una app.
+            </p>
+          </div>
+        )}
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
+
+      {showInstallPopup && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md rounded-lg shadow-lg flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b">
+              <h2 className="text-lg font-semibold text-[#31435d]">Instalá esta app en tu celular</h2>
+            </div>
+            <div className="px-4 py-3 overflow-y-auto text-sm space-y-3">
+              <p className="text-gray-700">
+                Tenés disponible una guía rápida para instalar esta app en la pantalla de inicio de tu celular.
+              </p>
+              <p className="text-gray-600">
+                Podés leerla cuando quieras en la sección <strong>"¿Cómo instalar esta app en tu celular?"</strong> al final de esta pantalla.
+              </p>
+              <div className="flex items-center gap-2 text-xs text-gray-600">
+                <input
+                  id="dont-show-install-popup"
+                  type="checkbox"
+                  className="rounded border-gray-300"
+                  checked={popupDontShowAgain}
+                  onChange={(e) => setPopupDontShowAgain(e.target.checked)}
+                />
+                <label htmlFor="dont-show-install-popup">
+                  No volver a mostrar este recordatorio.
+                </label>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 px-4 py-3 border-t bg-white text-xs">
+              <button
+                type="button"
+                className="px-3 py-2 border rounded"
+                onClick={() => {
+                  if (typeof window !== 'undefined' && popupDontShowAgain) {
+                    try {
+                      window.localStorage.setItem('hide_install_help_reminder', 'true');
+                    } catch {}
+                  }
+                  setShowInstallPopup(false);
+                }}
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                className="px-3 py-2 bg-[#3cadaf] hover:bg-[#31435d] text-white rounded"
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    const el = document.getElementById('install-app-help');
+                    if (el) {
+                      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                    if (!showInstallHelpOpen) {
+                      setShowInstallHelpOpen(true);
+                    }
+                    if (popupDontShowAgain) {
+                      try {
+                        window.localStorage.setItem('hide_install_help_reminder', 'true');
+                      } catch {}
+                    }
+                  }
+                  setShowInstallPopup(false);
+                }}
+              >
+                Ver instrucciones ahora
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
