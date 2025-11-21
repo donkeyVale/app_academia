@@ -42,6 +42,9 @@ export default function ReportsPage() {
   const [studentDetailModalOpen, setStudentDetailModalOpen] = useState(false);
   const [studentDetailName, setStudentDetailName] = useState<string | null>(null);
   const [studentDetailRows, setStudentDetailRows] = useState<PaymentReportRow[]>([]);
+  const [planDetailModalOpen, setPlanDetailModalOpen] = useState(false);
+  const [planDetailName, setPlanDetailName] = useState<string | null>(null);
+  const [planDetailRows, setPlanDetailRows] = useState<PaymentReportRow[]>([]);
 
   useEffect(() => {
     // Por defecto: mes actual
@@ -442,9 +445,16 @@ export default function ReportsPage() {
               {/* Mobile: tarjetas */}
               <div className="mt-2 space-y-2 md:hidden">
                 {planSummary.map((p, idx) => (
-                  <div
+                  <button
                     key={`${p.plan_name ?? 'sin-plan'}-${idx}`}
-                    className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1"
+                    type="button"
+                    className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1 text-left w-full"
+                    onClick={() => {
+                      const detail = rows.filter((r) => (r.plan_name ?? 'Sin nombre') === (p.plan_name ?? 'Sin nombre'));
+                      setPlanDetailRows(detail);
+                      setPlanDetailName(p.plan_name ?? 'Sin nombre');
+                      setPlanDetailModalOpen(true);
+                    }}
                   >
                     <div className="flex justify-between gap-2">
                       <span className="font-semibold text-[#31435d]">
@@ -458,7 +468,7 @@ export default function ReportsPage() {
                       <span className="font-semibold">Total:</span>{' '}
                       {p.total_amount} PYG
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
 
@@ -476,7 +486,13 @@ export default function ReportsPage() {
                     {planSummary.map((p, idx) => (
                       <tr
                         key={`${p.plan_name ?? 'sin-plan'}-${idx}`}
-                        className="border-b last:border-b-0"
+                        className="border-b last:border-b-0 cursor-pointer hover:bg-gray-50"
+                        onClick={() => {
+                          const detail = rows.filter((r) => (r.plan_name ?? 'Sin nombre') === (p.plan_name ?? 'Sin nombre'));
+                          setPlanDetailRows(detail);
+                          setPlanDetailName(p.plan_name ?? 'Sin nombre');
+                          setPlanDetailModalOpen(true);
+                        }}
                       >
                         <td className="px-3 py-2 align-top">
                           {p.plan_name ?? 'Sin nombre'}
@@ -542,6 +558,59 @@ export default function ReportsPage() {
                 type="button"
                 className="px-3 py-2 border rounded"
                 onClick={() => setStudentDetailModalOpen(false)}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {planDetailModalOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md rounded-lg shadow-lg flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b">
+              <h2 className="text-lg font-semibold text-[#31435d]">Pagos del plan</h2>
+            </div>
+            <div className="px-4 pt-2 pb-3 text-sm text-[#31435d] font-semibold border-b">
+              {planDetailName}
+            </div>
+            <div className="px-4 py-3 overflow-y-auto text-sm space-y-2">
+              {planDetailRows.length === 0 ? (
+                <p className="text-xs text-gray-600">No hay pagos registrados en este periodo.</p>
+              ) : (
+                <ul className="text-xs space-y-2">
+                  {planDetailRows.map((r) => (
+                    <li
+                      key={r.id}
+                      className="border rounded-lg px-3 py-2 bg-white flex flex-col gap-1"
+                    >
+                      <div className="flex justify-between gap-2">
+                        <span className="font-semibold text-[#31435d]">
+                          {new Date(r.payment_date).toLocaleDateString()}
+                        </span>
+                        <span className="font-semibold text-[#31435d]">
+                          {r.amount} {r.currency}
+                        </span>
+                      </div>
+                      <div className="text-gray-600">
+                        <span className="font-semibold">Alumno:</span>{' '}
+                        {r.student_name ?? r.student_id}
+                      </div>
+                      <div className="text-gray-600">
+                        <span className="font-semibold">Método:</span>{' '}
+                        <span className="capitalize">{r.method}</span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 px-4 py-3 border-t bg-white text-xs">
+              <button
+                type="button"
+                className="px-3 py-2 border rounded"
+                onClick={() => setPlanDetailModalOpen(false)}
               >
                 Cerrar
               </button>
