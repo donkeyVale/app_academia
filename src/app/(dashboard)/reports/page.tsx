@@ -206,34 +206,66 @@ export default function ReportsPage() {
         </div>
 
         {rows.length > 0 && (
-          <div className="overflow-x-auto mt-3">
-            <table className="min-w-full text-xs md:text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-left">
-                  <th className="px-3 py-2 border-b">Fecha</th>
-                  <th className="px-3 py-2 border-b">Alumno</th>
-                  <th className="px-3 py-2 border-b">Plan</th>
-                  <th className="px-3 py-2 border-b">Método</th>
-                  <th className="px-3 py-2 border-b text-right">Monto</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id} className="border-b last:border-b-0">
-                    <td className="px-3 py-2 align-top">
+          <>
+            {/* Vista mobile: tarjetas apiladas */}
+            <div className="mt-3 space-y-2 md:hidden">
+              {rows.map((r) => (
+                <div
+                  key={r.id}
+                  className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1"
+                >
+                  <div className="flex justify-between gap-2">
+                    <span className="font-semibold text-[#31435d]">
+                      {r.student_name ?? r.student_id}
+                    </span>
+                    <span className="text-gray-500">
                       {new Date(r.payment_date).toLocaleDateString()}
-                    </td>
-                    <td className="px-3 py-2 align-top">{r.student_name ?? r.student_id}</td>
-                    <td className="px-3 py-2 align-top">{r.plan_name ?? "-"}</td>
-                    <td className="px-3 py-2 align-top capitalize">{r.method}</td>
-                    <td className="px-3 py-2 align-top text-right">
+                    </span>
+                  </div>
+                  <div className="text-gray-600">
+                    <span className="font-semibold">Plan:</span>{" "}
+                    {r.plan_name ?? "-"}
+                  </div>
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="capitalize text-gray-600">{r.method}</span>
+                    <span className="font-semibold text-[#31435d]">
                       {r.amount} {r.currency}
-                    </td>
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Vista desktop: tabla clásica */}
+            <div className="overflow-x-auto mt-3 hidden md:block">
+              <table className="min-w-full text-xs md:text-sm">
+                <thead>
+                  <tr className="bg-gray-50 text-left">
+                    <th className="px-3 py-2 border-b">Fecha</th>
+                    <th className="px-3 py-2 border-b">Alumno</th>
+                    <th className="px-3 py-2 border-b">Plan</th>
+                    <th className="px-3 py-2 border-b">Método</th>
+                    <th className="px-3 py-2 border-b text-right">Monto</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {rows.map((r) => (
+                    <tr key={r.id} className="border-b last:border-b-0">
+                      <td className="px-3 py-2 align-top">
+                        {new Date(r.payment_date).toLocaleDateString()}
+                      </td>
+                      <td className="px-3 py-2 align-top">{r.student_name ?? r.student_id}</td>
+                      <td className="px-3 py-2 align-top">{r.plan_name ?? "-"}</td>
+                      <td className="px-3 py-2 align-top capitalize">{r.method}</td>
+                      <td className="px-3 py-2 align-top text-right">
+                        {r.amount} {r.currency}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </section>
