@@ -41,8 +41,24 @@ type StudentPlanRow = {
   plan_id: string;
   remaining_classes: number;
   purchased_at: string;
+  base_price?: number | null;
+  discount_type?: string | null;
+  discount_value?: number | null;
+  final_price?: number | null;
   plans: { name: string; classes_included: number } | null;
   students: { level: string | null; notes: string | null } | null;
+};
+
+type PaymentRow = {
+  id: string;
+  student_id: string;
+  student_plan_id: string;
+  amount: number;
+  currency: string;
+  payment_date: string;
+  method: string;
+  status: string;
+  notes: string | null;
 };
 
 export default function PlansClient() {
@@ -50,6 +66,8 @@ export default function PlansClient() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [studentPlans, setStudentPlans] = useState<StudentPlanRow[]>([]);
+  const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [paymentsByPlan, setPaymentsByPlan] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +75,8 @@ export default function PlansClient() {
   const [selectedStudentId, setSelectedStudentId] = useState('');
   const [selectedPlanId, setSelectedPlanId] = useState('');
   const [remainingClassesInput, setRemainingClassesInput] = useState('');
+  const [discountType, setDiscountType] = useState<'none' | 'percent' | 'amount'>('none');
+  const [discountValue, setDiscountValue] = useState('');
 
   // Crear plan
   const [planName, setPlanName] = useState('');
@@ -85,6 +105,7 @@ export default function PlansClient() {
   const [showCreatePlan, setShowCreatePlan] = useState(false);
   const [showAssignPlan, setShowAssignPlan] = useState(true);
   const [showStudentSummary, setShowStudentSummary] = useState(false);
+  const [showPaymentsSection, setShowPaymentsSection] = useState(false);
   const [recentPlansSearch, setRecentPlansSearch] = useState('');
 
   // Edición de plan existente
@@ -92,6 +113,16 @@ export default function PlansClient() {
   const [editPlanName, setEditPlanName] = useState('');
   const [editPlanClasses, setEditPlanClasses] = useState('');
   const [editPlanPrice, setEditPlanPrice] = useState('');
+
+  // Registrar pago
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [paymentStudentId, setPaymentStudentId] = useState('');
+  const [paymentStudentPlanId, setPaymentStudentPlanId] = useState('');
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentDate, setPaymentDate] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('efectivo');
+  const [paymentNotes, setPaymentNotes] = useState('');
+  const [paymentStatus, setPaymentStatus] = useState<'pagado' | 'pendiente'>('pagado');
 
   useEffect(() => {
     (async () => {
@@ -147,10 +178,30 @@ export default function PlansClient() {
 
       const { data: spData, error: spErr } = await supabase
         .from('student_plans')
-        .select('id,student_id,plan_id,remaining_classes,purchased_at,plans(name,classes_included),students(level,notes)')
+        .select('id,student_id,plan_id,remaining_classes,purchased_at,base_price,discount_type,discount_value,final_price,plans(name,classes_included),students(level,notes)')
         .order('purchased_at', { ascending: false });
       if (spErr) setError(spErr.message);
       setStudentPlans(((spData ?? []) as unknown as StudentPlanRow[]));
+
+      const { data: payData, error: payErr } = await supabase
+        .from('payments')
+        .select('id,student_id,student_plan_id,amount,currency,payment_date,method,status,notes')
+        .order('payment_date', { ascending: false })
+        .limit(10);
+      if (payErr) setError(payErr.message);
+      setPayments(((payData ?? []) as unknown as PaymentRow[]));
+
+      const { data: payAggData, error: payAggErr } = await supabase
+        .from('payments')
+        .select('student_plan_id,amount,status');
+      if (!payAggErr && payAggData) {
+        const map: Record<string, number> = {};
+        (payAggData as { student_plan_id: string; amount: number; status: string }[]).forEach((p) => {
+          if (p.status !== 'pagado') return;
+          map[p.student_plan_id] = (map[p.student_plan_id] ?? 0) + (p.amount ?? 0);
+        });
+        setPaymentsByPlan(map);
+      }
 
       setLoading(false);
     })();
@@ -395,16 +446,38 @@ export default function PlansClient() {
         setSaving(false);
         return;
       }
+      const basePrice = plan?.price_cents ?? 0;
+      let finalPrice = basePrice;
+      const discountNum = Number(discountValue || 0);
+      if (discountType === 'percent' && discountNum > 0) {
+        finalPrice = Math.max(0, basePrice - (basePrice * discountNum) / 100);
+      } else if (discountType === 'amount' && discountNum > 0) {
+        finalPrice = Math.max(0, basePrice - discountNum);
+      }
+      if (!basePrice || basePrice <= 0) {
+        setError('El plan seleccionado no tiene un precio válido.');
+        setSaving(false);
+        return;
+      }
+      if (!finalPrice || finalPrice <= 0) {
+        setError('El precio final debe ser mayor a 0 (revisa el descuento aplicado).');
+        setSaving(false);
+        return;
+      }
       const { error: insErr } = await supabase.from('student_plans').insert({
         student_id: selectedStudentId,
         plan_id: selectedPlanId,
         remaining_classes: remaining,
+        base_price: basePrice,
+        discount_type: discountType,
+        discount_value: discountNum,
+        final_price: finalPrice,
       });
       if (insErr) throw insErr;
 
       const { data: spData, error: spErr } = await supabase
         .from('student_plans')
-        .select('id,student_id,plan_id,remaining_classes,purchased_at,plans(name,classes_included),students(level,notes)')
+        .select('id,student_id,plan_id,remaining_classes,purchased_at,base_price,discount_type,discount_value,final_price,plans(name,classes_included),students(level,notes)')
         .order('purchased_at', { ascending: false });
       if (spErr) throw spErr;
       setStudentPlans(((spData ?? []) as unknown as StudentPlanRow[]));
@@ -412,8 +485,63 @@ export default function PlansClient() {
       setSelectedStudentId('');
       setSelectedPlanId('');
       setRemainingClassesInput('');
+      setDiscountType('none');
+      setDiscountValue('');
     } catch (err: any) {
       setError(err.message || 'Error asignando plan');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const onCreatePayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      if (!paymentStudentId || !paymentStudentPlanId) {
+        setError('Selecciona alumno y plan para registrar el pago');
+        setSaving(false);
+        return;
+      }
+      const amountNum = Number(paymentAmount);
+      if (!amountNum || amountNum <= 0) {
+        setError('El monto del pago debe ser mayor a 0');
+        setSaving(false);
+        return;
+      }
+      const dateToUse = paymentDate || new Date().toISOString().slice(0, 10);
+
+      const { error: insErr } = await supabase.from('payments').insert({
+        student_id: paymentStudentId,
+        student_plan_id: paymentStudentPlanId,
+        amount: amountNum,
+        currency: 'PYG',
+        payment_date: dateToUse,
+        method: paymentMethod,
+        status: paymentStatus,
+        notes: paymentNotes.trim() || null,
+      });
+      if (insErr) throw insErr;
+
+      const { data: payData, error: payErr } = await supabase
+        .from('payments')
+        .select('id,student_id,student_plan_id,amount,currency,payment_date,method,status,notes')
+        .order('payment_date', { ascending: false })
+        .limit(10);
+      if (payErr) throw payErr;
+      setPayments(((payData ?? []) as unknown as PaymentRow[]));
+
+      setPaymentStudentId('');
+      setPaymentStudentPlanId('');
+      setPaymentAmount('');
+      setPaymentDate('');
+      setPaymentMethod('efectivo');
+      setPaymentNotes('');
+      setPaymentStatus('pagado');
+      setPaymentModalOpen(false);
+    } catch (err: any) {
+      setError(err.message || 'Error registrando pago');
     } finally {
       setSaving(false);
     }
@@ -581,6 +709,64 @@ export default function PlansClient() {
       <button
         type="button"
         className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+        onClick={() => setShowPaymentsSection((v) => !v)}
+      >
+        <span>Pagos</span>
+        <span className="text-xs text-gray-500">{showPaymentsSection ? '▼' : '▲'}</span>
+      </button>
+      {showPaymentsSection && (
+        <div className="p-4 space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold">Pagos recientes</h2>
+            <button
+              type="button"
+              className="text-xs px-3 py-2 rounded bg-[#3cadaf] hover:bg-[#31435d] text-white"
+              onClick={() => {
+                setPaymentModalOpen(true);
+                setError(null);
+              }}
+            >
+              Registrar pago
+            </button>
+          </div>
+          {payments.length === 0 ? (
+            <p className="text-sm text-gray-600">Aún no hay pagos registrados.</p>
+          ) : (
+            <ul className="text-sm space-y-2">
+              {payments.map((p) => {
+                const studentInfo = students.find((s) => s.id === p.student_id);
+                const displayName = studentInfo?.full_name ?? studentInfo?.notes ?? studentInfo?.level ?? p.student_id;
+                const sp = studentPlans.find((sp) => sp.id === p.student_plan_id);
+                const planName = sp?.plans?.name ?? sp?.plan_id ?? '';
+                return (
+                  <li key={p.id} className="py-2 px-3 border rounded-lg bg-white flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+                    <div>
+                      <div className="font-medium text-[#31435d]">{displayName}</div>
+                      <div className="text-xs text-gray-600">
+                        <span className="font-semibold">Plan:</span> {planName || 'Sin nombre'}
+                        {' • '}
+                        <span className="font-semibold">Monto:</span> {p.amount} {p.currency}
+                        {' • '}
+                        <span className="font-semibold">Método:</span> {p.method}
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500 text-right">
+                      <div>{new Date(p.payment_date).toLocaleDateString()}</div>
+                      <div className="capitalize">Estado: {p.status}</div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+
+    <div className="border rounded-lg bg-white shadow-sm">
+      <button
+        type="button"
+        className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
         onClick={() => setShowAssignPlan((v) => !v)}
       >
         <span>Asignar plan y ver recientes</span>
@@ -624,6 +810,58 @@ export default function PlansClient() {
                   </option>
                 ))}
               </select>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-sm mb-1">Precio base del plan</label>
+                <div className="border rounded px-3 py-2 text-sm bg-gray-50">
+                  {(() => {
+                    const plan = plans.find((p) => p.id === selectedPlanId);
+                    return plan ? `${plan.price_cents} ${plan.currency}` : '-';
+                  })()}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Tipo de descuento</label>
+                <select
+                  className="border rounded p-2 w-full text-sm"
+                  value={discountType}
+                  onChange={(e) => setDiscountType(e.target.value as 'none' | 'percent' | 'amount')}
+                >
+                  <option value="none">Sin descuento</option>
+                  <option value="percent">Porcentaje (%)</option>
+                  <option value="amount">Monto fijo</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Valor del descuento</label>
+                <input
+                  type="number"
+                  min={0}
+                  className="border rounded p-2 w-full text-sm"
+                  value={discountValue}
+                  onChange={(e) => setDiscountValue(e.target.value)}
+                  disabled={discountType === 'none'}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm mb-1">Precio final del plan para este alumno</label>
+              <div className="border rounded px-3 py-2 text-sm bg-gray-50">
+                {(() => {
+                  const plan = plans.find((p) => p.id === selectedPlanId);
+                  if (!plan || !plan.price_cents) return '-';
+                  const basePrice = plan.price_cents;
+                  const discountNum = Number(discountValue || 0);
+                  let finalPrice = basePrice;
+                  if (discountType === 'percent' && discountNum > 0) {
+                    finalPrice = Math.max(0, basePrice - (basePrice * discountNum) / 100);
+                  } else if (discountType === 'amount' && discountNum > 0) {
+                    finalPrice = Math.max(0, basePrice - discountNum);
+                  }
+                  return `${finalPrice} ${plan.currency}`;
+                })()}
+              </div>
             </div>
             <div>
               <label className="block text-sm mb-1">Clases restantes iniciales</label>
@@ -677,6 +915,10 @@ export default function PlansClient() {
                     .map((sp) => {
                       const studentInfo = students.find((s) => s.id === sp.student_id);
                       const displayName = studentInfo?.full_name ?? studentInfo?.notes ?? studentInfo?.level ?? sp.student_id;
+                      const basePrice = sp.base_price ?? null;
+                      const finalPrice = sp.final_price ?? basePrice;
+                      const totalPaid = paymentsByPlan[sp.id] ?? 0;
+                      const balance = finalPrice != null ? Math.max(0, finalPrice - totalPaid) : null;
                       return (
                         <li key={sp.id} className="py-2 px-3 border rounded-lg bg-white flex flex-col md:flex-row md:items-center md:justify-between gap-1">
                           <div>
@@ -688,6 +930,23 @@ export default function PlansClient() {
                               {' • '}
                               <span className="font-semibold">Restantes:</span> {sp.remaining_classes}
                             </div>
+                            {finalPrice != null && (
+                              <div className="text-xs mt-1">
+                                <span className="font-semibold text-gray-600">Total plan:</span> {finalPrice} PYG
+                                {' • '}
+                                <span className="font-semibold text-gray-600">Pagado:</span> {totalPaid} PYG
+                                {' • '}
+                                <span
+                                  className={
+                                    balance === 0
+                                      ? 'font-semibold text-green-600'
+                                      : 'font-semibold text-amber-600'
+                                  }
+                                >
+                                  {balance === 0 ? 'Al día' : `Saldo: ${balance} PYG`}
+                                </span>
+                              </div>
+                            )}
                           </div>
                           <div className="text-xs text-gray-500">
                             <span className="font-semibold">Asignado:</span> {new Date(sp.purchased_at).toLocaleString()}
@@ -787,6 +1046,152 @@ export default function PlansClient() {
         </div>
       )}
     </div>
+
+    {paymentModalOpen && (
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+        <div className="bg-white w-full max-w-md rounded-lg shadow-lg flex flex-col max-h-[90vh]">
+          <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b">
+            <h2 className="text-lg font-semibold text-[#31435d]">Registrar pago</h2>
+          </div>
+          <form onSubmit={onCreatePayment} className="px-4 py-3 overflow-y-auto text-sm space-y-3">
+            <div>
+              <label className="block text-sm mb-1">Alumno</label>
+              <select
+                className="border rounded p-2 w-full text-sm"
+                value={paymentStudentId}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setPaymentStudentId(id);
+                  setPaymentStudentPlanId('');
+                }}
+              >
+                <option value="">Selecciona un alumno</option>
+                {students.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.full_name ?? s.notes ?? s.level ?? s.id}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm mb-1">Plan del alumno</label>
+              <select
+                className="border rounded p-2 w-full text-sm"
+                value={paymentStudentPlanId}
+                onChange={(e) => setPaymentStudentPlanId(e.target.value)}
+              >
+                <option value="">Selecciona un plan asignado</option>
+                {studentPlans
+                  .filter((sp) => sp.student_id === paymentStudentId)
+                  .map((sp) => (
+                    <option key={sp.id} value={sp.id}>
+                      {(sp.plans?.name ?? sp.plan_id) + ` • Restantes: ${sp.remaining_classes}`}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            {paymentStudentPlanId && (
+              <div className="text-xs text-gray-600 bg-gray-50 border rounded px-3 py-2">
+                {(() => {
+                  const sp = studentPlans.find((sp) => sp.id === paymentStudentPlanId);
+                  if (!sp) return null;
+                  const basePrice = sp.base_price ?? null;
+                  const finalPrice = sp.final_price ?? basePrice;
+                  if (finalPrice == null) return 'Este plan no tiene un precio configurado.';
+                  const totalPaid = paymentsByPlan[sp.id] ?? 0;
+                  const balance = Math.max(0, finalPrice - totalPaid);
+                  return (
+                    <span>
+                      Total plan: {finalPrice} PYG • Pagado: {totalPaid} PYG •{' '}
+                      {balance === 0 ? (
+                        <span className="text-green-600 font-semibold">Al día</span>
+                      ) : (
+                        <span className="text-amber-600 font-semibold">Saldo pendiente: {balance} PYG</span>
+                      )}
+                    </span>
+                  );
+                })()}
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm mb-1">Monto (PYG)</label>
+                <input
+                  type="number"
+                  min={1}
+                  className="border rounded p-2 w-full text-sm"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Fecha de pago</label>
+                <input
+                  type="date"
+                  className="border rounded p-2 w-full text-sm"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm mb-1">Método</label>
+                <select
+                  className="border rounded p-2 w-full text-sm"
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                >
+                  <option value="efectivo">Efectivo</option>
+                  <option value="transferencia">Transferencia</option>
+                  <option value="tarjeta">Tarjeta</option>
+                  <option value="mercadopago">MercadoPago</option>
+                  <option value="otro">Otro</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Estado</label>
+                <select
+                  className="border rounded p-2 w-full text-sm"
+                  value={paymentStatus}
+                  onChange={(e) => setPaymentStatus(e.target.value as 'pagado' | 'pendiente')}
+                >
+                  <option value="pagado">Pagado</option>
+                  <option value="pendiente">Pendiente</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm mb-1">Notas (opcional)</label>
+              <textarea
+                className="border rounded p-2 w-full text-sm min-h-[60px]"
+                value={paymentNotes}
+                onChange={(e) => setPaymentNotes(e.target.value)}
+              />
+            </div>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <div className="flex justify-end gap-2 py-2 border-t mt-2 pt-3">
+              <button
+                type="button"
+                className="px-3 py-2 border rounded text-xs"
+                onClick={() => {
+                  setPaymentModalOpen(false);
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="px-3 py-2 bg-[#3cadaf] hover:bg-[#31435d] text-white rounded text-xs disabled:opacity-50"
+                disabled={saving}
+              >
+                {saving ? 'Guardando...' : 'Registrar pago'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    )}
     </section>
   );
 }
