@@ -2,6 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { createClientBrowser } from "@/lib/supabase";
+import { toast } from "sonner";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 interface PaymentReportRow {
   id: string;
@@ -157,20 +167,36 @@ export default function ReportsPage() {
     rows: any[]
   ) => {
     if (!rows || rows.length === 0) return;
-    const XLSX = await import("xlsx");
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-    const wbout = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+    try {
+      const XLSX = await import("xlsx");
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+      const wbout = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
 
-    const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    a.click();
-    URL.revokeObjectURL(url);
+      const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Exportación a Excel lista");
+    } catch (e) {
+      console.error(e);
+      toast.error("No se pudo exportar a Excel");
+    }
   };
+
+  const incomeChartData = rows.length
+    ? Object.entries(
+        rows.reduce<Record<string, number>>((acc, r) => {
+          const key = new Date(r.payment_date).toLocaleDateString();
+          acc[key] = (acc[key] || 0) + (r.amount || 0);
+          return acc;
+        }, {})
+      ).map(([date, total]) => ({ date, total }))
+    : [];
 
   const exportToPdf = async (
     fileName: string,
@@ -179,22 +205,28 @@ export default function ReportsPage() {
     rows: any[][]
   ) => {
     if (!rows || rows.length === 0) return;
-    const { jsPDF } = await import("jspdf");
-    const autoTable = (await import("jspdf-autotable")).default as any;
+    try {
+      const { jsPDF } = await import("jspdf");
+      const autoTable = (await import("jspdf-autotable")).default as any;
 
-    const doc = new jsPDF();
-    doc.setFontSize(14);
-    doc.text(title, 14, 16);
+      const doc = new jsPDF();
+      doc.setFontSize(14);
+      doc.text(title, 14, 16);
 
-    autoTable(doc, {
-      head: [headers],
-      body: rows,
-      startY: 22,
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [49, 67, 93] },
-    });
+      autoTable(doc, {
+        head: [headers],
+        body: rows,
+        startY: 22,
+        styles: { fontSize: 8 },
+        headStyles: { fillColor: [49, 67, 93] },
+      });
 
-    doc.save(fileName);
+      doc.save(fileName);
+      toast.success("Exportación a PDF lista");
+    } catch (e) {
+      console.error(e);
+      toast.error("No se pudo exportar a PDF");
+    }
   };
 
   useEffect(() => {
@@ -1097,6 +1129,28 @@ export default function ReportsPage() {
                   </button>
                 </div>
               </div>
+
+              {incomeChartData.length > 0 && (
+                <div className="mt-4 h-56 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={incomeChartData} margin={{ top: 8, right: 16, left: -16, bottom: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 10 }}
+                        tickMargin={8}
+                      />
+                      <YAxis tick={{ fontSize: 10 }} tickMargin={8} />
+                      <Tooltip
+                        formatter={(value: any) => [`${value} PYG`, "Total"]}
+                        labelStyle={{ fontSize: 11 }}
+                        contentStyle={{ fontSize: 11 }}
+                      />
+                      <Bar dataKey="total" fill="#3cadaf" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
               {error && <p className="text-sm text-red-600 mt-1">{error}</p>}
             </form>
 

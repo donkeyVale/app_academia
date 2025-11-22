@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import PreloaderProvider from "./PreloaderProvider";
+import { Toaster } from "sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -60,6 +61,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#f5f7fa] text-[#31435d]`}
       >
         <PreloaderProvider>{children}</PreloaderProvider>
+        <Toaster richColors position="top-right" />
         <script
           dangerouslySetInnerHTML={{
             __html: `
