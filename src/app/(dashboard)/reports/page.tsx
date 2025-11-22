@@ -1070,7 +1070,7 @@ export default function ReportsPage() {
   };
 
   return (
-    <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4">
+    <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4 overflow-x-hidden">
       <div className="space-y-1">
         <h1 className="text-2xl font-semibold text-[#31435d]">Reportes</h1>
         <p className="text-sm text-gray-600">Consulta ingresos y uso de clases.</p>
