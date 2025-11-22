@@ -14,6 +14,9 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Calendar as CalendarIcon } from "lucide-react";
 
 interface PaymentReportRow {
   id: string;
@@ -86,6 +89,67 @@ interface LocationClassRow {
   location_name: string | null;
   present_count: number;
   absent_count: number;
+}
+
+interface DatePickerFieldProps {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function parseYmd(value: string): Date | undefined {
+  if (!value) return undefined;
+  const parts = value.split("-");
+  if (parts.length !== 3) return undefined;
+  const [y, m, d] = parts.map((p) => Number(p));
+  if (!y || !m || !d) return undefined;
+  const date = new Date(y, m - 1, d);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date;
+}
+
+function formatYmd(date: Date | undefined): string {
+  if (!date) return "";
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function formatDisplay(date: Date | undefined): string {
+  if (!date) return "Seleccionar fecha";
+  return date.toLocaleDateString("es-PY");
+}
+
+function DatePickerField({ value, onChange }: DatePickerFieldProps) {
+  const selectedDate = parseYmd(value);
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full justify-start text-left text-sm font-normal flex items-center gap-2"
+       >
+          <CalendarIcon className="h-4 w-4 text-gray-500" />
+          <span className={selectedDate ? "" : "text-gray-400"}>
+            {formatDisplay(selectedDate)}
+          </span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={selectedDate}
+          onSelect={(date) => {
+            if (!date) return;
+            onChange(formatYmd(date));
+          }}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 export default function ReportsPage() {
@@ -1077,7 +1141,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Ingresos */}
-      <div className="border rounded-lg bg-white shadow-sm">
+      <div className="border rounded-lg bg-white shadow-sm overflow-hidden">
         <button
           type="button"
           className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
@@ -1093,21 +1157,11 @@ export default function ReportsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="min-w-0 flex flex-col items-start w-full max-w-xs">
                   <label className="block text-sm mb-1">Desde</label>
-                  <Input
-                    type="date"
-                    className="w-full md:w-32 text-sm box-border mr-1"
-                    value={fromDate}
-                    onChange={(e) => setFromDate(e.target.value)}
-                  />
+                  <DatePickerField value={fromDate} onChange={setFromDate} />
                 </div>
-                <div className="min-w-0 flex flex-col items-start">
+                <div className="min-w-0 flex flex-col items-start w-full max-w-xs">
                   <label className="block text-sm mb-1">Hasta</label>
-                  <Input
-                    type="date"
-                    className="w-full md:w-32 text-sm box-border mr-1"
-                    value={toDate}
-                    onChange={(e) => setToDate(e.target.value)}
-                  />
+                  <DatePickerField value={toDate} onChange={setToDate} />
                 </div>
                 <div className="flex items-end gap-2 justify-end md:justify-start flex-wrap">
                   <Button
@@ -1490,7 +1544,7 @@ export default function ReportsPage() {
       )}
       
       {/* Asistencia / Uso de clases por alumno */}
-      <div className="border rounded-lg bg-white shadow-sm">
+      <div className="border rounded-lg bg-white shadow-sm overflow-hidden">
         <button
           type="button"
           className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
@@ -1756,7 +1810,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Asistencia / Uso de clases por profesor */}
-      <div className="border rounded-lg bg-white shadow-sm">
+      <div className="border rounded-lg bg-white shadow-sm overflow-hidden">
         <button
           type="button"
           className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
@@ -1993,7 +2047,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Asistencia / Uso de clases por sede / cancha */}
-      <div className="border rounded-lg bg-white shadow-sm">
+      <div className="border rounded-lg bg-white shadow-sm overflow-hidden">
         <button
           type="button"
           className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
