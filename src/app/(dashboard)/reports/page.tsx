@@ -659,6 +659,11 @@ export default function ReportsPage() {
                     onClick={() => {
                       setFromDate("");
                       setToDate("");
+                      setRows([]);
+                      setTotalAmount(0);
+                      setStudentSummary([]);
+                      setPlanSummary([]);
+                      setError(null);
                     }}
                   >
                     Limpiar
@@ -847,6 +852,185 @@ export default function ReportsPage() {
           )}
         </div>
       )}
+
+      {/* Asistencia / Uso de clases por alumno */}
+      <div className="border rounded-lg bg-white shadow-sm">
+        <button
+          type="button"
+          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+          onClick={() => setShowAttendanceStudent((v) => !v)}
+        >
+          <span>Asistencia / Uso de clases por alumno</span>
+          <span className="text-xs text-gray-500">{showAttendanceStudent ? '▼' : '▲'}</span>
+        </button>
+        {showAttendanceStudent && (
+          <div className="p-4 space-y-4">
+            <form onSubmit={loadAttendanceByStudent} className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div className="md:col-span-2">
+                  <label className="block text-sm mb-1">Alumno</label>
+                  <select
+                    className="border rounded p-2 w-full text-base md:text-sm"
+                    value={attendanceStudentId}
+                    onChange={(e) => setAttendanceStudentId(e.target.value)}
+                  >
+                    <option value="">Selecciona un alumno</option>
+                    {attendanceStudents.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">Desde</label>
+                  <input
+                    type="date"
+                    className="border rounded p-2 w-full text-base md:text-sm"
+                    value={attendanceFrom}
+                    onChange={(e) => setAttendanceFrom(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">Hasta</label>
+                  <input
+                    type="date"
+                    className="border rounded p-2 w-full text-base md:text-sm"
+                    value={attendanceTo}
+                    onChange={(e) => setAttendanceTo(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="border rounded px-3 py-2 text-xs text-gray-700 bg-white hover:bg-gray-50"
+                  onClick={() => {
+                    setAttendanceFrom("");
+                    setAttendanceTo("");
+                    setAttendanceRows([]);
+                    setAttendanceSummary(null);
+                    setError(null);
+                  }}
+                >
+                  Limpiar
+                </button>
+                <button
+                  type="submit"
+                  className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50 text-sm"
+                  disabled={attendanceLoading}
+                >
+                  {attendanceLoading ? 'Cargando asistencia...' : 'Ver asistencia'}
+                </button>
+              </div>
+            </form>
+
+            {attendanceSummary && (
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-sm">
+                <div className="space-y-1">
+                  <p className="text-gray-700">
+                    <span className="font-semibold">Total clases en el periodo:</span>{' '}
+                    {attendanceSummary.total}
+                  </p>
+                  <p className="text-green-700 text-sm">
+                    <span className="font-semibold">Presentes:</span>{' '}
+                    {attendanceSummary.present}
+                  </p>
+                  <p className="text-red-700 text-sm">
+                    <span className="font-semibold">Ausentes:</span>{' '}
+                    {attendanceSummary.absent}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {attendanceRows.length > 0 && (
+              <>
+                {/* Mobile: tarjetas */}
+                <div className="mt-2 space-y-2 md:hidden">
+                  {attendanceRows.map((r) => (
+                    <div
+                      key={r.class_id + r.date}
+                      className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1"
+                    >
+                      <div className="flex justify-between gap-2">
+                        <span className="font-semibold text-[#31435d]">
+                          {new Date(r.date).toLocaleString()}
+                        </span>
+                        <span
+                          className={
+                            r.present
+                              ? 'text-green-700 font-semibold'
+                              : 'text-red-700 font-semibold'
+                          }
+                        >
+                          {r.present ? 'Presente' : 'Ausente'}
+                        </span>
+                      </div>
+                      {r.location_name && (
+                        <div className="text-gray-600">
+                          <span className="font-semibold">Sede:</span>{' '}
+                          {r.location_name}
+                        </div>
+                      )}
+                      {r.court_name && (
+                        <div className="text-gray-600">
+                          <span className="font-semibold">Cancha:</span>{' '}
+                          {r.court_name}
+                        </div>
+                      )}
+                      {r.coach_name && (
+                        <div className="text-gray-600">
+                          <span className="font-semibold">Profesor:</span>{' '}
+                          {r.coach_name}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop: tabla */}
+                <div className="overflow-x-auto mt-2 hidden md:block">
+                  <table className="min-w-full text-xs md:text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 text-left">
+                        <th className="px-3 py-2 border-b">Fecha</th>
+                        <th className="px-3 py-2 border-b">Sede</th>
+                        <th className="px-3 py-2 border-b">Cancha</th>
+                        <th className="px-3 py-2 border-b">Profesor</th>
+                        <th className="px-3 py-2 border-b">Estado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {attendanceRows.map((r) => (
+                        <tr key={r.class_id + r.date} className="border-b last:border-b-0">
+                          <td className="px-3 py-2 align-top">
+                            {new Date(r.date).toLocaleString()}
+                          </td>
+                          <td className="px-3 py-2 align-top">{r.location_name ?? '-'}</td>
+                          <td className="px-3 py-2 align-top">{r.court_name ?? '-'}</td>
+                          <td className="px-3 py-2 align-top">{r.coach_name ?? '-'}</td>
+                          <td className="px-3 py-2 align-top">
+                            <span
+                              className={
+                                r.present
+                                  ? 'inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-green-50 text-green-700'
+                                  : 'inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 text-red-700'
+                              }
+                            >
+                              {r.present ? 'Presente' : 'Ausente'}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Asistencia / Uso de clases por alumno */}
       <div className="border rounded-lg bg-white shadow-sm">
