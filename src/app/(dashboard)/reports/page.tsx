@@ -705,16 +705,14 @@ export default function ReportsPage() {
     setLocationDetailRows([]);
 
     try {
+      // 1) Traer asistencia de la clase
       const { data: attData, error: attErr } = await supabase
         .from("attendance")
-        .select(
-          "student_id,present,students(id,level,notes,profiles(full_name))"
-        )
+        .select("student_id,present")
         .eq("class_id", classId);
       if (attErr) throw attErr;
 
-      // Usamos any aquí porque Supabase devuelve students y profiles como arrays anidados
-      const attRows = (attData ?? []) as any[];
+      const attRows = (attData ?? []) as { student_id: string; present: boolean | null }[];
 
       if (attRows.length === 0) {
         setLocationDetailRows([]);
@@ -722,12 +720,52 @@ export default function ReportsPage() {
         return;
       }
 
+      // 2) Cargar alumnos y perfiles para armar nombres
+      const studentIds = Array.from(new Set(attRows.map((a) => a.student_id)));
+      const { data: studentsData, error: studentsErr } = await supabase
+        .from("students")
+        .select("id,user_id,level,notes")
+        .in("id", studentIds);
+      if (studentsErr) throw studentsErr;
+
+      const students = (studentsData ?? []) as { id: string; user_id: string | null; level: string | null; notes: string | null }[];
+      const userIds = Array.from(
+        new Set(students.map((s) => s.user_id).filter((id): id is string => !!id))
+      );
+
+      let profilesMap: Record<string, string | null> = {};
+      if (userIds.length > 0) {
+        const { data: profilesData, error: profilesErr } = await supabase
+          .from("profiles")
+          .select("id,full_name")
+          .in("id", userIds);
+        if (profilesErr) throw profilesErr;
+        profilesMap = (profilesData ?? []).reduce<Record<string, string | null>>(
+          (acc, p: any) => {
+            acc[p.id as string] = (p.full_name as string | null) ?? null;
+            return acc;
+          },
+          {}
+        );
+      }
+
+      const studentMap: Record<
+        string,
+        { level: string | null; notes: string | null; user_id: string | null }
+      > = {};
+      students.forEach((s) => {
+        studentMap[s.id] = {
+          level: s.level,
+          notes: s.notes,
+          user_id: s.user_id,
+        };
+      });
+
       const detailRows = attRows.map((a) => {
-        // En la respuesta real, students suele ser un array, y dentro profiles también
-        const student = Array.isArray(a.students) ? a.students[0] : a.students;
-        const profiles = student?.profiles;
-        const profile = Array.isArray(profiles) ? profiles[0] : profiles;
-        const profileName = profile?.full_name ?? null;
+        const student = studentMap[a.student_id];
+        const profileName = student?.user_id
+          ? profilesMap[student.user_id] ?? null
+          : null;
         const fallbackLabel =
           profileName ?? student?.notes ?? student?.level ?? a.student_id;
         return {
