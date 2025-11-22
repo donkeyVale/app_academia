@@ -1090,7 +1090,7 @@ export default function ReportsPage() {
           <div className="p-4 space-y-4">
             {/* Filtro de ingresos por fecha */}
             <form onSubmit={loadReport} className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="min-w-0 flex flex-col items-start w-full max-w-xs">
                   <label className="block text-sm mb-1">Desde</label>
                   <Input
@@ -1504,7 +1504,7 @@ export default function ReportsPage() {
         {showAttendanceStudent && (
           <div className="p-4 space-y-4">
             <form onSubmit={loadAttendanceByStudent} className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="md:col-span-2">
                   <label className="block text-sm mb-1">Alumno</label>
                   <select
@@ -1768,7 +1768,7 @@ export default function ReportsPage() {
         {showAttendanceCoach && (
           <div className="p-4 space-y-4">
             <form onSubmit={loadAttendanceByCoach} className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="md:col-span-2">
                   <label className="block text-sm mb-1">Profesor</label>
                   <select
@@ -2005,7 +2005,7 @@ export default function ReportsPage() {
         {showAttendanceLocation && (
           <div className="p-4 space-y-4">
             <form onSubmit={loadAttendanceByLocation} className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-sm mb-1">Sede</label>
                   <select
