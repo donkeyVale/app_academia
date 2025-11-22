@@ -1890,9 +1890,18 @@ export default function ReportsPage() {
                 {/* Mobile: tarjetas */}
                 <div className="mt-2 space-y-2 md:hidden">
                   {coachRows.map((r) => (
-                    <div
+                    <button
                       key={r.class_id + r.date}
-                      className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1"
+                      type="button"
+                      className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1 text-left w-full"
+                      onClick={() =>
+                        loadLocationClassDetail(r.class_id, {
+                          date: r.date,
+                          location_name: r.location_name ?? null,
+                          court_name: r.court_name ?? null,
+                          coach_name: null,
+                        })
+                      }
                     >
                       <div className="flex justify-between gap-2">
                         <span className="font-semibold text-[#31435d]">
@@ -1910,7 +1919,7 @@ export default function ReportsPage() {
                         <span className="font-semibold">Ausentes:</span>{' '}
                         {r.absent_count}
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
 
@@ -1928,7 +1937,18 @@ export default function ReportsPage() {
                     </thead>
                     <tbody>
                       {coachRows.map((r) => (
-                        <tr key={r.class_id + r.date} className="border-b last:border-b-0">
+                        <tr
+                          key={r.class_id + r.date}
+                          className="border-b last:border-b-0 cursor-pointer hover:bg-gray-50"
+                          onClick={() =>
+                            loadLocationClassDetail(r.class_id, {
+                              date: r.date,
+                              location_name: r.location_name ?? null,
+                              court_name: r.court_name ?? null,
+                              coach_name: null,
+                            })
+                          }
+                        >
                           <td className="px-3 py-2 align-top">
                             {new Date(r.date).toLocaleString()}
                           </td>
