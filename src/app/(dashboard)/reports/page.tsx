@@ -55,6 +55,27 @@ interface CoachClassRow {
   absent_count: number;
 }
 
+interface LocationOption {
+  id: string;
+  label: string;
+}
+
+interface CourtOption {
+  id: string;
+  label: string;
+  location_id: string | null;
+}
+
+interface LocationClassRow {
+  class_id: string;
+  date: string;
+  coach_name: string | null;
+  court_name: string | null;
+  location_name: string | null;
+  present_count: number;
+  absent_count: number;
+}
+
 export default function ReportsPage() {
   const supabase = createClientBrowser();
   const [fromDate, setFromDate] = useState("");
@@ -94,6 +115,18 @@ export default function ReportsPage() {
   const [coachRows, setCoachRows] = useState<CoachClassRow[]>([]);
   const [coachSummary, setCoachSummary] = useState<{ totalClasses: number; present: number; absent: number } | null>(null);
   const [showAttendanceCoach, setShowAttendanceCoach] = useState(false);
+
+  // Asistencia por sede / cancha
+  const [locationOptions, setLocationOptions] = useState<LocationOption[]>([]);
+  const [courtOptions, setCourtOptions] = useState<CourtOption[]>([]);
+  const [locationId, setLocationId] = useState("");
+  const [courtId, setCourtId] = useState("");
+  const [locationFrom, setLocationFrom] = useState("");
+  const [locationTo, setLocationTo] = useState("");
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationRows, setLocationRows] = useState<LocationClassRow[]>([]);
+  const [locationSummary, setLocationSummary] = useState<{ totalClasses: number; present: number; absent: number } | null>(null);
+  const [showAttendanceLocation, setShowAttendanceLocation] = useState(false);
 
   useEffect(() => {
     // Por defecto: mes actual
@@ -187,6 +220,41 @@ export default function ReportsPage() {
       } catch (e) {
         // usamos el mismo error general
         const msg = (e as any)?.message || "Error cargando datos para reportes de asistencia";
+        setError(msg);
+      }
+    })();
+  }, [supabase]);
+
+  // Cargar sedes y canchas para reporte por sede/cancha
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: locData, error: locErr } = await supabase
+          .from("locations")
+          .select("id,name");
+        if (locErr) throw locErr;
+
+        const locOptions: LocationOption[] = (locData ?? []).map((l: any) => ({
+          id: l.id as string,
+          label: ((l.name as string | null) ?? l.id) as string,
+        }));
+        locOptions.sort((a, b) => a.label.localeCompare(b.label));
+        setLocationOptions(locOptions);
+
+        const { data: courtsData, error: ctErr } = await supabase
+          .from("courts")
+          .select("id,name,location_id");
+        if (ctErr) throw ctErr;
+
+        const ctOptions: CourtOption[] = (courtsData ?? []).map((c: any) => ({
+          id: c.id as string,
+          label: ((c.name as string | null) ?? c.id) as string,
+          location_id: (c.location_id as string | null) ?? null,
+        }));
+        ctOptions.sort((a, b) => a.label.localeCompare(b.label));
+        setCourtOptions(ctOptions);
+      } catch (e) {
+        const msg = (e as any)?.message || "Error cargando sedes y canchas";
         setError(msg);
       }
     })();
@@ -609,6 +677,200 @@ export default function ReportsPage() {
       setCoachSummary(null);
     } finally {
       setCoachLoading(false);
+    }
+  };
+
+  const loadAttendanceByLocation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!locationId) {
+      setError("Selecciona una sede para ver asistencia por sede/cancha");
+      return;
+    }
+    if (!locationFrom || !locationTo) {
+      setError("Selecciona un rango de fechas para asistencia por sede/cancha");
+      return;
+    }
+
+    setLocationLoading(true);
+    setError(null);
+
+    try {
+      // 1) Obtener canchas de la sede seleccionada (o una cancha específica si se eligió)
+      const courtFilter = supabase
+        .from("courts")
+        .select("id,name,location_id")
+        .eq("location_id", locationId);
+
+      const { data: courtsData, error: courtsErr } = await courtFilter;
+      if (courtsErr) throw courtsErr;
+
+      const courts = (courtsData ?? []) as { id: string; name: string | null; location_id: string | null }[];
+      if (courts.length === 0) {
+        setLocationRows([]);
+        setLocationSummary({ totalClasses: 0, present: 0, absent: 0 });
+        return;
+      }
+
+      const allowedCourtIds = courts.map((c) => c.id);
+
+      // 2) Obtener clases en esas canchas y rango de fechas
+      let clsQuery = supabase
+        .from("class_sessions")
+        .select("id,date,court_id,coach_id")
+        .gte("date", locationFrom)
+        .lte("date", locationTo)
+        .in("court_id", allowedCourtIds);
+
+      if (courtId) {
+        clsQuery = clsQuery.eq("court_id", courtId);
+      }
+
+      const { data: clsData, error: clsErr } = await clsQuery;
+      if (clsErr) throw clsErr;
+
+      const classes = (clsData ?? []) as { id: string; date: string; court_id: string | null; coach_id: string | null }[];
+      if (classes.length === 0) {
+        setLocationRows([]);
+        setLocationSummary({ totalClasses: 0, present: 0, absent: 0 });
+        return;
+      }
+
+      // 3) Obtener asistencia de esas clases
+      const classIds = classes.map((c) => c.id);
+      const { data: attData, error: attErr } = await supabase
+        .from("attendance")
+        .select("class_id,present")
+        .in("class_id", classIds);
+      if (attErr) throw attErr;
+
+      const attendance = (attData ?? []) as { class_id: string; present: boolean | null }[];
+
+      // 4) Mapas de cancha y sede
+      const courtIds = Array.from(new Set(classes.map((c) => c.court_id).filter((id): id is string => !!id)));
+      let courtMap: Record<string, { court_name: string | null; location_id: string | null }> = {};
+      if (courtIds.length > 0) {
+        const { data: courtsFull, error: ctErr } = await supabase
+          .from("courts")
+          .select("id,name,location_id")
+          .in("id", courtIds);
+        if (ctErr) throw ctErr;
+        courtMap = (courtsFull ?? []).reduce<
+          Record<string, { court_name: string | null; location_id: string | null }>
+        >(
+          (acc, c: any) => {
+            acc[c.id as string] = {
+              court_name: (c.name as string | null) ?? null,
+              location_id: (c.location_id as string | null) ?? null,
+            };
+            return acc;
+          },
+          {}
+        );
+      }
+
+      const locationIds = Array.from(
+        new Set(
+          Object.values(courtMap)
+            .map((c) => c.location_id)
+            .filter((id): id is string => !!id)
+        )
+      );
+      let locationMap: Record<string, string | null> = {};
+      if (locationIds.length > 0) {
+        const { data: locData, error: locErr } = await supabase
+          .from("locations")
+          .select("id,name")
+          .in("id", locationIds);
+        if (locErr) throw locErr;
+        locationMap = (locData ?? []).reduce<Record<string, string | null>>(
+          (acc, l: any) => {
+            acc[l.id as string] = (l.name as string | null) ?? null;
+            return acc;
+          },
+          {}
+        );
+      }
+
+      // 5) Mapear profesores para mostrar nombre
+      const coachIds = Array.from(
+        new Set(classes.map((c) => c.coach_id).filter((id): id is string => !!id))
+      );
+      let coachMap: Record<string, string | null> = {};
+      if (coachIds.length > 0) {
+        const { data: coachesData, error: coachesErr } = await supabase
+          .from("coaches")
+          .select("id,user_id");
+        if (coachesErr) throw coachesErr;
+        const coachesRaw = (coachesData ?? []) as { id: string; user_id: string | null }[];
+        const coachUserIds = Array.from(
+          new Set(coachesRaw.map((c) => c.user_id).filter((id): id is string => !!id))
+        );
+        let profilesMap: Record<string, string | null> = {};
+        if (coachUserIds.length > 0) {
+          const { data: profilesData, error: pErr } = await supabase
+            .from("profiles")
+            .select("id,full_name")
+            .in("id", coachUserIds);
+          if (pErr) throw pErr;
+          profilesMap = (profilesData ?? []).reduce<Record<string, string | null>>(
+            (acc, p: any) => {
+              acc[p.id as string] = (p.full_name as string | null) ?? null;
+              return acc;
+            },
+            {}
+          );
+        }
+        coachesRaw.forEach((c) => {
+          if (!coachIds.includes(c.id)) return;
+          coachMap[c.id] = c.user_id ? profilesMap[c.user_id] ?? null : null;
+        });
+      }
+
+      // 6) Agrupar asistencia por clase
+      const byClass: Record<string, { present: number; absent: number }> = {};
+      attendance.forEach((a) => {
+        const key = a.class_id;
+        if (!byClass[key]) {
+          byClass[key] = { present: 0, absent: 0 };
+        }
+        if (a.present) {
+          byClass[key].present += 1;
+        } else {
+          byClass[key].absent += 1;
+        }
+      });
+
+      // 7) Construir filas finales
+      const rows: LocationClassRow[] = classes.map((c) => {
+        const counts = byClass[c.id] ?? { present: 0, absent: 0 };
+        const courtInfo = c.court_id ? courtMap[c.court_id] : undefined;
+        const locationName = courtInfo?.location_id
+          ? locationMap[courtInfo.location_id] ?? null
+          : null;
+        const coachName = c.coach_id ? coachMap[c.coach_id] ?? null : null;
+        return {
+          class_id: c.id,
+          date: c.date,
+          coach_name: coachName,
+          court_name: courtInfo?.court_name ?? null,
+          location_name: locationName,
+          present_count: counts.present,
+          absent_count: counts.absent,
+        };
+      }).sort((a, b) => a.date.localeCompare(b.date));
+
+      const totalClasses = rows.length;
+      const totalPresent = rows.reduce((acc, r) => acc + r.present_count, 0);
+      const totalAbsent = rows.reduce((acc, r) => acc + r.absent_count, 0);
+      setLocationRows(rows);
+      setLocationSummary({ totalClasses, present: totalPresent, absent: totalAbsent });
+    } catch (e) {
+      const msg = (e as any)?.message || "Error cargando asistencia por sede/cancha";
+      setError(msg);
+      setLocationRows([]);
+      setLocationSummary(null);
+    } finally {
+      setLocationLoading(false);
     }
   };
 
@@ -1260,6 +1522,188 @@ export default function ReportsPage() {
                           </td>
                           <td className="px-3 py-2 align-top">{r.location_name ?? '-'}</td>
                           <td className="px-3 py-2 align-top">{r.court_name ?? '-'}</td>
+                          <td className="px-3 py-2 align-top text-right">{r.present_count}</td>
+                          <td className="px-3 py-2 align-top text-right">{r.absent_count}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Asistencia / Uso de clases por sede / cancha */}
+      <div className="border rounded-lg bg-white shadow-sm">
+        <button
+          type="button"
+          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+          onClick={() => setShowAttendanceLocation((v) => !v)}
+        >
+          <span>Asistencia / Uso de clases por sede / cancha</span>
+          <span className="text-xs text-gray-500">{showAttendanceLocation ? '▼' : '▲'}</span>
+        </button>
+        {showAttendanceLocation && (
+          <div className="p-4 space-y-4">
+            <form onSubmit={loadAttendanceByLocation} className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-sm mb-1">Sede</label>
+                  <select
+                    className="border rounded p-2 w-full text-base md:text-sm"
+                    value={locationId}
+                    onChange={(e) => {
+                      setLocationId(e.target.value);
+                      setCourtId("");
+                    }}
+                  >
+                    <option value="">Selecciona una sede</option>
+                    {locationOptions.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">Cancha (opcional)</label>
+                  <select
+                    className="border rounded p-2 w-full text-base md:text-sm"
+                    value={courtId}
+                    onChange={(e) => setCourtId(e.target.value)}
+                    disabled={!locationId}
+                  >
+                    <option value="">Todas las canchas</option>
+                    {courtOptions
+                      .filter((c) => !locationId || c.location_id === locationId)
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.label}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">Desde</label>
+                  <input
+                    type="date"
+                    className="border rounded p-2 w-full text-base md:text-sm"
+                    value={locationFrom}
+                    onChange={(e) => setLocationFrom(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">Hasta</label>
+                  <input
+                    type="date"
+                    className="border rounded p-2 w-full text-base md:text-sm"
+                    value={locationTo}
+                    onChange={(e) => setLocationTo(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="border rounded px-3 py-2 text-xs text-gray-700 bg-white hover:bg-gray-50"
+                  onClick={() => {
+                    setLocationId("");
+                    setCourtId("");
+                    setLocationFrom("");
+                    setLocationTo("");
+                    setLocationRows([]);
+                    setLocationSummary(null);
+                    setError(null);
+                  }}
+                >
+                  Limpiar
+                </button>
+                <button
+                  type="submit"
+                  className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50 text-sm"
+                  disabled={locationLoading}
+                >
+                  {locationLoading ? 'Cargando asistencia...' : 'Ver asistencia'}
+                </button>
+              </div>
+            </form>
+
+            {locationSummary && (
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-sm">
+                <div className="space-y-1">
+                  <p className="text-gray-700">
+                    <span className="font-semibold">Total clases en el periodo:</span>{' '}
+                    {locationSummary.totalClasses}
+                  </p>
+                  <p className="text-green-700 text-sm">
+                    <span className="font-semibold">Presentes (alumnos):</span>{' '}
+                    {locationSummary.present}
+                  </p>
+                  <p className="text-red-700 text-sm">
+                    <span className="font-semibold">Ausentes (alumnos):</span>{' '}
+                    {locationSummary.absent}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {locationRows.length > 0 && (
+              <>
+                {/* Mobile: tarjetas */}
+                <div className="mt-2 space-y-2 md:hidden">
+                  {locationRows.map((r) => (
+                    <div
+                      key={r.class_id + r.date}
+                      className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1"
+                    >
+                      <div className="flex justify-between gap-2">
+                        <span className="font-semibold text-[#31435d]">
+                          {new Date(r.date).toLocaleString()}
+                        </span>
+                        <span className="text-gray-600 text-[11px]">
+                          {r.location_name ?? '-'} / {r.court_name ?? '-'}
+                        </span>
+                      </div>
+                      <div className="text-gray-600">
+                        <span className="font-semibold">Profesor:</span>{' '}
+                        {r.coach_name ?? '-'}
+                      </div>
+                      <div className="text-gray-600">
+                        <span className="font-semibold">Presentes:</span>{' '}
+                        {r.present_count}
+                      </div>
+                      <div className="text-gray-600">
+                        <span className="font-semibold">Ausentes:</span>{' '}
+                        {r.absent_count}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop: tabla */}
+                <div className="overflow-x-auto mt-2 hidden md:block">
+                  <table className="min-w-full text-xs md:text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 text-left">
+                        <th className="px-3 py-2 border-b">Fecha</th>
+                        <th className="px-3 py-2 border-b">Sede</th>
+                        <th className="px-3 py-2 border-b">Cancha</th>
+                        <th className="px-3 py-2 border-b">Profesor</th>
+                        <th className="px-3 py-2 border-b text-right">Presentes</th>
+                        <th className="px-3 py-2 border-b text-right">Ausentes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {locationRows.map((r) => (
+                        <tr key={r.class_id + r.date} className="border-b last:border-b-0">
+                          <td className="px-3 py-2 align-top">
+                            {new Date(r.date).toLocaleString()}
+                          </td>
+                          <td className="px-3 py-2 align-top">{r.location_name ?? '-'}</td>
+                          <td className="px-3 py-2 align-top">{r.court_name ?? '-'}</td>
+                          <td className="px-3 py-2 align-top">{r.coach_name ?? '-'}</td>
                           <td className="px-3 py-2 align-top text-right">{r.present_count}</td>
                           <td className="px-3 py-2 align-top text-right">{r.absent_count}</td>
                         </tr>
