@@ -1095,7 +1095,7 @@ export default function ReportsPage() {
                   <label className="block text-sm mb-1">Desde</label>
                   <Input
                     type="date"
-                    className="w-full max-w-xs md:max-w-full text-base md:text-sm"
+                    className="w-full max-w-xs text-base md:text-sm"
                     value={fromDate}
                     onChange={(e) => setFromDate(e.target.value)}
                   />
@@ -1104,7 +1104,7 @@ export default function ReportsPage() {
                   <label className="block text-sm mb-1">Hasta</label>
                   <Input
                     type="date"
-                    className="w-full max-w-xs md:max-w-full text-base md:text-sm"
+                    className="w-full max-w-xs text-base md:text-sm"
                     value={toDate}
                     onChange={(e) => setToDate(e.target.value)}
                   />
@@ -1524,7 +1524,7 @@ export default function ReportsPage() {
                   <label className="block text-sm mb-1">Desde</label>
                   <Input
                     type="date"
-                    className="w-full max-w-xs md:max-w-full text-base md:text-sm"
+                    className="w-full max-w-xs text-base md:text-sm"
                     value={attendanceFrom}
                     onChange={(e) => setAttendanceFrom(e.target.value)}
                   />
@@ -1533,7 +1533,7 @@ export default function ReportsPage() {
                   <label className="block text-sm mb-1">Hasta</label>
                   <Input
                     type="date"
-                    className="w-full max-w-xs md:max-w-full text-base md:text-sm"
+                    className="w-full max-w-xs text-base md:text-sm"
                     value={attendanceTo}
                     onChange={(e) => setAttendanceTo(e.target.value)}
                   />
@@ -1788,7 +1788,7 @@ export default function ReportsPage() {
                   <label className="block text-sm mb-1">Desde</label>
                   <Input
                     type="date"
-                    className="w-full max-w-xs md:max-w-full text-base md:text-sm"
+                    className="w-full max-w-xs text-base md:text-sm"
                     value={coachFrom}
                     onChange={(e) => setCoachFrom(e.target.value)}
                   />
@@ -1797,7 +1797,7 @@ export default function ReportsPage() {
                   <label className="block text-sm mb-1">Hasta</label>
                   <Input
                     type="date"
-                    className="w-full max-w-xs md:max-w-full text-base md:text-sm"
+                    className="w-full max-w-xs text-base md:text-sm"
                     value={coachTo}
                     onChange={(e) => setCoachTo(e.target.value)}
                   />
@@ -2046,7 +2046,7 @@ export default function ReportsPage() {
                   <label className="block text-sm mb-1">Desde</label>
                   <Input
                     type="date"
-                    className="w-full max-w-xs md:max-w-full text-base md:text-sm"
+                    className="w-full max-w-xs text-base md:text-sm"
                     value={locationFrom}
                     onChange={(e) => setLocationFrom(e.target.value)}
                   />
@@ -2055,7 +2055,7 @@ export default function ReportsPage() {
                   <label className="block text-sm mb-1">Hasta</label>
                   <Input
                     type="date"
-                    className="w-full max-w-xs md:max-w-full text-base md:text-sm"
+                    className="w-full max-w-xs text-base md:text-sm"
                     value={locationTo}
                     onChange={(e) => setLocationTo(e.target.value)}
                   />
