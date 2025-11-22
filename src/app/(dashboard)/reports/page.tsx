@@ -708,7 +708,7 @@ export default function ReportsPage() {
       const { data: attData, error: attErr } = await supabase
         .from("attendance")
         .select(
-          "student_id,present,students!inner(id,level,notes,profiles(full_name))"
+          "student_id,present,students(id,level,notes,profiles(full_name))"
         )
         .eq("class_id", classId);
       if (attErr) throw attErr;
