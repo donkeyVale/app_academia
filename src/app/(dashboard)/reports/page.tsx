@@ -144,6 +144,13 @@ export default function ReportsPage() {
     present: boolean;
   }[]>([]);
 
+  const [exportMenu, setExportMenu] = useState<{
+    income: boolean;
+    attendanceStudent: boolean;
+    attendanceCoach: boolean;
+    attendanceLocation: boolean;
+  }>({ income: false, attendanceStudent: false, attendanceCoach: false, attendanceLocation: false });
+
   const exportToExcel = async (
     fileName: string,
     sheetName: string,
@@ -163,6 +170,31 @@ export default function ReportsPage() {
     a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const exportToPdf = async (
+    fileName: string,
+    title: string,
+    headers: string[],
+    rows: any[][]
+  ) => {
+    if (!rows || rows.length === 0) return;
+    const { jsPDF } = await import("jspdf");
+    const autoTable = (await import("jspdf-autotable")).default as any;
+
+    const doc = new jsPDF();
+    doc.setFontSize(14);
+    doc.text(title, 14, 16);
+
+    autoTable(doc, {
+      head: [headers],
+      body: rows,
+      startY: 22,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [49, 67, 93] },
+    });
+
+    doc.save(fileName);
   };
 
   useEffect(() => {
@@ -1077,33 +1109,76 @@ export default function ReportsPage() {
                     {loading ? "..." : `${totalAmount} PYG`}
                   </p>
                 </div>
-                <div className="flex flex-col items-end gap-1 text-xs text-gray-500">
+                <div className="flex flex-col items-end gap-1 text-xs text-gray-500 relative">
                   <div>
                     {rows.length > 0
                       ? `Mostrando ${rows.length} pagos`
                       : "Sin pagos en el rango seleccionado"}
                   </div>
                   {rows.length > 0 && (
-                    <button
-                      type="button"
-                      className="inline-flex items-center px-3 py-1 border rounded bg-white hover:bg-gray-50 text-[11px] text-gray-700"
-                      onClick={() =>
-                        exportToExcel(
-                          `ingresos-${fromDate || ""}-${toDate || ""}.xlsx`,
-                          "Ingresos",
-                          rows.map((r) => ({
-                            Fecha: new Date(r.payment_date).toLocaleDateString(),
-                            Alumno: r.student_name ?? r.student_id,
-                            Plan: r.plan_name ?? "-",
-                            Metodo: r.method,
-                            Monto: r.amount,
-                            Moneda: r.currency,
+                    <div className="relative">
+                      <button
+                        type="button"
+                        className="inline-flex items-center px-3 py-1 border rounded bg-white hover:bg-gray-50 text-[11px] text-gray-700"
+                        onClick={() =>
+                          setExportMenu((m) => ({
+                            income: !m.income,
+                            attendanceStudent: false,
+                            attendanceCoach: false,
+                            attendanceLocation: false,
                           }))
-                        )
-                      }
-                    >
-                      Exportar a Excel
-                    </button>
+                        }
+                      >
+                        Exportar
+                      </button>
+                      {exportMenu.income && (
+                        <div className="absolute right-0 mt-1 w-40 border rounded bg-white shadow text-[11px] z-10">
+                          <button
+                            type="button"
+                            className="w-full px-3 py-1 text-left hover:bg-gray-50"
+                            onClick={() => {
+                              exportToExcel(
+                                `ingresos-${fromDate || ""}-${toDate || ""}.xlsx`,
+                                "Ingresos",
+                                rows.map((r) => ({
+                                  Fecha: new Date(r.payment_date).toLocaleDateString(),
+                                  Alumno: r.student_name ?? r.student_id,
+                                  Plan: r.plan_name ?? "-",
+                                  Metodo: r.method,
+                                  Monto: r.amount,
+                                  Moneda: r.currency,
+                                }))
+                              );
+                              setExportMenu((m) => ({ ...m, income: false }));
+                            }}
+                          >
+                            Excel (.xlsx)
+                          </button>
+                          <button
+                            type="button"
+                            className="w-full px-3 py-1 text-left hover:bg-gray-50"
+                            onClick={() => {
+                              exportToPdf(
+                                `ingresos-${fromDate || ""}-${toDate || ""}.pdf`,
+                                "Ingresos",
+                                ["Fecha", "Alumno", "Plan", "Metodo", "Monto", "Moneda"],
+                                rows.map((r) => [
+                                  new Date(r.payment_date).toLocaleDateString(),
+                                  r.student_name ?? r.student_id,
+                                  r.plan_name ?? "-",
+                                  r.method,
+                                  String(r.amount),
+                                  r.currency,
+                                ])
+                              );
+                              setExportMenu((m) => ({ ...m, income: false }));
+                            }}
+                          >
+                            PDF (.pdf)
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -1403,27 +1478,69 @@ export default function ReportsPage() {
                 </div>
               </div>
               <div className="flex justify-between items-center gap-2">
-                <div>
+                <div className="relative">
                   {attendanceRows.length > 0 && (
-                    <button
-                      type="button"
-                      className="border rounded px-3 py-2 text-xs text-gray-700 bg-white hover:bg-gray-50"
-                      onClick={() =>
-                        exportToExcel(
-                          "asistencia-por-alumno.xlsx",
-                          "Asistencia alumno",
-                          attendanceRows.map((r) => ({
-                            Fecha: new Date(r.date).toLocaleString(),
-                            Sede: r.location_name ?? "-",
-                            Cancha: r.court_name ?? "-",
-                            Profesor: r.coach_name ?? "-",
-                            Estado: r.present ? "Presente" : "Ausente",
+                    <>
+                      <button
+                        type="button"
+                        className="border rounded px-3 py-2 text-xs text-gray-700 bg-white hover:bg-gray-50"
+                        onClick={() =>
+                          setExportMenu((m) => ({
+                            income: false,
+                            attendanceStudent: !m.attendanceStudent,
+                            attendanceCoach: false,
+                            attendanceLocation: false,
                           }))
-                        )
-                      }
-                    >
-                      Exportar a Excel
-                    </button>
+                        }
+                      >
+                        Exportar
+                      </button>
+                      {exportMenu.attendanceStudent && (
+                        <div className="absolute left-0 mt-1 w-40 border rounded bg-white shadow text-[11px] z-10">
+                          <button
+                            type="button"
+                            className="w-full px-3 py-1 text-left hover:bg-gray-50"
+                            onClick={() => {
+                              exportToExcel(
+                                "asistencia-por-alumno.xlsx",
+                                "Asistencia alumno",
+                                attendanceRows.map((r) => ({
+                                  Fecha: new Date(r.date).toLocaleString(),
+                                  Sede: r.location_name ?? "-",
+                                  Cancha: r.court_name ?? "-",
+                                  Profesor: r.coach_name ?? "-",
+                                  Estado: r.present ? "Presente" : "Ausente",
+                                }))
+                              );
+                              setExportMenu((m) => ({ ...m, attendanceStudent: false }));
+                            }}
+                          >
+                            Excel (.xlsx)
+                          </button>
+                          <button
+                            type="button"
+                            className="w-full px-3 py-1 text-left hover:bg-gray-50"
+                            onClick={() => {
+                              exportToPdf(
+                                "asistencia-por-alumno.pdf",
+                                "Asistencia por alumno",
+                                ["Fecha", "Sede", "Cancha", "Profesor", "Estado"],
+                                attendanceRows.map((r) => [
+                                  new Date(r.date).toLocaleString(),
+                                  r.location_name ?? "-",
+                                  r.court_name ?? "-",
+                                  r.coach_name ?? "-",
+                                  r.present ? "Presente" : "Ausente",
+                                ])
+                              );
+                              setExportMenu((m) => ({ ...m, attendanceStudent: false }));
+                            }}
+                          >
+                            PDF (.pdf)
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
                 <button
@@ -1604,7 +1721,72 @@ export default function ReportsPage() {
                   />
                 </div>
               </div>
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-between items-center gap-2">
+                <div className="relative">
+                  {coachRows.length > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        className="border rounded px-3 py-2 text-xs text-gray-700 bg-white hover:bg-gray-50"
+                        onClick={() =>
+                          setExportMenu((m) => ({
+                            income: false,
+                            attendanceStudent: false,
+                            attendanceCoach: !m.attendanceCoach,
+                            attendanceLocation: false,
+                          }))
+                        }
+                      >
+                        Exportar
+                      </button>
+                      {exportMenu.attendanceCoach && (
+                        <div className="absolute left-0 mt-1 w-40 border rounded bg-white shadow text-[11px] z-10">
+                          <button
+                            type="button"
+                            className="w-full px-3 py-1 text-left hover:bg-gray-50"
+                            onClick={() => {
+                              exportToExcel(
+                                "asistencia-por-profesor.xlsx",
+                                "Asistencia profesor",
+                                coachRows.map((r) => ({
+                                  Fecha: new Date(r.date).toLocaleString(),
+                                  Sede: r.location_name ?? "-",
+                                  Cancha: r.court_name ?? "-",
+                                  Presentes: r.present_count,
+                                  Ausentes: r.absent_count,
+                                }))
+                              );
+                              setExportMenu((m) => ({ ...m, attendanceCoach: false }));
+                            }}
+                          >
+                            Excel (.xlsx)
+                          </button>
+                          <button
+                            type="button"
+                            className="w-full px-3 py-1 text-left hover:bg-gray-50"
+                            onClick={() => {
+                              exportToPdf(
+                                "asistencia-por-profesor.pdf",
+                                "Asistencia por profesor",
+                                ["Fecha", "Sede", "Cancha", "Presentes", "Ausentes"],
+                                coachRows.map((r) => [
+                                  new Date(r.date).toLocaleString(),
+                                  r.location_name ?? "-",
+                                  r.court_name ?? "-",
+                                  String(r.present_count),
+                                  String(r.absent_count),
+                                ])
+                              );
+                              setExportMenu((m) => ({ ...m, attendanceCoach: false }));
+                            }}
+                          >
+                            PDF (.pdf)
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
                 <button
                   type="button"
                   className="border rounded px-3 py-2 text-xs text-gray-700 bg-white hover:bg-gray-50"
