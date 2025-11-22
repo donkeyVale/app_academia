@@ -1091,20 +1091,20 @@ export default function ReportsPage() {
             {/* Filtro de ingresos por fecha */}
             <form onSubmit={loadReport} className="space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div>
+                <div className="min-w-0">
                   <label className="block text-sm mb-1">Desde</label>
                   <Input
                     type="date"
-                    className="w-full text-base md:text-sm"
+                    className="w-full max-w-full text-base md:text-sm"
                     value={fromDate}
                     onChange={(e) => setFromDate(e.target.value)}
                   />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <label className="block text-sm mb-1">Hasta</label>
                   <Input
                     type="date"
-                    className="w-full text-base md:text-sm"
+                    className="w-full max-w-full text-base md:text-sm"
                     value={toDate}
                     onChange={(e) => setToDate(e.target.value)}
                   />
