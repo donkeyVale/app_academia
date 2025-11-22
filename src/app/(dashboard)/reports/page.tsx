@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { useEffect, useState } from "react";
 import { createClientBrowser } from "@/lib/supabase";
 import { toast } from "sonner";
@@ -11,6 +12,7 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  Cell,
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1576,11 +1578,11 @@ export default function ReportsPage() {
                 </div>
                 <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Desde</label>
-                  <DatePickerField value={coachFrom} onChange={setCoachFrom} />
+                  <DatePickerField value={attendanceFrom} onChange={setAttendanceFrom} />
                 </div>
                 <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Hasta</label>
-                  <DatePickerField value={coachTo} onChange={setCoachTo} />
+                  <DatePickerField value={attendanceTo} onChange={setAttendanceTo} />
                 </div>
               </div>
 
@@ -1682,24 +1684,58 @@ export default function ReportsPage() {
             </form>
 
             {attendanceSummary && (
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-sm">
-                <div className="space-y-1">
-                  <p className="text-gray-700">
-                    <span className="font-semibold">
-                      Total clases en el periodo:
-                    </span>{" "}
-                    {attendanceSummary.total}
-                  </p>
-                  <p className="text-green-700 text-sm">
-                    <span className="font-semibold">Presentes:</span>{" "}
-                    {attendanceSummary.present}
-                  </p>
-                  <p className="text-red-700 text-sm">
-                    <span className="font-semibold">Ausentes:</span>{" "}
-                    {attendanceSummary.absent}
-                  </p>
+              <>
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-sm">
+                  <div className="space-y-1">
+                    <p className="text-gray-700">
+                      <span className="font-semibold">
+                        Total clases en el periodo:
+                      </span>{" "}
+                      {attendanceSummary.total}
+                    </p>
+                    <p className="text-green-700 text-sm">
+                      <span className="font-semibold">Presentes:</span>{" "}
+                      {attendanceSummary.present}
+                    </p>
+                    <p className="text-red-700 text-sm">
+                      <span className="font-semibold">Ausentes:</span>{" "}
+                      {attendanceSummary.absent}
+                    </p>
+                  </div>
                 </div>
-              </div>
+                <div className="mt-3 h-40 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={[
+                        { name: "Presentes", value: attendanceSummary.present },
+                        { name: "Ausentes", value: attendanceSummary.absent },
+                      ]}
+                      margin={{ top: 8, right: 16, left: 8, bottom: 8 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fontSize: 10 }} tickMargin={8} />
+                      <YAxis tick={{ fontSize: 10 }} tickMargin={6} allowDecimals={false} />
+                      <Tooltip
+                        formatter={(value: any) => [String(value), "Cantidad"]}
+                        labelStyle={{ fontSize: 11 }}
+                        contentStyle={{ fontSize: 11 }}
+                      />
+                      <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                        {[
+                          attendanceSummary.present,
+                          attendanceSummary.absent,
+                        ].map((_, idx) => (
+                          <Cell
+                            // eslint-disable-next-line react/no-array-index-key
+                            key={idx}
+                            fill={idx === 0 ? "#16a34a" : "#dc2626"}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </>
             )}
 
             {attendanceRows.length > 0 && (
@@ -1830,11 +1866,11 @@ export default function ReportsPage() {
                 </div>
                 <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Desde</label>
-                  <DatePickerField value={attendanceFrom} onChange={setAttendanceFrom} />
+                  <DatePickerField value={coachFrom} onChange={setCoachFrom} />
                 </div>
                 <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Hasta</label>
-                  <DatePickerField value={attendanceTo} onChange={setAttendanceTo} />
+                  <DatePickerField value={coachTo} onChange={setCoachTo} />
                 </div>
               </div>
               <div className="flex justify-between items-center gap-2">
@@ -1926,22 +1962,56 @@ export default function ReportsPage() {
             </form>
 
             {coachSummary && (
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-sm">
-                <div className="space-y-1">
-                  <p className="text-gray-700">
-                    <span className="font-semibold">Total clases en el periodo:</span>{' '}
-                    {coachSummary.totalClasses}
-                  </p>
-                  <p className="text-green-700 text-sm">
-                    <span className="font-semibold">Presentes (alumnos):</span>{' '}
-                    {coachSummary.present}
-                  </p>
-                  <p className="text-red-700 text-sm">
-                    <span className="font-semibold">Ausentes (alumnos):</span>{' '}
-                    {coachSummary.absent}
-                  </p>
+              <>
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-sm">
+                  <div className="space-y-1">
+                    <p className="text-gray-700">
+                      <span className="font-semibold">Total clases en el periodo:</span>{' '}
+                      {coachSummary.totalClasses}
+                    </p>
+                    <p className="text-green-700 text-sm">
+                      <span className="font-semibold">Presentes (alumnos):</span>{' '}
+                      {coachSummary.present}
+                    </p>
+                    <p className="text-red-700 text-sm">
+                      <span className="font-semibold">Ausentes (alumnos):</span>{' '}
+                      {coachSummary.absent}
+                    </p>
+                  </div>
                 </div>
-              </div>
+                <div className="mt-3 h-40 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={[
+                        { name: "Presentes", value: coachSummary.present },
+                        { name: "Ausentes", value: coachSummary.absent },
+                      ]}
+                      margin={{ top: 8, right: 16, left: 8, bottom: 8 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fontSize: 10 }} tickMargin={8} />
+                      <YAxis tick={{ fontSize: 10 }} tickMargin={6} allowDecimals={false} />
+                      <Tooltip
+                        formatter={(value: any) => [String(value), "Cantidad"]}
+                        labelStyle={{ fontSize: 11 }}
+                        contentStyle={{ fontSize: 11 }}
+                      />
+                      <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                        {[
+                          coachSummary.present,
+                          coachSummary.absent,
+                        ].map((_, idx) => (
+                          <Cell
+                            // eslint-disable-next-line react/no-array-index-key
+                            key={idx}
+                            fill={idx === 0 ? "#16a34a" : "#dc2626"}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </>
             )}
 
             {coachRows.length > 0 && (
@@ -2085,59 +2155,162 @@ export default function ReportsPage() {
                   <DatePickerField value={locationTo} onChange={setLocationTo} />
                 </div>
               </div>
-              <div className="flex justify-end gap-2">
-                <button
-                  type="button"
-                  className="border rounded px-3 py-2 text-xs text-gray-700 bg-white hover:bg-gray-50"
-                  onClick={() => {
-                    setLocationId("");
-                    setCourtId("");
-                    setLocationFrom("");
-                    setLocationTo("");
-                    setLocationRows([]);
-                    setLocationSummary(null);
-                    setError(null);
-                  }}
-                >
-                  Limpiar
-                </button>
-                <button
-                  type="submit"
-                  className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50 text-sm"
-                  disabled={locationLoading}
-                >
-                  {locationLoading ? 'Cargando asistencia...' : 'Ver asistencia'}
-                </button>
+              <div className="flex justify-between items-center gap-2">
+                <div className="relative">
+                  {locationRows.length > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        className="border rounded px-3 py-2 text-xs text-gray-700 bg-white hover:bg-gray-50"
+                        onClick={() =>
+                          setExportMenu((m) => ({
+                            income: false,
+                            attendanceStudent: false,
+                            attendanceCoach: false,
+                            attendanceLocation: !m.attendanceLocation,
+                          }))
+                        }
+                      >
+                        Exportar
+                      </button>
+                      {exportMenu.attendanceLocation && (
+                        <div className="absolute left-0 mt-1 w-40 border rounded bg-white shadow text-[11px] z-10">
+                          <button
+                            type="button"
+                            className="w-full px-3 py-1 text-left hover:bg-gray-50"
+                            onClick={() => {
+                              exportToExcel(
+                                "asistencia-por-sede-cancha.xlsx",
+                                "Asistencia sede/cancha",
+                                locationRows.map((r) => ({
+                                  Fecha: new Date(r.date).toLocaleString(),
+                                  Sede: r.location_name ?? "-",
+                                  Cancha: r.court_name ?? "-",
+                                  Profesor: r.coach_name ?? "-",
+                                  Presentes: r.present_count,
+                                  Ausentes: r.absent_count,
+                                }))
+                              );
+                              setExportMenu((m) => ({ ...m, attendanceLocation: false }));
+                            }}
+                          >
+                            Excel (.xlsx)
+                          </button>
+                          <button
+                            type="button"
+                            className="w-full px-3 py-1 text-left hover:bg-gray-50"
+                            onClick={() => {
+                              exportToPdf(
+                                "asistencia-por-sede-cancha.pdf",
+                                "Asistencia por sede/cancha",
+                                ["Fecha", "Sede", "Cancha", "Profesor", "Presentes", "Ausentes"],
+                                locationRows.map((r) => [
+                                  new Date(r.date).toLocaleString(),
+                                  r.location_name ?? "-",
+                                  r.court_name ?? "-",
+                                  r.coach_name ?? "-",
+                                  String(r.present_count),
+                                  String(r.absent_count),
+                                ])
+                              );
+                              setExportMenu((m) => ({ ...m, attendanceLocation: false }));
+                            }}
+                          >
+                            PDF (.pdf)
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="border rounded px-3 py-2 text-xs text-gray-700 bg-white hover:bg-gray-50"
+                    onClick={() => {
+                      setLocationId("");
+                      setCourtId("");
+                      setLocationFrom("");
+                      setLocationTo("");
+                      setLocationRows([]);
+                      setLocationSummary(null);
+                      setError(null);
+                    }}
+                  >
+                    Limpiar
+                  </button>
+                  <button
+                    type="submit"
+                    className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50 text-sm"
+                    disabled={locationLoading}
+                  >
+                    {locationLoading ? 'Cargando asistencia...' : 'Ver asistencia'}
+                  </button>
+                </div>
               </div>
             </form>
 
             {locationSummary && (
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-sm">
-                <div className="space-y-1">
-                  <p className="text-gray-700">
-                    <span className="font-semibold">Total clases en el periodo:</span>{' '}
-                    {locationSummary.totalClasses}
-                  </p>
-                  <p className="text-green-700 text-sm">
-                    <span className="font-semibold">Presentes (alumnos):</span>{' '}
-                    {locationSummary.present}
-                  </p>
-                  <p className="text-red-700 text-sm">
-                    <span className="font-semibold">Ausentes (alumnos):</span>{' '}
-                    {locationSummary.absent}
-                  </p>
+              <>
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-sm">
+                  <div className="space-y-1">
+                    <p className="text-gray-700">
+                      <span className="font-semibold">Total clases en el periodo:</span>{' '}
+                      {locationSummary.totalClasses}
+                    </p>
+                    <p className="text-green-700 text-sm">
+                      <span className="font-semibold">Presentes (alumnos):</span>{' '}
+                      {locationSummary.present}
+                    </p>
+                    <p className="text-red-700 text-sm">
+                      <span className="font-semibold">Ausentes (alumnos):</span>{' '}
+                      {locationSummary.absent}
+                    </p>
+                  </div>
+                  <div className="space-y-1 text-sm text-gray-700">
+                    <p>
+                      <span className="font-semibold">Horas por clase:</span>{' '}
+                      {CLASS_DURATION_MINUTES / 60} h
+                    </p>
+                    <p>
+                      <span className="font-semibold">Horas totales usadas:</span>{' '}
+                      {(locationSummary.totalClasses * (CLASS_DURATION_MINUTES / 60)).toFixed(1)} h
+                    </p>
+                  </div>
                 </div>
-                <div className="space-y-1 text-sm text-gray-700">
-                  <p>
-                    <span className="font-semibold">Horas por clase:</span>{' '}
-                    {CLASS_DURATION_MINUTES / 60} h
-                  </p>
-                  <p>
-                    <span className="font-semibold">Horas totales usadas:</span>{' '}
-                    {(locationSummary.totalClasses * (CLASS_DURATION_MINUTES / 60)).toFixed(1)} h
-                  </p>
+                <div className="mt-3 h-40 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={[
+                        { name: "Presentes", value: locationSummary.present },
+                        { name: "Ausentes", value: locationSummary.absent },
+                      ]}
+                      margin={{ top: 8, right: 16, left: 8, bottom: 8 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fontSize: 10 }} tickMargin={8} />
+                      <YAxis tick={{ fontSize: 10 }} tickMargin={6} allowDecimals={false} />
+                      <Tooltip
+                        formatter={(value: any) => [String(value), "Cantidad"]}
+                        labelStyle={{ fontSize: 11 }}
+                        contentStyle={{ fontSize: 11 }}
+                      />
+                      <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                        {[
+                          locationSummary.present,
+                          locationSummary.absent,
+                        ].map((_, idx) => (
+                          <Cell
+                            // eslint-disable-next-line react/no-array-index-key
+                            key={idx}
+                            fill={idx === 0 ? "#16a34a" : "#dc2626"}
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
-              </div>
+              </>
             )}
 
             {locationRows.length > 0 && (
