@@ -1077,10 +1077,34 @@ export default function ReportsPage() {
                     {loading ? "..." : `${totalAmount} PYG`}
                   </p>
                 </div>
-                <div className="text-xs text-gray-500">
-                  {rows.length > 0
-                    ? `Mostrando ${rows.length} pagos`
-                    : "Sin pagos en el rango seleccionado"}
+                <div className="flex flex-col items-end gap-1 text-xs text-gray-500">
+                  <div>
+                    {rows.length > 0
+                      ? `Mostrando ${rows.length} pagos`
+                      : "Sin pagos en el rango seleccionado"}
+                  </div>
+                  {rows.length > 0 && (
+                    <button
+                      type="button"
+                      className="inline-flex items-center px-3 py-1 border rounded bg-white hover:bg-gray-50 text-[11px] text-gray-700"
+                      onClick={() =>
+                        exportToExcel(
+                          `ingresos-${fromDate || ""}-${toDate || ""}.xlsx`,
+                          "Ingresos",
+                          rows.map((r) => ({
+                            Fecha: new Date(r.payment_date).toLocaleDateString(),
+                            Alumno: r.student_name ?? r.student_id,
+                            Plan: r.plan_name ?? "-",
+                            Metodo: r.method,
+                            Monto: r.amount,
+                            Moneda: r.currency,
+                          }))
+                        )
+                      }
+                    >
+                      Exportar a Excel
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -1378,7 +1402,30 @@ export default function ReportsPage() {
                   />
                 </div>
               </div>
-              <div className="flex justify-end gap-2">
+              <div className="flex justify-between items-center gap-2">
+                <div>
+                  {attendanceRows.length > 0 && (
+                    <button
+                      type="button"
+                      className="border rounded px-3 py-2 text-xs text-gray-700 bg-white hover:bg-gray-50"
+                      onClick={() =>
+                        exportToExcel(
+                          "asistencia-por-alumno.xlsx",
+                          "Asistencia alumno",
+                          attendanceRows.map((r) => ({
+                            Fecha: new Date(r.date).toLocaleString(),
+                            Sede: r.location_name ?? "-",
+                            Cancha: r.court_name ?? "-",
+                            Profesor: r.coach_name ?? "-",
+                            Estado: r.present ? "Presente" : "Ausente",
+                          }))
+                        )
+                      }
+                    >
+                      Exportar a Excel
+                    </button>
+                  )}
+                </div>
                 <button
                   type="button"
                   className="border rounded px-3 py-2 text-xs text-gray-700 bg-white hover:bg-gray-50"
