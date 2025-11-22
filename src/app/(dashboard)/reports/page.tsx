@@ -1091,7 +1091,7 @@ export default function ReportsPage() {
             {/* Filtro de ingresos por fecha */}
             <form onSubmit={loadReport} className="space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="min-w-0 flex flex-col items-center md:items-start">
+                <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Desde</label>
                   <Input
                     type="date"
@@ -1497,7 +1497,9 @@ export default function ReportsPage() {
           onClick={() => setShowAttendanceStudent((v) => !v)}
         >
           <span>Asistencia / Uso de clases por alumno</span>
-          <span className="text-xs text-gray-500">{showAttendanceStudent ? '▼' : '▲'}</span>
+          <span className="text-xs text-gray-500">
+            {showAttendanceStudent ? "▼" : "▲"}
+          </span>
         </button>
         {showAttendanceStudent && (
           <div className="p-4 space-y-4">
@@ -1518,7 +1520,7 @@ export default function ReportsPage() {
                     ))}
                   </select>
                 </div>
-                <div className="min-w-0 flex flex-col items-center md:items-start">
+                <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Desde</label>
                   <Input
                     type="date"
@@ -1527,7 +1529,7 @@ export default function ReportsPage() {
                     onChange={(e) => setAttendanceFrom(e.target.value)}
                   />
                 </div>
-                <div className="min-w-0 flex flex-col items-center md:items-start">
+                <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Hasta</label>
                   <Input
                     type="date"
@@ -1537,6 +1539,7 @@ export default function ReportsPage() {
                   />
                 </div>
               </div>
+
               <div className="flex justify-between items-center gap-2">
                 <div className="relative">
                   {attendanceRows.length > 0 && (
@@ -1572,7 +1575,10 @@ export default function ReportsPage() {
                                   Estado: r.present ? "Presente" : "Ausente",
                                 }))
                               );
-                              setExportMenu((m) => ({ ...m, attendanceStudent: false }));
+                              setExportMenu((m) => ({
+                                ...m,
+                                attendanceStudent: false,
+                              }));
                             }}
                           >
                             Excel (.xlsx)
@@ -1593,7 +1599,10 @@ export default function ReportsPage() {
                                   r.present ? "Presente" : "Ausente",
                                 ])
                               );
-                              setExportMenu((m) => ({ ...m, attendanceStudent: false }));
+                              setExportMenu((m) => ({
+                                ...m,
+                                attendanceStudent: false,
+                              }));
                             }}
                           >
                             PDF (.pdf)
@@ -1621,7 +1630,9 @@ export default function ReportsPage() {
                   className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50 text-sm"
                   disabled={attendanceLoading}
                 >
-                  {attendanceLoading ? 'Cargando asistencia...' : 'Ver asistencia'}
+                  {attendanceLoading
+                    ? "Cargando asistencia..."
+                    : "Ver asistencia"}
                 </button>
               </div>
             </form>
@@ -1630,15 +1641,17 @@ export default function ReportsPage() {
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 text-sm">
                 <div className="space-y-1">
                   <p className="text-gray-700">
-                    <span className="font-semibold">Total clases en el periodo:</span>{' '}
+                    <span className="font-semibold">
+                      Total clases en el periodo:
+                    </span>{" "}
                     {attendanceSummary.total}
                   </p>
                   <p className="text-green-700 text-sm">
-                    <span className="font-semibold">Presentes:</span>{' '}
+                    <span className="font-semibold">Presentes:</span>{" "}
                     {attendanceSummary.present}
                   </p>
                   <p className="text-red-700 text-sm">
-                    <span className="font-semibold">Ausentes:</span>{' '}
+                    <span className="font-semibold">Ausentes:</span>{" "}
                     {attendanceSummary.absent}
                   </p>
                 </div>
@@ -1661,28 +1674,28 @@ export default function ReportsPage() {
                         <span
                           className={
                             r.present
-                              ? 'text-green-700 font-semibold'
-                              : 'text-red-700 font-semibold'
+                              ? "text-green-700 font-semibold"
+                              : "text-red-700 font-semibold"
                           }
                         >
-                          {r.present ? 'Presente' : 'Ausente'}
+                          {r.present ? "Presente" : "Ausente"}
                         </span>
                       </div>
                       {r.location_name && (
                         <div className="text-gray-600">
-                          <span className="font-semibold">Sede:</span>{' '}
+                          <span className="font-semibold">Sede:</span>{" "}
                           {r.location_name}
                         </div>
                       )}
                       {r.court_name && (
                         <div className="text-gray-600">
-                          <span className="font-semibold">Cancha:</span>{' '}
+                          <span className="font-semibold">Cancha:</span>{" "}
                           {r.court_name}
                         </div>
                       )}
                       {r.coach_name && (
                         <div className="text-gray-600">
-                          <span className="font-semibold">Profesor:</span>{' '}
+                          <span className="font-semibold">Profesor:</span>{" "}
                           {r.coach_name}
                         </div>
                       )}
@@ -1704,22 +1717,31 @@ export default function ReportsPage() {
                     </thead>
                     <tbody>
                       {attendanceRows.map((r) => (
-                        <tr key={r.class_id + r.date} className="border-b last:border-b-0">
+                        <tr
+                          key={r.class_id + r.date}
+                          className="border-b last:border-b-0"
+                        >
                           <td className="px-3 py-2 align-top">
                             {new Date(r.date).toLocaleString()}
                           </td>
-                          <td className="px-3 py-2 align-top">{r.location_name ?? '-'}</td>
-                          <td className="px-3 py-2 align-top">{r.court_name ?? '-'}</td>
-                          <td className="px-3 py-2 align-top">{r.coach_name ?? '-'}</td>
+                          <td className="px-3 py-2 align-top">
+                            {r.location_name ?? "-"}
+                          </td>
+                          <td className="px-3 py-2 align-top">
+                            {r.court_name ?? "-"}
+                          </td>
+                          <td className="px-3 py-2 align-top">
+                            {r.coach_name ?? "-"}
+                          </td>
                           <td className="px-3 py-2 align-top">
                             <span
                               className={
                                 r.present
-                                  ? 'inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-green-50 text-green-700'
-                                  : 'inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 text-red-700'
+                                  ? "inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-green-50 text-green-700"
+                                  : "inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 text-red-700"
                               }
                             >
-                              {r.present ? 'Presente' : 'Ausente'}
+                              {r.present ? "Presente" : "Ausente"}
                             </span>
                           </td>
                         </tr>
