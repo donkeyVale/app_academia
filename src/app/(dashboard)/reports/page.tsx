@@ -1576,11 +1576,11 @@ export default function ReportsPage() {
                 </div>
                 <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Desde</label>
-                  <DatePickerField value={attendanceFrom} onChange={setAttendanceFrom} />
+                  <DatePickerField value={coachFrom} onChange={setCoachFrom} />
                 </div>
                 <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Hasta</label>
-                  <DatePickerField value={attendanceTo} onChange={setAttendanceTo} />
+                  <DatePickerField value={coachTo} onChange={setCoachTo} />
                 </div>
               </div>
 
@@ -2078,21 +2078,11 @@ export default function ReportsPage() {
                 </div>
                 <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Desde</label>
-                  <Input
-                    type="date"
-                    className="w-full md:w-32 text-sm box-border mr-1"
-                    value={locationFrom}
-                    onChange={(e) => setLocationFrom(e.target.value)}
-                  />
+                  <DatePickerField value={locationFrom} onChange={setLocationFrom} />
                 </div>
                 <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Hasta</label>
-                  <Input
-                    type="date"
-                    className="w-full md:w-32 text-sm box-border mr-1"
-                    value={locationTo}
-                    onChange={(e) => setLocationTo(e.target.value)}
-                  />
+                  <DatePickerField value={locationTo} onChange={setLocationTo} />
                 </div>
               </div>
               <div className="flex justify-end gap-2">
