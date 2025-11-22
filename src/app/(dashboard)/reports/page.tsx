@@ -78,6 +78,7 @@ interface LocationClassRow {
 
 export default function ReportsPage() {
   const supabase = createClientBrowser();
+  const CLASS_DURATION_MINUTES = 60;
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [loading, setLoading] = useState(false);
@@ -127,6 +128,21 @@ export default function ReportsPage() {
   const [locationRows, setLocationRows] = useState<LocationClassRow[]>([]);
   const [locationSummary, setLocationSummary] = useState<{ totalClasses: number; present: number; absent: number } | null>(null);
   const [showAttendanceLocation, setShowAttendanceLocation] = useState(false);
+
+  // Detalle de una clase en reporte por sede/cancha
+  const [locationDetailOpen, setLocationDetailOpen] = useState(false);
+  const [locationDetailClassId, setLocationDetailClassId] = useState<string | null>(null);
+  const [locationDetailInfo, setLocationDetailInfo] = useState<{
+    date: string;
+    location_name: string | null;
+    court_name: string | null;
+    coach_name: string | null;
+  } | null>(null);
+  const [locationDetailRows, setLocationDetailRows] = useState<{
+    student_id: string;
+    student_name: string | null;
+    present: boolean;
+  }[]>([]);
 
   useEffect(() => {
     // Por defecto: mes actual
@@ -677,6 +693,74 @@ export default function ReportsPage() {
       setCoachSummary(null);
     } finally {
       setCoachLoading(false);
+    }
+  };
+
+  const loadLocationClassDetail = async (classId: string, info: { date: string; location_name: string | null; court_name: string | null; coach_name: string | null }) => {
+    setLocationDetailClassId(classId);
+    setLocationDetailInfo(info);
+    setLocationDetailRows([]);
+
+    try {
+      const { data: attData, error: attErr } = await supabase
+        .from("attendance")
+        .select("student_id,present")
+        .eq("class_id", classId);
+      if (attErr) throw attErr;
+
+      const attRows = (attData ?? []) as { student_id: string; present: boolean | null }[];
+      if (attRows.length === 0) {
+        setLocationDetailRows([]);
+        setLocationDetailOpen(true);
+        return;
+      }
+
+      const studentIds = Array.from(new Set(attRows.map((a) => a.student_id)));
+      const { data: studentsData, error: studentsErr } = await supabase
+        .from("students")
+        .select("id,user_id")
+        .in("id", studentIds);
+      if (studentsErr) throw studentsErr;
+
+      const students = (studentsData ?? []) as { id: string; user_id: string | null }[];
+      const profileIds = Array.from(
+        new Set(students.map((s) => s.user_id).filter((id): id is string => !!id))
+      );
+
+      let profilesMap: Record<string, string | null> = {};
+      if (profileIds.length > 0) {
+        const { data: profilesData, error: profilesErr } = await supabase
+          .from("profiles")
+          .select("id,full_name")
+          .in("id", profileIds);
+        if (profilesErr) throw profilesErr;
+        profilesMap = (profilesData ?? []).reduce<Record<string, string | null>>(
+          (acc, p: any) => {
+            acc[p.id as string] = (p.full_name as string | null) ?? null;
+            return acc;
+          },
+          {}
+        );
+      }
+
+      const studentNameMap: Record<string, string | null> = {};
+      students.forEach((s) => {
+        studentNameMap[s.id] = s.user_id ? profilesMap[s.user_id] ?? null : null;
+      });
+
+      const detailRows = attRows.map((a) => ({
+        student_id: a.student_id,
+        student_name: studentNameMap[a.student_id] ?? null,
+        present: !!a.present,
+      }));
+
+      setLocationDetailRows(detailRows);
+      setLocationDetailOpen(true);
+    } catch (e) {
+      const msg = (e as any)?.message || "Error cargando detalle de asistencia";
+      setError(msg);
+      setLocationDetailRows([]);
+      setLocationDetailOpen(true);
     }
   };
 
@@ -1646,6 +1730,16 @@ export default function ReportsPage() {
                     {locationSummary.absent}
                   </p>
                 </div>
+                <div className="space-y-1 text-sm text-gray-700">
+                  <p>
+                    <span className="font-semibold">Horas por clase:</span>{' '}
+                    {CLASS_DURATION_MINUTES / 60} h
+                  </p>
+                  <p>
+                    <span className="font-semibold">Horas totales usadas:</span>{' '}
+                    {(locationSummary.totalClasses * (CLASS_DURATION_MINUTES / 60)).toFixed(1)} h
+                  </p>
+                </div>
               </div>
             )}
 
@@ -1654,9 +1748,18 @@ export default function ReportsPage() {
                 {/* Mobile: tarjetas */}
                 <div className="mt-2 space-y-2 md:hidden">
                   {locationRows.map((r) => (
-                    <div
+                    <button
                       key={r.class_id + r.date}
-                      className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1"
+                      type="button"
+                      className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1 text-left w-full"
+                      onClick={() =>
+                        loadLocationClassDetail(r.class_id, {
+                          date: r.date,
+                          location_name: r.location_name,
+                          court_name: r.court_name,
+                          coach_name: r.coach_name,
+                        })
+                      }
                     >
                       <div className="flex justify-between gap-2">
                         <span className="font-semibold text-[#31435d]">
@@ -1678,7 +1781,7 @@ export default function ReportsPage() {
                         <span className="font-semibold">Ausentes:</span>{' '}
                         {r.absent_count}
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
 
@@ -1697,7 +1800,18 @@ export default function ReportsPage() {
                     </thead>
                     <tbody>
                       {locationRows.map((r) => (
-                        <tr key={r.class_id + r.date} className="border-b last:border-b-0">
+                        <tr
+                          key={r.class_id + r.date}
+                          className="border-b last:border-b-0 cursor-pointer hover:bg-gray-50"
+                          onClick={() =>
+                            loadLocationClassDetail(r.class_id, {
+                              date: r.date,
+                              location_name: r.location_name,
+                              court_name: r.court_name,
+                              coach_name: r.coach_name,
+                            })
+                          }
+                        >
                           <td className="px-3 py-2 align-top">
                             {new Date(r.date).toLocaleString()}
                           </td>
