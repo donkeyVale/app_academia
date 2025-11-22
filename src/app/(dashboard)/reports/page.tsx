@@ -144,6 +144,27 @@ export default function ReportsPage() {
     present: boolean;
   }[]>([]);
 
+  const exportToExcel = async (
+    fileName: string,
+    sheetName: string,
+    rows: any[]
+  ) => {
+    if (!rows || rows.length === 0) return;
+    const XLSX = await import("xlsx");
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+    const wbout = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+
+    const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   useEffect(() => {
     // Por defecto: mes actual
     const today = new Date();
