@@ -1100,7 +1100,7 @@ export default function ReportsPage() {
                     onChange={(e) => setFromDate(e.target.value)}
                   />
                 </div>
-                <div className="min-w-0 flex flex-col items-center md:items-start">
+                <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Hasta</label>
                   <Input
                     type="date"
@@ -1784,7 +1784,7 @@ export default function ReportsPage() {
                     ))}
                   </select>
                 </div>
-                <div className="min-w-0 flex flex-col items-center md:items-start">
+                <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Desde</label>
                   <Input
                     type="date"
@@ -1793,7 +1793,7 @@ export default function ReportsPage() {
                     onChange={(e) => setCoachFrom(e.target.value)}
                   />
                 </div>
-                <div className="min-w-0 flex flex-col items-center md:items-start">
+                <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Hasta</label>
                   <Input
                     type="date"
@@ -2042,7 +2042,7 @@ export default function ReportsPage() {
                       ))}
                   </select>
                 </div>
-                <div className="min-w-0 flex flex-col items-center md:items-start">
+                <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Desde</label>
                   <Input
                     type="date"
@@ -2051,7 +2051,7 @@ export default function ReportsPage() {
                     onChange={(e) => setLocationFrom(e.target.value)}
                   />
                 </div>
-                <div className="min-w-0 flex flex-col items-center md:items-start">
+                <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Hasta</label>
                   <Input
                     type="date"
