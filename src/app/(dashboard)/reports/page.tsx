@@ -1576,21 +1576,11 @@ export default function ReportsPage() {
                 </div>
                 <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Desde</label>
-                  <Input
-                    type="date"
-                    className="w-full md:w-32 text-sm box-border mr-1"
-                    value={attendanceFrom}
-                    onChange={(e) => setAttendanceFrom(e.target.value)}
-                  />
+                  <DatePickerField value={attendanceFrom} onChange={setAttendanceFrom} />
                 </div>
                 <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Hasta</label>
-                  <Input
-                    type="date"
-                    className="w-full md:w-32 text-sm box-border mr-1"
-                    value={attendanceTo}
-                    onChange={(e) => setAttendanceTo(e.target.value)}
-                  />
+                  <DatePickerField value={attendanceTo} onChange={setAttendanceTo} />
                 </div>
               </div>
 
@@ -1840,21 +1830,11 @@ export default function ReportsPage() {
                 </div>
                 <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Desde</label>
-                  <Input
-                    type="date"
-                    className="w-full md:w-32 text-sm box-border mr-1"
-                    value={coachFrom}
-                    onChange={(e) => setCoachFrom(e.target.value)}
-                  />
+                  <DatePickerField value={attendanceFrom} onChange={setAttendanceFrom} />
                 </div>
                 <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Hasta</label>
-                  <Input
-                    type="date"
-                    className="w-full md:w-32 text-sm box-border mr-1"
-                    value={coachTo}
-                    onChange={(e) => setCoachTo(e.target.value)}
-                  />
+                  <DatePickerField value={attendanceTo} onChange={setAttendanceTo} />
                 </div>
               </div>
               <div className="flex justify-between items-center gap-2">
