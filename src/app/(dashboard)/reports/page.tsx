@@ -161,6 +161,9 @@ export default function ReportsPage() {
     attendanceLocation: boolean;
   }>({ income: false, attendanceStudent: false, attendanceCoach: false, attendanceLocation: false });
 
+  const formatPyg = (value: number) =>
+    new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 }).format(value || 0);
+
   const exportToExcel = async (
     fileName: string,
     sheetName: string,
@@ -1133,7 +1136,7 @@ export default function ReportsPage() {
               {incomeChartData.length > 0 && (
                 <div className="mt-4 h-56 w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={incomeChartData} margin={{ top: 8, right: 16, left: -16, bottom: 8 }}>
+                    <BarChart data={incomeChartData} margin={{ top: 8, right: 16, left: 24, bottom: 8 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
                       <XAxis
                         dataKey="date"
@@ -1142,7 +1145,7 @@ export default function ReportsPage() {
                       />
                       <YAxis tick={{ fontSize: 10 }} tickMargin={8} />
                       <Tooltip
-                        formatter={(value: any) => [`${value} PYG`, "Total"]}
+                        formatter={(value: any) => [`${formatPyg(Number(value))} PYG`, "Total"]}
                         labelStyle={{ fontSize: 11 }}
                         contentStyle={{ fontSize: 11 }}
                       />
@@ -1160,7 +1163,7 @@ export default function ReportsPage() {
                 <div>
                   <p className="text-sm text-gray-600">Total ingresado en el periodo seleccionado</p>
                   <p className="text-2xl font-semibold text-[#31435d]">
-                    {loading ? "..." : `${totalAmount} PYG`}
+                    {loading ? "..." : `${formatPyg(totalAmount)} PYG`}
                   </p>
                 </div>
                 <div className="flex flex-col items-end gap-1 text-xs text-gray-500 relative">
