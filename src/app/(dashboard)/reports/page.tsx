@@ -1950,6 +1950,78 @@ export default function ReportsPage() {
           </div>
         </div>
       )}
+
+      {/* Modal: detalle de asistencia por clase (sede / cancha) */}
+      {locationDetailOpen && locationDetailInfo && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md rounded-lg shadow-lg flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b">
+              <h2 className="text-lg font-semibold text-[#31435d]">Asistencia de la clase</h2>
+            </div>
+            <div className="px-4 pt-2 pb-3 text-sm text-[#31435d] border-b space-y-1">
+              <p>
+                <span className="font-semibold">Fecha:</span>{' '}
+                {new Date(locationDetailInfo.date).toLocaleString()}
+              </p>
+              <p>
+                <span className="font-semibold">Sede:</span>{' '}
+                {locationDetailInfo.location_name ?? '-'}
+              </p>
+              <p>
+                <span className="font-semibold">Cancha:</span>{' '}
+                {locationDetailInfo.court_name ?? '-'}
+              </p>
+              <p>
+                <span className="font-semibold">Profesor:</span>{' '}
+                {locationDetailInfo.coach_name ?? '-'}
+              </p>
+            </div>
+            <div className="px-4 py-3 overflow-y-auto text-sm space-y-4">
+              {locationDetailRows.length === 0 ? (
+                <p className="text-xs text-gray-600">No hay registros de asistencia para esta clase.</p>
+              ) : (
+                <>
+                  <div>
+                    <h3 className="text-xs font-semibold text-[#31435d] mb-1">Presentes</h3>
+                    <ul className="text-xs space-y-1">
+                      {locationDetailRows
+                        .filter((r) => r.present)
+                        .map((r) => (
+                          <li key={r.student_id} className="flex justify-between gap-2">
+                            <span>{r.student_name ?? r.student_id}</span>
+                            <span className="text-green-700 font-semibold text-[11px]">Presente</span>
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-semibold text-[#31435d] mb-1">Ausentes</h3>
+                    <ul className="text-xs space-y-1">
+                      {locationDetailRows
+                        .filter((r) => !r.present)
+                        .map((r) => (
+                          <li key={r.student_id} className="flex justify-between gap-2">
+                            <span>{r.student_name ?? r.student_id}</span>
+                            <span className="text-red-700 font-semibold text-[11px]">Ausente</span>
+                          </li>
+                        ))}
+                    </ul>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 px-4 py-3 border-t bg-white text-xs">
+              <button
+                type="button"
+                className="px-3 py-2 border rounded"
+                onClick={() => setLocationDetailOpen(false)}
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
