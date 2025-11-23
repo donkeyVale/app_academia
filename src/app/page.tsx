@@ -393,7 +393,7 @@ export default function HomePage() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
-            className="border rounded-xl p-3 bg-white flex flex-col gap-1 text-sm shadow-md max-w-xs ml-auto mt-1 origin-top-right"
+            className="border border-[#dbeafe] rounded-xl px-3 py-2 bg-[#f1f5f9] flex flex-col gap-1 text-sm shadow-md w-full max-w-[220px] ml-auto mt-1 origin-top-right"
           >
             <p className="px-3 pb-1 text-[11px] uppercase tracking-wide text-gray-400">
               Navegación rápida
