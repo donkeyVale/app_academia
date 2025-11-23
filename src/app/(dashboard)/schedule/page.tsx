@@ -1734,55 +1734,86 @@ export default function SchedulePage() {
       )}
 
       {attendanceClass && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white w-full max-w-lg rounded-lg shadow-lg flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b">
-              <h3 className="text-lg font-semibold">Asistencia</h3>
-              <button className="text-sm underline" onClick={() => setAttendanceClass(null)}>Cerrar</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3 py-4">
+          <div className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-lg bg-white shadow-xl border border-slate-200">
+            <div className="flex items-center justify-between border-b px-4 pt-4 pb-3">
+              <div className="space-y-0.5">
+                <h3 className="text-base font-semibold text-[#31435d]">Asistencia</h3>
+                {attendanceClass && (
+                  <p className="text-xs text-gray-500">
+                    Clase del {new Date(attendanceClass.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    {" "}a las{" "}
+                    {new Date(attendanceClass.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                className="text-xs text-gray-500 hover:text-gray-700 underline-offset-2 hover:underline"
+                onClick={() => setAttendanceClass(null)}
+              >
+                Cerrar
+              </button>
             </div>
-            <div className="px-4 py-3 overflow-y-auto text-sm">
+            <div className="px-4 py-3 text-sm overflow-y-auto">
               {attendanceLoading ? (
-                <p className="text-sm">Cargando alumnos...</p>
+                <p className="text-sm text-gray-600">Cargando alumnos...</p>
               ) : attendanceList.length === 0 ? (
-                <p className="text-sm">No hay alumnos reservados para esta clase.</p>
+                <p className="text-sm text-gray-600">No hay alumnos reservados para esta clase.</p>
               ) : (
                 <ul className="space-y-2">
                   {attendanceList.map((row, idx) => (
                     <li
                       key={row.student_id}
-                      className="flex flex-row flex-wrap items-center justify-between gap-2 border-b pb-2 max-w-full text-xs"
+                      className="flex max-w-full flex-row flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs"
                     >
-                      <span className="font-medium break-words max-w-full">
+                      <span className="max-w-full break-words font-medium text-slate-800">
                         {row.label}
                       </span>
-                      <label className="flex items-center gap-1">
-                        <input
-                          type="checkbox"
-                          checked={row.present}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            setAttendanceList((prev) => {
-                              const copy = [...prev];
-                              copy[idx] = { ...copy[idx], present: checked };
-                              return copy;
-                            });
-                          }}
+                      <button
+                        type="button"
+                        className={
+                          "inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-medium border " +
+                          (row.present
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            : "bg-white text-slate-600 border-slate-300")
+                        }
+                        onClick={() => {
+                          setAttendanceList((prev) => {
+                            const copy = [...prev];
+                            copy[idx] = { ...copy[idx], present: !copy[idx].present };
+                            return copy;
+                          });
+                        }}
+                      >
+                        <span
+                          className={
+                            "h-2.5 w-2.5 rounded-full " +
+                            (row.present ? "bg-emerald-500" : "bg-slate-300")
+                          }
                         />
-                        <span>Presente</span>
-                      </label>
+                        <span>{row.present ? "Presente" : "Ausente"}</span>
+                      </button>
                     </li>
                   ))}
                 </ul>
               )}
             </div>
-            <div className="flex justify-end gap-2 px-4 py-3 border-t bg-white">
-              <button className="px-3 py-2 border rounded text-sm" onClick={() => setAttendanceClass(null)}>Cancelar</button>
+            <div className="flex items-center justify-end gap-2 border-t bg-white px-4 py-3 text-sm">
               <button
-                className="px-3 py-2 bg-[#3cadaf] hover:bg-[#31435d] text-white rounded text-sm disabled:opacity-50"
+                type="button"
+                className="rounded border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                onClick={() => setAttendanceClass(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="rounded bg-[#3cadaf] px-3 py-2 text-xs font-medium text-white hover:bg-[#31435d] disabled:opacity-50"
                 disabled={attendanceSaving}
                 onClick={onSaveAttendance}
               >
-                {attendanceSaving ? 'Guardando...' : 'Guardar asistencia'}
+                {attendanceSaving ? "Guardando..." : "Guardar asistencia"}
               </button>
             </div>
           </div>
