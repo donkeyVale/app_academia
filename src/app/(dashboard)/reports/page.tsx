@@ -1409,7 +1409,7 @@ export default function ReportsPage() {
         <div className="border rounded-lg bg-white shadow_sm">
           <button
             type="button"
-            className="w-full flex items-center justify_between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+            className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
             onClick={() => setShowStudentSummary((v) => !v)}
           >
             <span className="inline-flex items-center gap-2">
