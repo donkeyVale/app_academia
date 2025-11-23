@@ -1643,91 +1643,165 @@ export default function SchedulePage() {
       )}
 
       {editing && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white w-full max-w-lg rounded-lg shadow-lg flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b">
-              <h3 className="text-lg font-semibold">Editar clase</h3>
-              <button className="text-sm underline" onClick={() => setEditing(null)}>Cerrar</button>
-            </div>
-            <div className="grid gap-3 px-4 py-3 overflow-y-auto text-sm">
-              <div>
-                <label className="block text-sm mb-1">Cancha</label>
-                <select className="border rounded p-2 w-full" value={editCourtId} onChange={(e) => setEditCourtId(e.target.value)}>
-                  {(locationId ? courts.filter((c) => c.location_id === locationId) : courts).map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm mb-1">Fecha</label>
-                <input type="date" className="border rounded p-2 w-full" value={editDay} onChange={(e) => setEditDay(e.target.value)} />
-              </div>
-              <div>
-                <label className="block text-sm mb-1">Hora disponible</label>
-                <select className="border rounded p-2 w-full" value={editTime} onChange={(e) => setEditTime(e.target.value)} disabled={!editCourtId || !editDay}>
-                  <option value="" disabled>{!editCourtId ? 'Selecciona una cancha' : !editDay ? 'Selecciona una fecha' : (editAvailableTimes.length ? 'Selecciona una hora' : 'Sin horarios disponibles')}</option>
-                  {editAvailableTimes.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-                {editCourtId && editDay && editAvailableTimes.length === 0 && (
-                  <p className="text-xs text-red-600 mt-1">No hay horarios disponibles para esta cancha en el día seleccionado.</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3 py-4">
+          <div className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-lg bg-white shadow-xl border border-slate-200">
+            <div className="flex items-center justify-between border-b px-4 pt-4 pb-3">
+              <div className="space-y-0.5">
+                <h3 className="text-base font-semibold text-[#31435d]">Editar clase</h3>
+                {editing && (
+                  <p className="text-xs text-gray-500">
+                    Clase del {new Date(editing.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    {" "}a las{" "}
+                    {new Date(editing.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
                 )}
               </div>
-              <div>
-                <label className="block text-sm mb-1">Profesor</label>
-                <select className="border rounded p-2 w-full" value={editCoachId} onChange={(e) => setEditCoachId(e.target.value)}>
-                  {coaches.map((c) => (
-                    <option key={c.id} value={c.id}>{c.full_name ?? 'Coach'}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm mb-1">Notas / Descripción</label>
-                <textarea className="border rounded p-2 w-full h-20" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} />
-              </div>
-              <div>
-                <label className="block text-sm mb-1">Alumnos (selección múltiple)</label>
-                <input
-                  type="text"
-                  className="border rounded p-2 w-full mb-2"
-                  placeholder="Buscar alumnos..."
-                  value={editStudentQuery}
-                  onChange={(e) => setEditStudentQuery(e.target.value)}
-                />
-                <select
-                  multiple
-                  className="border rounded p-2 w-full h-28"
-                  value={editSelectedStudents}
-                  onChange={(e) => {
-                    const opts = Array.from(e.target.selectedOptions).map(o => o.value);
-                    if (opts.length > 4) {
-                      alert('Máximo 4 alumnos por clase');
-                      return;
-                    }
-                    setEditSelectedStudents(opts);
-                  }}
-                >
-                  {students
-                    .filter((s) => {
-                      const t = (editStudentQuery || '').toLowerCase();
-                      if (!t) return true;
-                      const label =
-                        (s.full_name || '') + ' ' + (s.notes || '') + ' ' + (s.level || '') + ' ' + s.id;
-                      return label.toLowerCase().includes(t);
-                    })
-                    .map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.full_name ?? s.notes ?? s.level ?? s.id}
+              <button
+                type="button"
+                className="text-xs text-gray-500 hover:text-gray-700 underline-offset-2 hover:underline"
+                onClick={() => setEditing(null)}
+              >
+                Cerrar
+              </button>
+            </div>
+            <div className="px-4 py-3 overflow-y-auto text-sm">
+              <div className="grid gap-3">
+                <div className="grid gap-2 md:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-700">Cancha</label>
+                    <select
+                      className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/50"
+                      value={editCourtId}
+                      onChange={(e) => setEditCourtId(e.target.value)}
+                    >
+                      {(locationId ? courts.filter((c) => c.location_id === locationId) : courts).map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-700">Profesor</label>
+                    <select
+                      className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/50"
+                      value={editCoachId}
+                      onChange={(e) => setEditCoachId(e.target.value)}
+                    >
+                      {coaches.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.full_name ?? 'Coach'}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid gap-2 md:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-700">Fecha</label>
+                    <input
+                      type="date"
+                      className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/50"
+                      value={editDay}
+                      onChange={(e) => setEditDay(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-700">Hora disponible</label>
+                    <select
+                      className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/50"
+                      value={editTime}
+                      onChange={(e) => setEditTime(e.target.value)}
+                      disabled={!editCourtId || !editDay}
+                    >
+                      <option value="" disabled>
+                        {!editCourtId
+                          ? 'Selecciona una cancha'
+                          : !editDay
+                          ? 'Selecciona una fecha'
+                          : editAvailableTimes.length
+                          ? 'Selecciona una hora'
+                          : 'Sin horarios disponibles'}
                       </option>
-                    ))}
-                </select>
-                <p className="text-xs text-gray-500">Se crearán/eliminarán reservas según los cambios. Máximo 4.</p>
+                      {editAvailableTimes.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                    {editCourtId && editDay && editAvailableTimes.length === 0 && (
+                      <p className="mt-1 text-xs text-red-600">
+                        No hay horarios disponibles para esta cancha en el día seleccionado.
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">Notas / Descripción</label>
+                  <textarea
+                    className="h-20 w-full resize-none rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/50"
+                    value={editNotes}
+                    onChange={(e) => setEditNotes(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">Alumnos (selección múltiple)</label>
+                  <input
+                    type="text"
+                    className="mb-2 w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/50"
+                    placeholder="Buscar alumnos..."
+                    value={editStudentQuery}
+                    onChange={(e) => setEditStudentQuery(e.target.value)}
+                  />
+                  <select
+                    multiple
+                    className="h-32 w-full rounded border border-slate-300 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/50"
+                    value={editSelectedStudents}
+                    onChange={(e) => {
+                      const opts = Array.from(e.target.selectedOptions).map((o) => o.value);
+                      if (opts.length > 4) {
+                        alert('Máximo 4 alumnos por clase');
+                        return;
+                      }
+                      setEditSelectedStudents(opts);
+                    }}
+                  >
+                    {students
+                      .filter((s) => {
+                        const t = (editStudentQuery || '').toLowerCase();
+                        if (!t) return true;
+                        const label =
+                          (s.full_name || '') + ' ' + (s.notes || '') + ' ' + (s.level || '') + ' ' + s.id;
+                        return label.toLowerCase().includes(t);
+                      })
+                      .map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.full_name ?? s.notes ?? s.level ?? s.id}
+                        </option>
+                      ))}
+                  </select>
+                  <p className="mt-1 text-[11px] text-gray-500">
+                    Se crearán/eliminarán reservas según los cambios. Máximo 4 alumnos por clase.
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="flex justify-end gap-2 px-4 py-3 border-t bg-white">
-              <button className="px-3 py-2 border rounded text-sm" onClick={() => setEditing(null)}>Cancelar</button>
-              <button className="px-3 py-2 bg-[#3cadaf] hover:bg-[#31435d] text-white rounded text-sm disabled:opacity-50" disabled={saving} onClick={onSaveEdit}>{saving ? 'Guardando...' : 'Guardar cambios'}</button>
+            <div className="flex items-center justify-end gap-2 border-t bg-white px-4 py-3 text-sm">
+              <button
+                type="button"
+                className="rounded border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                onClick={() => setEditing(null)}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="rounded bg-[#3cadaf] px-3 py-2 text-xs font-medium text-white hover:bg-[#31435d] disabled:opacity-50"
+                disabled={saving}
+                onClick={onSaveEdit}
+              >
+                {saving ? 'Guardando...' : 'Guardar cambios'}
+              </button>
             </div>
           </div>
         </div>
