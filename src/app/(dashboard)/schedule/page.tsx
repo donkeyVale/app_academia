@@ -1030,7 +1030,7 @@ export default function SchedulePage() {
                                 key={id}
                                 type="button"
                                 onClick={toggle}
-                                className="w-full flex items-center justify-between px-2 py-1.5 text-xs hover:bg-slate-50"
+                                className="w-full flex items-center justify-between px-2 py-1.5 text-[13px] hover:bg-slate-50"
                               >
                                 <span className="truncate mr-2">
                                   {s.full_name ?? s.notes ?? s.level ?? s.id}
