@@ -1122,9 +1122,10 @@ export default function SchedulePage() {
                 <div>
                   <label className="block text-xs mb-1">Sede</label>
                   <Select
-                    value={filterLocationId}
+                    value={filterLocationId || '__all'}
                     onValueChange={(val) => {
-                      setFilterLocationId(val);
+                      const mapped = val === '__all' ? '' : val;
+                      setFilterLocationId(mapped);
                       setFilterCourtId('');
                     }}
                   >
@@ -1132,7 +1133,7 @@ export default function SchedulePage() {
                       <SelectValue placeholder="Todas" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todas</SelectItem>
+                      <SelectItem value="__all">Todas</SelectItem>
                       {locations.map((l) => (
                         <SelectItem key={l.id} value={l.id}>
                           {l.name}
@@ -1144,14 +1145,17 @@ export default function SchedulePage() {
                 <div>
                   <label className="block text-xs mb-1">Cancha</label>
                   <Select
-                    value={filterCourtId}
-                    onValueChange={(val) => setFilterCourtId(val)}
+                    value={filterCourtId || '__all'}
+                    onValueChange={(val) => {
+                      const mapped = val === '__all' ? '' : val;
+                      setFilterCourtId(mapped);
+                    }}
                   >
                     <SelectTrigger className="w-full h-9 text-xs">
                       <SelectValue placeholder="Todas" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Todas</SelectItem>
+                      <SelectItem value="__all">Todas</SelectItem>
                       {courts
                         .filter((c) => !filterLocationId || c.location_id === filterLocationId)
                         .map((c) => (
@@ -1168,14 +1172,17 @@ export default function SchedulePage() {
               <div>
                 <label className="block text-xs mb-1">Profesor</label>
                 <Select
-                  value={filterCoachId}
-                  onValueChange={(val) => setFilterCoachId(val)}
+                  value={filterCoachId || '__all'}
+                  onValueChange={(val) => {
+                    const mapped = val === '__all' ? '' : val;
+                    setFilterCoachId(mapped);
+                  }}
                 >
                   <SelectTrigger className="w-full h-9 text-xs">
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos</SelectItem>
+                    <SelectItem value="__all">Todos</SelectItem>
                     {coaches.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {c.full_name ?? 'Coach'}
@@ -1189,14 +1196,17 @@ export default function SchedulePage() {
               <div>
                 <label className="block text-xs mb-1">Alumno</label>
                 <Select
-                  value={filterStudentId}
-                  onValueChange={(val) => setFilterStudentId(val)}
+                  value={filterStudentId || '__all'}
+                  onValueChange={(val) => {
+                    const mapped = val === '__all' ? '' : val;
+                    setFilterStudentId(mapped);
+                  }}
                 >
                   <SelectTrigger className="w-full h-9 text-xs">
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos</SelectItem>
+                    <SelectItem value="__all">Todos</SelectItem>
                     {students.map((s) => (
                       <SelectItem key={s.id} value={s.id}>
                         {s.full_name ?? s.notes ?? s.level ?? s.id}
