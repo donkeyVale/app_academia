@@ -20,6 +20,14 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
   Calendar as CalendarIcon,
   BarChart3,
   UserCheck,
@@ -2505,132 +2513,148 @@ export default function ReportsPage() {
       </div>
 
       {/* Modal: detalle por alumno */}
-      {studentDetailModalOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white w-full max-w-md rounded-lg shadow-lg flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b">
-              <h2 className="text-lg font-semibold text-[#31435d]">Pagos del alumno</h2>
-            </div>
-            <div className="px-4 pt-2 pb-3 text-sm text-[#31435d] font-semibold border-b">
-              {studentDetailName}
-            </div>
-            <div className="px-4 py-3 overflow-y-auto text-sm space-y-2">
-              {studentDetailRows.length === 0 ? (
-                <p className="text-xs text-gray-600">No hay pagos registrados en este periodo.</p>
-              ) : (
-                <ul className="text-xs space-y-2">
-                  {studentDetailRows.map((r) => (
-                    <li
-                      key={r.id}
-                      className="border rounded-lg px-3 py-2 bg-white flex flex-col gap-1"
-                    >
-                      <div className="flex justify-between gap-2">
-                        <span className="font-semibold text-[#31435d]">
-                          {new Date(r.payment_date).toLocaleDateString()}
-                        </span>
-                        <span className="font-semibold text-[#31435d]">
-                          {r.amount} {r.currency}
-                        </span>
-                      </div>
-                      <div className="text-gray-600">
-                        <span className="font-semibold">Plan:</span>{' '}
-                        {r.plan_name ?? '-'}
-                      </div>
-                      <div className="text-gray-600">
-                        <span className="font-semibold">Método:</span>{' '}
-                        <span className="capitalize">{r.method}</span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div className="flex justify-end gap-2 px-4 py-3 border-t bg-white text-xs">
-              {studentDetailRows.length > 0 && (
-                <div className="mr-auto text-[11px] text-gray-600">
-                  <span className="font-semibold">Total en este periodo:</span>{' '}
-                  {studentDetailRows.reduce((acc, r) => acc + (r.amount || 0), 0)} PYG
-                </div>
-              )}
-              <button
-                type="button"
-                className="px-3 py-2 border rounded"
-                onClick={() => setStudentDetailModalOpen(false)}
-              >
-                Cerrar
-              </button>
-            </div>
+      <Dialog open={studentDetailModalOpen} onOpenChange={setStudentDetailModalOpen}
+      >
+        <DialogContent className="max-w-md max-h-[90vh] p-0 flex flex-col">
+          <DialogHeader className="px-4 pt-4 pb-2 border-b">
+            <DialogTitle className="text-lg font-semibold text-[#31435d]">
+              Pagos del alumno
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              Detalle de pagos del alumno en el periodo seleccionado
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-4 pt-2 pb-3 text-sm text-[#31435d] font-semibold border-b">
+            {studentDetailName}
           </div>
-        </div>
-      )}
+          <div className="px-4 py-3 overflow-y-auto text-sm space-y-2">
+            {studentDetailRows.length === 0 ? (
+              <p className="text-xs text-gray-600">No hay pagos registrados en este periodo.</p>
+            ) : (
+              <ul className="text-xs space-y-2">
+                {studentDetailRows.map((r) => (
+                  <li
+                    key={r.id}
+                    className="border rounded-lg px-3 py-2 bg-white flex flex-col gap-1"
+                  >
+                    <div className="flex justify-between gap-2">
+                      <span className="font-semibold text-[#31435d]">
+                        {new Date(r.payment_date).toLocaleDateString()}
+                      </span>
+                      <span className="font-semibold text-[#31435d]">
+                        {r.amount} {r.currency}
+                      </span>
+                    </div>
+                    <div className="text-gray-600">
+                      <span className="font-semibold">Plan:</span>{' '}
+                      {r.plan_name ?? '-'}
+                    </div>
+                    <div className="text-gray-600">
+                      <span className="font-semibold">Método:</span>{' '}
+                      <span className="capitalize">{r.method}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <DialogFooter className="flex justify-end gap-2 px-4 py-3 border-t bg-white text-xs">
+            {studentDetailRows.length > 0 && (
+              <div className="mr-auto text-[11px] text-gray-600">
+                <span className="font-semibold">Total en este periodo:</span>{' '}
+                {studentDetailRows.reduce((acc, r) => acc + (r.amount || 0), 0)} PYG
+              </div>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setStudentDetailModalOpen(false)}
+            >
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal: detalle por plan */}
-      {planDetailModalOpen && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white w-full max-w-md rounded-lg shadow-lg flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b">
-              <h2 className="text-lg font-semibold text-[#31435d]">Pagos del plan</h2>
-            </div>
-            <div className="px-4 pt-2 pb-3 text-sm text-[#31435d] font-semibold border-b">
-              {planDetailName}
-            </div>
-            <div className="px-4 py-3 overflow-y-auto text-sm space-y-2">
-              {planDetailRows.length === 0 ? (
-                <p className="text-xs text-gray-600">No hay pagos registrados en este periodo.</p>
-              ) : (
-                <ul className="text-xs space-y-2">
-                  {planDetailRows.map((r) => (
-                    <li
-                      key={r.id}
-                      className="border rounded-lg px-3 py-2 bg-white flex flex-col gap-1"
-                    >
-                      <div className="flex justify-between gap-2">
-                        <span className="font-semibold text-[#31435d]">
-                          {new Date(r.payment_date).toLocaleDateString()}
-                        </span>
-                        <span className="font-semibold text-[#31435d]">
-                          {r.amount} {r.currency}
-                        </span>
-                      </div>
-                      <div className="text-gray-600">
-                        <span className="font-semibold">Alumno:</span>{' '}
-                        {r.student_name ?? r.student_id}
-                      </div>
-                      <div className="text-gray-600">
-                        <span className="font-semibold">Método:</span>{' '}
-                        <span className="capitalize">{r.method}</span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            <div className="flex justify-end gap-2 px-4 py-3 border-t bg-white text-xs">
-              {planDetailRows.length > 0 && (
-                <div className="mr-auto text-[11px] text-gray-600">
-                  <span className="font-semibold">Total en este periodo:</span>{' '}
-                  {planDetailRows.reduce((acc, r) => acc + (r.amount || 0), 0)} PYG
-                </div>
-              )}
-              <button
-                type="button"
-                className="px-3 py-2 border rounded"
-                onClick={() => setPlanDetailModalOpen(false)}
-              >
-                Cerrar
-              </button>
-            </div>
+      <Dialog open={planDetailModalOpen} onOpenChange={setPlanDetailModalOpen}
+      >
+        <DialogContent className="max-w-md max-h-[90vh] p-0 flex flex-col">
+          <DialogHeader className="px-4 pt-4 pb-2 border-b">
+            <DialogTitle className="text-lg font-semibold text-[#31435d]">
+              Pagos del plan
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              Detalle de pagos del plan en el periodo seleccionado
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-4 pt-2 pb-3 text-sm text-[#31435d] font-semibold border-b">
+            {planDetailName}
           </div>
-        </div>
-      )}
+          <div className="px-4 py-3 overflow-y-auto text-sm space-y-2">
+            {planDetailRows.length === 0 ? (
+              <p className="text-xs text-gray-600">No hay pagos registrados en este periodo.</p>
+            ) : (
+              <ul className="text-xs space-y-2">
+                {planDetailRows.map((r) => (
+                  <li
+                    key={r.id}
+                    className="border rounded-lg px-3 py-2 bg-white flex flex-col gap-1"
+                  >
+                    <div className="flex justify-between gap-2">
+                      <span className="font-semibold text-[#31435d]">
+                        {new Date(r.payment_date).toLocaleDateString()}
+                      </span>
+                      <span className="font-semibold text-[#31435d]">
+                        {r.amount} {r.currency}
+                      </span>
+                    </div>
+                    <div className="text-gray-600">
+                      <span className="font-semibold">Alumno:</span>{' '}
+                      {r.student_name ?? r.student_id}
+                    </div>
+                    <div className="text-gray-600">
+                      <span className="font-semibold">Método:</span>{' '}
+                      <span className="capitalize">{r.method}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <DialogFooter className="flex justify-end gap-2 px-4 py-3 border-t bg-white text-xs">
+            {planDetailRows.length > 0 && (
+              <div className="mr-auto text-[11px] text-gray-600">
+                <span className="font-semibold">Total en este periodo:</span>{' '}
+                {planDetailRows.reduce((acc, r) => acc + (r.amount || 0), 0)} PYG
+              </div>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPlanDetailModalOpen(false)}
+            >
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal: detalle de asistencia por clase (sede / cancha) */}
-      {locationDetailOpen && locationDetailInfo && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white w-full max-w-md rounded-lg shadow-lg flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b">
-              <h2 className="text-lg font-semibold text-[#31435d]">Asistencia de la clase</h2>
-            </div>
+      <Dialog open={locationDetailOpen && !!locationDetailInfo} onOpenChange={setLocationDetailOpen}
+      >
+        <DialogContent className="max-w-md max-h-[90vh] p-0 flex flex-col">
+          <DialogHeader className="px-4 pt-4 pb-2 border-b">
+            <DialogTitle className="text-lg font-semibold text-[#31435d]">
+              Asistencia de la clase
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              Detalle de asistencia por alumno para la clase seleccionada
+            </DialogDescription>
+          </DialogHeader>
+          {locationDetailInfo && (
             <div className="px-4 pt-2 pb-3 text-sm text-[#31435d] border-b space-y-1">
               <p>
                 <span className="font-semibold">Fecha:</span>{' '}
@@ -2649,52 +2673,53 @@ export default function ReportsPage() {
                 {locationDetailInfo.coach_name ?? '-'}
               </p>
             </div>
-            <div className="px-4 py-3 overflow-y-auto text-sm space-y-4">
-              {locationDetailRows.length === 0 ? (
-                <p className="text-xs text-gray-600">No hay registros de asistencia para esta clase.</p>
-              ) : (
-                <>
-                  <div>
-                    <h3 className="text-xs font-semibold text-[#31435d] mb-1">Presentes</h3>
-                    <ul className="text-xs space-y-1">
-                      {locationDetailRows
-                        .filter((r) => r.present)
-                        .map((r) => (
-                          <li key={r.student_id} className="flex justify-between gap-2">
-                            <span>{r.student_name ?? r.student_id}</span>
-                            <span className="text-green-700 font-semibold text-[11px]">Presente</span>
-                          </li>
-                        ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <h3 className="text-xs font-semibold text-[#31435d] mb-1">Ausentes</h3>
-                    <ul className="text-xs space-y-1">
-                      {locationDetailRows
-                        .filter((r) => !r.present)
-                        .map((r) => (
-                          <li key={r.student_id} className="flex justify-between gap-2">
-                            <span>{r.student_name ?? r.student_id}</span>
-                            <span className="text-red-700 font-semibold text-[11px]">Ausente</span>
-                          </li>
-                        ))}
-                    </ul>
-                  </div>
-                </>
-              )}
-            </div>
-            <div className="flex justify-end gap-2 px-4 py-3 border-t bg-white text-xs">
-              <button
-                type="button"
-                className="px-3 py-2 border rounded"
-                onClick={() => setLocationDetailOpen(false)}
-              >
-                Cerrar
-              </button>
-            </div>
+          )}
+          <div className="px-4 py-3 overflow-y-auto text-sm space-y-4">
+            {locationDetailRows.length === 0 ? (
+              <p className="text-xs text-gray-600">No hay registros de asistencia para esta clase.</p>
+            ) : (
+              <>
+                <div>
+                  <h3 className="text-xs font-semibold text-[#31435d] mb-1">Presentes</h3>
+                  <ul className="text-xs space-y-1">
+                    {locationDetailRows
+                      .filter((r) => r.present)
+                      .map((r) => (
+                        <li key={r.student_id} className="flex justify-between gap-2">
+                          <span>{r.student_name ?? r.student_id}</span>
+                          <span className="text-green-700 font-semibold text-[11px]">Presente</span>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+                <div>
+                  <h3 className="text-xs font-semibold text-[#31435d] mb-1">Ausentes</h3>
+                  <ul className="text-xs space-y-1">
+                    {locationDetailRows
+                      .filter((r) => !r.present)
+                      .map((r) => (
+                        <li key={r.student_id} className="flex justify-between gap-2">
+                          <span>{r.student_name ?? r.student_id}</span>
+                          <span className="text-red-700 font-semibold text-[11px]">Ausente</span>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              </>
+            )}
           </div>
-        </div>
-      )}
+          <DialogFooter className="flex justify-end gap-2 px-4 py-3 border-t bg-white text-xs">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setLocationDetailOpen(false)}
+            >
+              Cerrar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
