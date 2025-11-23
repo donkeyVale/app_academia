@@ -15,7 +15,7 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select';
-import { Calendar as CalendarIcon, Clock } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, CalendarDays } from 'lucide-react';
 
 const iconColor = "#3cadaf";
 
@@ -1030,7 +1030,7 @@ export default function SchedulePage() {
                                 key={id}
                                 type="button"
                                 onClick={toggle}
-                                className="w-full flex items-center justify-between px-2 py-1.5 text-[13px] hover:bg-slate-50"
+                                className="w-full flex items-center justify-between px-2 py-1.5 text-sm hover:bg-slate-50"
                               >
                                 <span className="truncate mr-2">
                                   {s.full_name ?? s.notes ?? s.level ?? s.id}
@@ -1073,24 +1073,30 @@ export default function SchedulePage() {
           className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
           onClick={() => setShowUpcomingSection((v) => !v)}
         >
-          <span className="font-semibold">Próximas clases</span>
+          <span className="inline-flex items-center gap-2 font-semibold text-[#31435d]">
+            <CalendarDays className="w-4 h-4 text-[#3cadaf]" />
+            Próximas clases
+          </span>
           <span className="text-xs text-gray-500">{showUpcomingSection ? '▼' : '▲'}</span>
         </button>
         {showUpcomingSection && (
-          <div className="space-y-6 p-4">
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+            className="space-y-6 p-4 origin-top"
+          >
             <div className="space-y-3 max-w-full">
               <h2 className="text-lg font-semibold text-[#31435d]">Próximas clases</h2>
         <div className="space-y-2 p-3 border rounded-lg bg-[#f0f9fb] max-w-full w-full overflow-hidden">
           <div className="grid gap-2 md:grid-cols-5 items-end w-full max-w-full">
             <div>
               <label className="block text-xs mb-1 font-semibold">Filtrar por</label>
-              <select
-                className="border rounded p-2 w-full text-xs"
+              <Select
                 value={filterMode}
-                onChange={(e) => {
-                  const mode = e.target.value as typeof filterMode;
-                  setFilterMode(mode);
-                  // Al cambiar de modo, limpiamos filtros específicos
+                onValueChange={(mode) => {
+                  const typed = mode as typeof filterMode;
+                  setFilterMode(typed);
                   setFilterLocationId('');
                   setFilterCourtId('');
                   setFilterCoachId('');
@@ -1099,78 +1105,105 @@ export default function SchedulePage() {
                   setFilterTo('');
                 }}
               >
-                <option value="none">Sin filtro</option>
-                <option value="sede">Sede / Cancha</option>
-                <option value="profesor">Profesor</option>
-                <option value="alumno">Alumno</option>
-                <option value="fecha">Fecha</option>
-              </select>
+                <SelectTrigger className="w-full h-9 text-xs">
+                  <SelectValue placeholder="Sin filtro" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sin filtro</SelectItem>
+                  <SelectItem value="sede">Sede / Cancha</SelectItem>
+                  <SelectItem value="profesor">Profesor</SelectItem>
+                  <SelectItem value="alumno">Alumno</SelectItem>
+                  <SelectItem value="fecha">Fecha</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             {filterMode === 'sede' && (
               <>
                 <div>
                   <label className="block text-xs mb-1">Sede</label>
-                  <select
-                    className="border rounded p-2 w-full text-xs"
+                  <Select
                     value={filterLocationId}
-                    onChange={(e) => {
-                      setFilterLocationId(e.target.value);
+                    onValueChange={(val) => {
+                      setFilterLocationId(val);
                       setFilterCourtId('');
                     }}
                   >
-                    <option value="">Todas</option>
-                    {locations.map((l) => (
-                      <option key={l.id} value={l.id}>{l.name}</option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full h-9 text-xs">
+                      <SelectValue placeholder="Todas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todas</SelectItem>
+                      {locations.map((l) => (
+                        <SelectItem key={l.id} value={l.id}>
+                          {l.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-xs mb-1">Cancha</label>
-                  <select
-                    className="border rounded p-2 w-full text-xs"
+                  <Select
                     value={filterCourtId}
-                    onChange={(e) => setFilterCourtId(e.target.value)}
+                    onValueChange={(val) => setFilterCourtId(val)}
                   >
-                    <option value="">Todas</option>
-                    {courts
-                      .filter((c) => !filterLocationId || c.location_id === filterLocationId)
-                      .map((c) => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                  </select>
+                    <SelectTrigger className="w-full h-9 text-xs">
+                      <SelectValue placeholder="Todas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">Todas</SelectItem>
+                      {courts
+                        .filter((c) => !filterLocationId || c.location_id === filterLocationId)
+                        .map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </>
             )}
             {filterMode === 'profesor' && (
               <div>
                 <label className="block text-xs mb-1">Profesor</label>
-                <select
-                  className="border rounded p-2 w-full text-xs"
+                <Select
                   value={filterCoachId}
-                  onChange={(e) => setFilterCoachId(e.target.value)}
+                  onValueChange={(val) => setFilterCoachId(val)}
                 >
-                  <option value="">Todos</option>
-                  {coaches.map((c) => (
-                    <option key={c.id} value={c.id}>{c.full_name ?? 'Coach'}</option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full h-9 text-xs">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Todos</SelectItem>
+                    {coaches.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.full_name ?? 'Coach'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
             {filterMode === 'alumno' && (
               <div>
                 <label className="block text-xs mb-1">Alumno</label>
-                <select
-                  className="border rounded p-2 w-full text-xs"
+                <Select
                   value={filterStudentId}
-                  onChange={(e) => setFilterStudentId(e.target.value)}
+                  onValueChange={(val) => setFilterStudentId(val)}
                 >
-                  <option value="">Todos</option>
-                  {students.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.full_name ?? s.notes ?? s.level ?? s.id}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full h-9 text-xs">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Todos</SelectItem>
+                    {students.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.full_name ?? s.notes ?? s.level ?? s.id}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
             {filterMode === 'fecha' && (
@@ -1332,7 +1365,7 @@ export default function SchedulePage() {
         )}
             </div>
 
-          </div>
+          </motion.div>
         )}
       </div>
 
