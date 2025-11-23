@@ -12,7 +12,15 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Smartphone } from 'lucide-react';
+import {
+  Smartphone,
+  Layers,
+  Users,
+  CalendarDays,
+  UserCog,
+  CalendarClock,
+  TicketPercent,
+} from 'lucide-react';
 
 const iconColor = "#3cadaf";
 
@@ -435,7 +443,7 @@ export default function HomePage() {
           >
             <div className="flex items-center gap-2 mb-1">
               <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
-                <IconMoney />
+                <Layers className="w-4 h-4 text-[#3cadaf]" />
               </div>
               <p className="text-xs uppercase tracking-wide text-gray-500">Planes activos</p>
             </div>
@@ -449,7 +457,7 @@ export default function HomePage() {
           >
             <div className="flex items-center gap-2 mb-1">
               <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
-                <IconStudents />
+                <Users className="w-4 h-4 text-[#22c55e]" />
               </div>
               <p className="text-xs uppercase tracking-wide text-gray-500">Alumnos con plan</p>
             </div>
@@ -463,7 +471,7 @@ export default function HomePage() {
           >
             <div className="flex items-center gap-2 mb-1">
               <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
-                <IconCalendar />
+                <CalendarDays className="w-4 h-4 text-[#3b82f6]" />
               </div>
               <p className="text-xs uppercase tracking-wide text-gray-500">Clases de hoy</p>
             </div>
@@ -477,7 +485,7 @@ export default function HomePage() {
           >
             <div className="flex items-center gap-2 mb-1">
               <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
-                <IconUsers />
+                <UserCog className="w-4 h-4 text-[#f97316]" />
               </div>
               <p className="text-xs uppercase tracking-wide text-gray-500">Profesores / Alumnos</p>
             </div>
