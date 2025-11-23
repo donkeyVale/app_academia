@@ -1759,7 +1759,7 @@ export default function SchedulePage() {
                       placeholder="Buscar alumnos..."
                       value={editStudentQuery}
                       onChange={(e) => setEditStudentQuery(e.target.value)}
-                      className="h-9 text-xs"
+                      className="h-10 text-base"
                     />
                     <div className="max-h-40 overflow-auto rounded-md border text-xs">
                       {students
