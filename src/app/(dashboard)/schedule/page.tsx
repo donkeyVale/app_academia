@@ -3,6 +3,18 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
 import { logAudit } from '@/lib/audit';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from '@/components/ui/select';
+import { Calendar as CalendarIcon, Clock } from 'lucide-react';
 
 const iconColor = "#3cadaf";
 
@@ -19,6 +31,67 @@ const IconCalendar = (props: React.SVGProps<SVGSVGElement>) => (
     <path d="M15 3v4" stroke={iconColor} strokeWidth="1.6" />
   </svg>
 );
+
+// Utilidades para manejar fechas en formato yyyy-mm-dd
+function parseYmd(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const [y, m, d] = value.split('-').map((x) => parseInt(x, 10));
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
+
+function formatYmd(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function formatDisplay(date: Date | null): string {
+  if (!date) return 'Selecciona una fecha';
+  return date.toLocaleDateString('es-ES', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+interface DatePickerFieldProps {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function DatePickerField({ value, onChange }: DatePickerFieldProps) {
+  const selectedDate = parseYmd(value);
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full justify-start text-left text-sm font-normal flex items-center gap-2"
+        >
+          <CalendarIcon className="h-4 w-4 text-gray-500" />
+          <span className={selectedDate ? '' : 'text-gray-400'}>
+            {formatDisplay(selectedDate)}
+          </span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={selectedDate ?? undefined}
+          onSelect={(date) => {
+            if (!date) return;
+            onChange(formatYmd(date));
+          }}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 type Court = { id: string; name: string; location_id: string };
 type Location = { id: string; name: string };
@@ -769,63 +842,133 @@ export default function SchedulePage() {
           className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
           onClick={() => setShowCreateSection((v) => !v)}
         >
-          <span className="font-semibold">Crear clase</span>
+          <span className="inline-flex items-center gap-2 font-semibold text-[#31435d]">
+            <Clock className="w-4 h-4 text-[#3cadaf]" />
+            Crear clase
+          </span>
           <span className="text-xs text-gray-500">{showCreateSection ? '▼' : '▲'}</span>
         </button>
-        {showCreateSection && (
-          <form onSubmit={onCreate} className="grid gap-3 max-w-xl p-4">
-        <div>
-          <label className="block text-sm mb-1">Complejo</label>
-          <select className="border rounded p-2 w-full" value={locationId} onChange={(e) => setLocationId(e.target.value)}>
-            <option value="">Todos</option>
-            {locations.map((l) => (
-              <option key={l.id} value={l.id}>{l.name}</option>
-            ))}
-          </select>
-        </div>
-        {/* Primero: Cancha */}
-        <div>
-          <label className="block text-sm mb-1">Cancha</label>
-          <select className="border rounded p-2 w-full" value={courtId} onChange={(e) => setCourtId(e.target.value)} required>
-            <option value="" disabled>Selecciona una cancha</option>
-            {(locationId ? courts.filter((c) => c.location_id === locationId) : courts).map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
-        {/* Luego: Fecha y Hora disponible */}
-        <div>
-          <label className="block text-sm mb-1">Fecha</label>
-          <input type="date" className="border rounded p-2 w-full" value={day} onChange={(e) => setDay(e.target.value)} required />
-          <p className="text-xs text-gray-500">Duración fija: 60 minutos</p>
-        </div>
-        <div>
-          <label className="block text-sm mb-1">Hora disponible</label>
-          <select className="border rounded p-2 w-full" value={time} onChange={(e) => setTime(e.target.value)} required disabled={!courtId || !day}>
-            <option value="" disabled>{!courtId ? 'Selecciona una cancha' : !day ? 'Selecciona una fecha' : (availableTimes.length ? 'Selecciona una hora' : 'Sin horarios disponibles')}</option>
-            {availableTimes.map((t) => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
-          {courtId && day && availableTimes.length === 0 && (
-            <p className="text-xs text-red-600 mt-1">No hay horarios disponibles para esta cancha en el día seleccionado.</p>
-          )}
-        </div>
-        {/* Tipo y cupo ahora se derivan de la cantidad de alumnos seleccionados (1-4) */}
-        <div>
-          <label className="block text-sm mb-1">Profesor</label>
-          <select className="border rounded p-2 w-full" value={coachId} onChange={(e) => setCoachId(e.target.value)} required>
-            <option value="" disabled>Selecciona un profesor</option>
-            {coaches.map((c) => (
-              <option key={c.id} value={c.id}>{c.full_name ?? 'Coach'}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm mb-1">Notas / Descripción</label>
-          <textarea className="border rounded p-2 w-full h-20" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ej.: Clase grupal nivel intermedio" />
-        </div>
-        <div>
+        <AnimatePresence initial={false}>
+          {showCreateSection && (
+            <motion.form
+              key="create-class-section"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              onSubmit={onCreate}
+              className="grid gap-3 max-w-xl p-4 origin-top"
+            >
+              <div>
+                <label className="block text-sm mb-1">Complejo</label>
+                <Select
+                  value={locationId}
+                  onValueChange={(val) => {
+                    setLocationId(val);
+                    setCourtId('');
+                  }}
+                >
+                  <SelectTrigger className="w-full text-sm">
+                    <SelectValue placeholder="Selecciona un complejo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {locations.map((l) => (
+                      <SelectItem key={l.id} value={l.id}>
+                        {l.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Primero: Cancha */}
+              <div>
+                <label className="block text-sm mb-1">Cancha</label>
+                <Select
+                  value={courtId}
+                  onValueChange={(val) => setCourtId(val)}
+                  disabled={!locationId}
+                >
+                  <SelectTrigger className="w-full text-sm">
+                    <SelectValue placeholder={locationId ? 'Selecciona una cancha' : 'Selecciona un complejo primero'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(locationId ? courts.filter((c) => c.location_id === locationId) : courts).map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {/* Luego: Fecha y Hora disponible */}
+              <div>
+                <label className="block text-sm mb-1">Fecha</label>
+                <DatePickerField value={day} onChange={setDay} />
+                <p className="text-xs text-gray-500 mt-1">Duración fija: 60 minutos</p>
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Hora disponible</label>
+                <Select
+                  value={time}
+                  onValueChange={(val) => setTime(val)}
+                  disabled={!courtId || !day || availableTimes.length === 0}
+                >
+                  <SelectTrigger className="w-full text-sm">
+                    <SelectValue
+                      placeholder={
+                        !courtId
+                          ? 'Selecciona una cancha'
+                          : !day
+                          ? 'Selecciona una fecha'
+                          : availableTimes.length
+                          ? 'Selecciona una hora'
+                          : 'Sin horarios disponibles'
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableTimes.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {courtId && day && availableTimes.length === 0 && (
+                  <p className="text-xs text-red-600 mt-1">
+                    No hay horarios disponibles para esta cancha en el día seleccionado.
+                  </p>
+                )}
+              </div>
+              {/* Tipo y cupo ahora se derivan de la cantidad de alumnos seleccionados (1-4) */}
+              <div>
+                <label className="block text-sm mb-1">Profesor</label>
+                <Select
+                  value={coachId}
+                  onValueChange={(val) => setCoachId(val)}
+                >
+                  <SelectTrigger className="w-full text-sm">
+                    <SelectValue placeholder="Selecciona un profesor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {coaches.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.full_name ?? 'Coach'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Notas / Descripción</label>
+                <textarea
+                  className="border rounded p-2 w-full h-20"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Ej.: Clase grupal nivel intermedio"
+                />
+              </div>
+              <div>
           <label className="block text-sm mb-1">Alumnos (selección múltiple)</label>
           <input
             type="text"
@@ -863,8 +1006,9 @@ export default function SchedulePage() {
         <button className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50" disabled={saving}>
           {saving ? 'Creando...' : 'Crear clase'}
         </button>
-          </form>
-        )}
+            </motion.form>
+          )}
+        </AnimatePresence>
       </div>
 
       <div className="border rounded-lg bg-white shadow-sm overflow-x-hidden">
