@@ -1753,91 +1753,72 @@ export default function SchedulePage() {
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-slate-700">Alumnos (selección múltiple)</label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="flex w-full items-center justify-between truncate text-xs font-normal"
-                      >
-                        <span className="mr-2 truncate">
-                          {editSelectedStudents.length === 0
-                            ? 'Selecciona hasta 4 alumnos'
-                            : editSelectedStudents.length === 1
-                            ? '1 alumno seleccionado'
-                            : `${editSelectedStudents.length} alumnos seleccionados`}
-                        </span>
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full max-w-full p-3" align="start">
-                      <div className="space-y-2">
-                        <Input
-                          type="text"
-                          placeholder="Buscar alumnos..."
-                          value={editStudentQuery}
-                          onChange={(e) => setEditStudentQuery(e.target.value)}
-                          className="h-9 text-xs"
-                        />
-                        <div className="max-h-48 overflow-auto rounded-md border text-xs">
-                          {students
-                            .filter((s) => {
-                              const t = (editStudentQuery || '').toLowerCase();
-                              if (!t) return true;
-                              const label =
-                                (s.full_name || '') +
-                                ' ' +
-                                (s.notes || '') +
-                                ' ' +
-                                (s.level || '') +
-                                ' ' +
-                                s.id;
-                              return label.toLowerCase().includes(t);
-                            })
-                            .map((s) => {
-                              const id = s.id;
-                              const checked = editSelectedStudents.includes(id);
-                              const toggle = () => {
-                                setEditSelectedStudents((prev) => {
-                                  if (!checked && prev.length >= 4) {
-                                    alert('Máximo 4 alumnos por clase');
-                                    return prev;
-                                  }
-                                  return checked
-                                    ? prev.filter((x) => x !== id)
-                                    : [...prev, id];
-                                });
-                              };
-                              return (
-                                <button
-                                  key={id}
-                                  type="button"
-                                  onClick={toggle}
-                                  className="flex w-full items-center justify-between px-2 py-1.5 text-left text-xs hover:bg-slate-50"
-                                >
-                                  <span className="mr-2 truncate">
-                                    {s.full_name ?? s.notes ?? s.level ?? s.id}
-                                  </span>
-                                  <input
-                                    type="checkbox"
-                                    readOnly
-                                    checked={checked}
-                                    className="h-3.5 w-3.5 rounded border-gray-300"
-                                  />
-                                </button>
-                              );
-                            })}
-                          {students.length === 0 && (
-                            <div className="px-2 py-1.5 text-[11px] text-gray-500">
-                              No hay alumnos cargados.
-                            </div>
-                          )}
+                  <div className="space-y-2">
+                    <Input
+                      type="text"
+                      placeholder="Buscar alumnos..."
+                      value={editStudentQuery}
+                      onChange={(e) => setEditStudentQuery(e.target.value)}
+                      className="h-9 text-xs"
+                    />
+                    <div className="max-h-40 overflow-auto rounded-md border text-xs">
+                      {students
+                        .filter((s) => {
+                          const t = (editStudentQuery || '').toLowerCase();
+                          if (!t) return true;
+                          const label =
+                            (s.full_name || '') +
+                            ' ' +
+                            (s.notes || '') +
+                            ' ' +
+                            (s.level || '') +
+                            ' ' +
+                            s.id;
+                          return label.toLowerCase().includes(t);
+                        })
+                        .map((s) => {
+                          const id = s.id;
+                          const checked = editSelectedStudents.includes(id);
+                          const toggle = () => {
+                            setEditSelectedStudents((prev) => {
+                              if (!checked && prev.length >= 4) {
+                                alert('Máximo 4 alumnos por clase');
+                                return prev;
+                              }
+                              return checked
+                                ? prev.filter((x) => x !== id)
+                                : [...prev, id];
+                            });
+                          };
+                          return (
+                            <button
+                              key={id}
+                              type="button"
+                              onClick={toggle}
+                              className="flex w-full items-center justify-between px-2 py-1.5 text-left text-xs hover:bg-slate-50"
+                            >
+                              <span className="mr-2 truncate">
+                                {s.full_name ?? s.notes ?? s.level ?? s.id}
+                              </span>
+                              <input
+                                type="checkbox"
+                                readOnly
+                                checked={checked}
+                                className="h-3.5 w-3.5 rounded border-gray-300"
+                              />
+                            </button>
+                          );
+                        })}
+                      {students.length === 0 && (
+                        <div className="px-2 py-1.5 text-[11px] text-gray-500">
+                          No hay alumnos cargados.
                         </div>
-                        <p className="text-[11px] text-gray-500">
-                          Se crearán/eliminarán reservas según los cambios. Máximo 4 alumnos por clase.
-                        </p>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-gray-500">
+                      Se crearán/eliminarán reservas según los cambios. Máximo 4 alumnos por clase.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
