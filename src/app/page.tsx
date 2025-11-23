@@ -20,6 +20,11 @@ import {
   UserCog,
   CalendarClock,
   TicketPercent,
+  Menu,
+  X,
+  CreditCard,
+  BarChart3,
+  LogOut,
 } from 'lucide-react';
 
 const iconColor = "#3cadaf";
@@ -368,69 +373,84 @@ export default function HomePage() {
         </div>
         <button
           type="button"
-          className="border border-gray-300 bg-white rounded-full px-3 py-2 text-xs flex flex-col justify-center items-center gap-0.5 shadow-sm hover:shadow-md transition-shadow"
+          className="border border-gray-300 bg-white rounded-full px-2.5 py-2 text-xs flex items-center justify-center shadow-sm hover:shadow-md hover:border-[#3cadaf]/70 transition-all"
           onClick={() => setMenuOpen((v) => !v)}
-          aria-label="Abrir menú principal"
+          aria-label={menuOpen ? 'Cerrar menú principal' : 'Abrir menú principal'}
         >
-          <span className="block w-5 h-0.5 bg-[#31435d] rounded" />
-          <span className="block w-5 h-0.5 bg-[#31435d] rounded" />
-          <span className="block w-5 h-0.5 bg-[#31435d] rounded" />
+          {menuOpen ? (
+            <X className="w-4 h-4 text-[#31435d]" />
+          ) : (
+            <Menu className="w-4 h-4 text-[#31435d]" />
+          )}
         </button>
       </div>
 
-      {menuOpen && (
-        <nav className="border rounded-lg p-3 bg-white flex flex-col gap-2 text-sm shadow-md">
-          <Link
-            className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-50 transition-colors"
-            href="/schedule"
-            onClick={() => setMenuOpen(false)}
+      <AnimatePresence initial={false}>
+        {menuOpen && (
+          <motion.nav
+            key="dashboard-main-menu"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+            className="border rounded-xl p-3 bg-white flex flex-col gap-1 text-sm shadow-md max-w-xs ml-auto mt-1 origin-top-right"
           >
-            <IconCalendar />
-            <span>Agenda</span>
-          </Link>
-          <Link
-            className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-50 transition-colors"
-            href="/students"
-            onClick={() => setMenuOpen(false)}
-          >
-            <IconStudents />
-            <span>Alumnos</span>
-          </Link>
-          <Link
-            className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-50 transition-colors"
-            href="/finance"
-            onClick={() => setMenuOpen(false)}
-          >
-            <IconMoney />
-            <span>Finanzas</span>
-          </Link>
-          {isAdmin && (
+            <p className="px-3 pb-1 text-[11px] uppercase tracking-wide text-gray-400">
+              Navegación rápida
+            </p>
             <Link
-              className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-50 transition-colors"
-              href="/users"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+              href="/schedule"
               onClick={() => setMenuOpen(false)}
             >
-              <IconUsers />
-              <span>Usuarios</span>
+              <CalendarDays className="w-4 h-4 text-[#3b82f6]" />
+              <span>Agenda</span>
             </Link>
-          )}
-          <Link
-            className="flex items-center gap-2 px-3 py-2 rounded hover:bg-gray-50 transition-colors"
-            href="/reports"
-            onClick={() => setMenuOpen(false)}
-          >
-            <IconReport />
-            <span>Reportes</span>
-          </Link>
-          <button
-            type="button"
-            className="text-left mt-2 px-3 py-2 rounded text-xs text-red-600 hover:bg-red-50 transition-colors"
-            onClick={handleLogout}
-          >
-            Cerrar sesión
-          </button>
-        </nav>
-      )}
+            <Link
+              className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+              href="/students"
+              onClick={() => setMenuOpen(false)}
+            >
+              <Users className="w-4 h-4 text-[#22c55e]" />
+              <span>Alumnos</span>
+            </Link>
+            <Link
+              className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+              href="/finance"
+              onClick={() => setMenuOpen(false)}
+            >
+              <CreditCard className="w-4 h-4 text-[#3cadaf]" />
+              <span>Finanzas</span>
+            </Link>
+            {isAdmin && (
+              <Link
+                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                href="/users"
+                onClick={() => setMenuOpen(false)}
+              >
+                <UserCog className="w-4 h-4 text-[#f97316]" />
+                <span>Usuarios</span>
+              </Link>
+            )}
+            <Link
+              className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+              href="/reports"
+              onClick={() => setMenuOpen(false)}
+            >
+              <BarChart3 className="w-4 h-4 text-[#6366f1]" />
+              <span>Reportes</span>
+            </Link>
+            <button
+              type="button"
+              className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg text-xs text-red-600 hover:bg-red-50 transition-colors"
+              onClick={handleLogout}
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Cerrar sesión</span>
+            </button>
+          </motion.nav>
+        )}
+      </AnimatePresence>
 
       {(!role || role === 'admin') && (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
