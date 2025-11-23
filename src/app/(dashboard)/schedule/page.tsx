@@ -1126,19 +1126,22 @@ export default function SchedulePage() {
               <>
                 <div>
                   <label className="block text-xs mb-1">Sede</label>
-                  <Select
-                    value={filterLocationId || '__all'}
-                    onValueChange={(val) => {
-                      const mapped = val === '__all' ? '' : val;
-                      setFilterLocationId(mapped);
-                      setFilterCourtId('');
-                    }}
-                  >
-                    <SelectTrigger className="w-full h-9 text-xs">
-                      <SelectValue placeholder="Todas" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <div className="p-1">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-between h-9 px-2 text-xs font-normal"
+                      >
+                        <span className="truncate mr-2">
+                          {filterLocationId
+                            ? locations.find((l) => l.id === filterLocationId)?.name || 'Sede seleccionada'
+                            : 'Todas las sedes'}
+                        </span>
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64 p-2" align="start">
+                      <div className="space-y-2">
                         <Input
                           type="text"
                           placeholder="Buscar sede..."
@@ -1146,36 +1149,57 @@ export default function SchedulePage() {
                           onChange={(e) => setLocationFilterSearch(e.target.value)}
                           className="h-10 text-base"
                         />
+                        <div className="max-h-52 overflow-auto border rounded-md divide-y text-xs">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFilterLocationId('');
+                              setFilterCourtId('');
+                            }}
+                            className="w-full px-2 py-1.5 text-left hover:bg-slate-50"
+                          >
+                            Todas las sedes
+                          </button>
+                          {locations
+                            .filter((l) =>
+                              !locationFilterSearch
+                                ? true
+                                : l.name.toLowerCase().includes(locationFilterSearch.toLowerCase())
+                            )
+                            .map((l) => (
+                              <button
+                                key={l.id}
+                                type="button"
+                                onClick={() => setFilterLocationId(l.id)}
+                                className="w-full px-2 py-1.5 text-left hover:bg-slate-50"
+                              >
+                                {l.name}
+                              </button>
+                            ))}
+                        </div>
                       </div>
-                      <SelectItem value="__all">Todas</SelectItem>
-                      {locations
-                        .filter((l) =>
-                          !locationFilterSearch
-                            ? true
-                            : l.name.toLowerCase().includes(locationFilterSearch.toLowerCase())
-                        )
-                        .map((l) => (
-                          <SelectItem key={l.id} value={l.id}>
-                            {l.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div>
                   <label className="block text-xs mb-1">Cancha</label>
-                  <Select
-                    value={filterCourtId || '__all'}
-                    onValueChange={(val) => {
-                      const mapped = val === '__all' ? '' : val;
-                      setFilterCourtId(mapped);
-                    }}
-                  >
-                    <SelectTrigger className="w-full h-9 text-xs">
-                      <SelectValue placeholder="Todas" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <div className="p-1">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-between h-9 px-2 text-xs font-normal"
+                        disabled={!filterLocationId}
+                      >
+                        <span className="truncate mr-2">
+                          {filterCourtId
+                            ? courts.find((c) => c.id === filterCourtId)?.name || 'Cancha seleccionada'
+                            : 'Todas las canchas'}
+                        </span>
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64 p-2" align="start">
+                      <div className="space-y-2">
                         <Input
                           type="text"
                           placeholder="Buscar cancha..."
@@ -1183,40 +1207,57 @@ export default function SchedulePage() {
                           onChange={(e) => setCourtFilterSearch(e.target.value)}
                           className="h-10 text-base"
                         />
+                        <div className="max-h-52 overflow-auto border rounded-md divide-y text-xs">
+                          <button
+                            type="button"
+                            onClick={() => setFilterCourtId('')}
+                            className="w-full px-2 py-1.5 text-left hover:bg-slate-50"
+                          >
+                            Todas las canchas
+                          </button>
+                          {courts
+                            .filter((c) => !filterLocationId || c.location_id === filterLocationId)
+                            .filter((c) =>
+                              !courtFilterSearch
+                                ? true
+                                : c.name.toLowerCase().includes(courtFilterSearch.toLowerCase())
+                            )
+                            .map((c) => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => setFilterCourtId(c.id)}
+                                className="w-full px-2 py-1.5 text-left hover:bg-slate-50"
+                              >
+                                {c.name}
+                              </button>
+                            ))}
+                        </div>
                       </div>
-                      <SelectItem value="__all">Todas</SelectItem>
-                      {courts
-                        .filter((c) => !filterLocationId || c.location_id === filterLocationId)
-                        .filter((c) =>
-                          !courtFilterSearch
-                            ? true
-                            : c.name.toLowerCase().includes(courtFilterSearch.toLowerCase())
-                        )
-                        .map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </>
             )}
             {filterMode === 'profesor' && (
               <div>
                 <label className="block text-xs mb-1">Profesor</label>
-                <Select
-                  value={filterCoachId || '__all'}
-                  onValueChange={(val) => {
-                    const mapped = val === '__all' ? '' : val;
-                    setFilterCoachId(mapped);
-                  }}
-                >
-                  <SelectTrigger className="w-full h-9 text-xs">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <div className="p-1">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-between h-9 px-2 text-xs font-normal"
+                    >
+                      <span className="truncate mr-2">
+                        {filterCoachId
+                          ? coaches.find((c) => c.id === filterCoachId)?.full_name || 'Profesor seleccionado'
+                          : 'Todos los profesores'}
+                      </span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-2" align="start">
+                    <div className="space-y-2">
                       <Input
                         type="text"
                         placeholder="Buscar profesor..."
@@ -1224,38 +1265,55 @@ export default function SchedulePage() {
                         onChange={(e) => setCoachFilterSearch(e.target.value)}
                         className="h-10 text-base"
                       />
+                      <div className="max-h-52 overflow-auto border rounded-md divide-y text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setFilterCoachId('')}
+                          className="w-full px-2 py-1.5 text-left hover:bg-slate-50"
+                        >
+                          Todos los profesores
+                        </button>
+                        {coaches
+                          .filter((c) => {
+                            if (!coachFilterSearch) return true;
+                            const label = (c.full_name || 'Coach').toLowerCase();
+                            return label.includes(coachFilterSearch.toLowerCase());
+                          })
+                          .map((c) => (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => setFilterCoachId(c.id)}
+                              className="w-full px-2 py-1.5 text-left hover:bg-slate-50"
+                            >
+                              {c.full_name ?? 'Coach'}
+                            </button>
+                          ))}
+                      </div>
                     </div>
-                    <SelectItem value="__all">Todos</SelectItem>
-                    {coaches
-                      .filter((c) => {
-                        if (!coachFilterSearch) return true;
-                        const label = (c.full_name || 'Coach').toLowerCase();
-                        return label.includes(coachFilterSearch.toLowerCase());
-                      })
-                      .map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.full_name ?? 'Coach'}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                  </PopoverContent>
+                </Popover>
               </div>
             )}
             {filterMode === 'alumno' && (
               <div>
                 <label className="block text-xs mb-1">Alumno</label>
-                <Select
-                  value={filterStudentId || '__all'}
-                  onValueChange={(val) => {
-                    const mapped = val === '__all' ? '' : val;
-                    setFilterStudentId(mapped);
-                  }}
-                >
-                  <SelectTrigger className="w-full h-9 text-xs">
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <div className="p-1">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-between h-9 px-2 text-xs font-normal"
+                    >
+                      <span className="truncate mr-2">
+                        {filterStudentId
+                          ? students.find((s) => s.id === filterStudentId)?.full_name || 'Alumno seleccionado'
+                          : 'Todos los alumnos'}
+                      </span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 p-2" align="start">
+                    <div className="space-y-2">
                       <Input
                         type="text"
                         placeholder="Buscar alumno..."
@@ -1263,28 +1321,41 @@ export default function SchedulePage() {
                         onChange={(e) => setStudentFilterSearch(e.target.value)}
                         className="h-10 text-base"
                       />
+                      <div className="max-h-52 overflow-auto border rounded-md divide-y text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setFilterStudentId('')}
+                          className="w-full px-2 py-1.5 text-left hover:bg-slate-50"
+                        >
+                          Todos los alumnos
+                        </button>
+                        {students
+                          .filter((s) => {
+                            if (!studentFilterSearch) return true;
+                            const label =
+                              (s.full_name || '') +
+                              ' ' +
+                              (s.notes || '') +
+                              ' ' +
+                              (s.level || '') +
+                              ' ' +
+                              s.id;
+                            return label.toLowerCase().includes(studentFilterSearch.toLowerCase());
+                          })
+                          .map((s) => (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => setFilterStudentId(s.id)}
+                              className="w-full px-2 py-1.5 text-left hover:bg-slate-50"
+                            >
+                              {s.full_name ?? s.notes ?? s.level ?? s.id}
+                            </button>
+                          ))}
+                      </div>
                     </div>
-                    <SelectItem value="__all">Todos</SelectItem>
-                    {students
-                      .filter((s) => {
-                        if (!studentFilterSearch) return true;
-                        const label =
-                          (s.full_name || '') +
-                          ' ' +
-                          (s.notes || '') +
-                          ' ' +
-                          (s.level || '') +
-                          ' ' +
-                          s.id;
-                        return label.toLowerCase().includes(studentFilterSearch.toLowerCase());
-                      })
-                      .map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.full_name ?? s.notes ?? s.level ?? s.id}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+                  </PopoverContent>
+                </Popover>
               </div>
             )}
             {filterMode === 'fecha' && (
