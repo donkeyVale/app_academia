@@ -1144,7 +1144,7 @@ export default function SchedulePage() {
                           placeholder="Buscar sede..."
                           value={locationFilterSearch}
                           onChange={(e) => setLocationFilterSearch(e.target.value)}
-                          className="h-9 text-sm"
+                          className="h-10 text-base"
                         />
                       </div>
                       <SelectItem value="__all">Todas</SelectItem>
@@ -1181,7 +1181,7 @@ export default function SchedulePage() {
                           placeholder="Buscar cancha..."
                           value={courtFilterSearch}
                           onChange={(e) => setCourtFilterSearch(e.target.value)}
-                          className="h-9 text-sm"
+                          className="h-10 text-base"
                         />
                       </div>
                       <SelectItem value="__all">Todas</SelectItem>
@@ -1222,7 +1222,7 @@ export default function SchedulePage() {
                         placeholder="Buscar profesor..."
                         value={coachFilterSearch}
                         onChange={(e) => setCoachFilterSearch(e.target.value)}
-                        className="h-9 text-sm"
+                        className="h-10 text-base"
                       />
                     </div>
                     <SelectItem value="__all">Todos</SelectItem>
@@ -1261,7 +1261,7 @@ export default function SchedulePage() {
                         placeholder="Buscar alumno..."
                         value={studentFilterSearch}
                         onChange={(e) => setStudentFilterSearch(e.target.value)}
-                        className="h-9 text-sm"
+                        className="h-10 text-base"
                       />
                     </div>
                     <SelectItem value="__all">Todos</SelectItem>
