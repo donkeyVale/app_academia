@@ -1669,42 +1669,49 @@ export default function SchedulePage() {
                 <div className="grid gap-2 md:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-700">Cancha</label>
-                    <select
-                      className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/50"
+                    <Select
                       value={editCourtId}
-                      onChange={(e) => setEditCourtId(e.target.value)}
+                      onValueChange={(val) => setEditCourtId(val)}
                     >
-                      {(locationId ? courts.filter((c) => c.location_id === locationId) : courts).map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="w-full h-9 text-xs">
+                        <SelectValue
+                          placeholder={locationId ? 'Selecciona una cancha' : 'Selecciona un complejo primero'}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(locationId ? courts.filter((c) => c.location_id === locationId) : courts).map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-700">Profesor</label>
-                    <select
-                      className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/50"
+                    <Select
                       value={editCoachId}
-                      onChange={(e) => setEditCoachId(e.target.value)}
+                      onValueChange={(val) => setEditCoachId(val)}
                     >
-                      {coaches.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.full_name ?? 'Coach'}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="w-full h-9 text-xs">
+                        <SelectValue placeholder="Selecciona un profesor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {coaches.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.full_name ?? 'Coach'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
                 <div className="grid gap-2 md:grid-cols-2">
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-700">Fecha</label>
-                    <input
-                      type="date"
-                      className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/50"
-                      value={editDay}
-                      onChange={(e) => setEditDay(e.target.value)}
-                    />
+                    <div className="w-full">
+                      <DatePickerField value={editDay} onChange={setEditDay} />
+                    </div>
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-700">Hora disponible</label>
@@ -1746,43 +1753,91 @@ export default function SchedulePage() {
                 </div>
                 <div>
                   <label className="mb-1 block text-xs font-medium text-slate-700">Alumnos (selección múltiple)</label>
-                  <input
-                    type="text"
-                    className="mb-2 w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/50"
-                    placeholder="Buscar alumnos..."
-                    value={editStudentQuery}
-                    onChange={(e) => setEditStudentQuery(e.target.value)}
-                  />
-                  <select
-                    multiple
-                    className="h-32 w-full rounded border border-slate-300 px-2 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/50"
-                    value={editSelectedStudents}
-                    onChange={(e) => {
-                      const opts = Array.from(e.target.selectedOptions).map((o) => o.value);
-                      if (opts.length > 4) {
-                        alert('Máximo 4 alumnos por clase');
-                        return;
-                      }
-                      setEditSelectedStudents(opts);
-                    }}
-                  >
-                    {students
-                      .filter((s) => {
-                        const t = (editStudentQuery || '').toLowerCase();
-                        if (!t) return true;
-                        const label =
-                          (s.full_name || '') + ' ' + (s.notes || '') + ' ' + (s.level || '') + ' ' + s.id;
-                        return label.toLowerCase().includes(t);
-                      })
-                      .map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.full_name ?? s.notes ?? s.level ?? s.id}
-                        </option>
-                      ))}
-                  </select>
-                  <p className="mt-1 text-[11px] text-gray-500">
-                    Se crearán/eliminarán reservas según los cambios. Máximo 4 alumnos por clase.
-                  </p>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="flex w-full items-center justify-between truncate text-xs font-normal"
+                      >
+                        <span className="mr-2 truncate">
+                          {editSelectedStudents.length === 0
+                            ? 'Selecciona hasta 4 alumnos'
+                            : editSelectedStudents.length === 1
+                            ? '1 alumno seleccionado'
+                            : `${editSelectedStudents.length} alumnos seleccionados`}
+                        </span>
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full max-w-full p-3" align="start">
+                      <div className="space-y-2">
+                        <Input
+                          type="text"
+                          placeholder="Buscar alumnos..."
+                          value={editStudentQuery}
+                          onChange={(e) => setEditStudentQuery(e.target.value)}
+                          className="h-9 text-xs"
+                        />
+                        <div className="max-h-48 overflow-auto rounded-md border text-xs">
+                          {students
+                            .filter((s) => {
+                              const t = (editStudentQuery || '').toLowerCase();
+                              if (!t) return true;
+                              const label =
+                                (s.full_name || '') +
+                                ' ' +
+                                (s.notes || '') +
+                                ' ' +
+                                (s.level || '') +
+                                ' ' +
+                                s.id;
+                              return label.toLowerCase().includes(t);
+                            })
+                            .map((s) => {
+                              const id = s.id;
+                              const checked = editSelectedStudents.includes(id);
+                              const toggle = () => {
+                                setEditSelectedStudents((prev) => {
+                                  if (!checked && prev.length >= 4) {
+                                    alert('Máximo 4 alumnos por clase');
+                                    return prev;
+                                  }
+                                  return checked
+                                    ? prev.filter((x) => x !== id)
+                                    : [...prev, id];
+                                });
+                              };
+                              return (
+                                <button
+                                  key={id}
+                                  type="button"
+                                  onClick={toggle}
+                                  className="flex w-full items-center justify-between px-2 py-1.5 text-left text-xs hover:bg-slate-50"
+                                >
+                                  <span className="mr-2 truncate">
+                                    {s.full_name ?? s.notes ?? s.level ?? s.id}
+                                  </span>
+                                  <input
+                                    type="checkbox"
+                                    readOnly
+                                    checked={checked}
+                                    className="h-3.5 w-3.5 rounded border-gray-300"
+                                  />
+                                </button>
+                              );
+                            })}
+                          {students.length === 0 && (
+                            <div className="px-2 py-1.5 text-[11px] text-gray-500">
+                              No hay alumnos cargados.
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-gray-500">
+                          Se crearán/eliminarán reservas según los cambios. Máximo 4 alumnos por clase.
+                        </p>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
             </div>
