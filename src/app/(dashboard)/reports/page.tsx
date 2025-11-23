@@ -1413,7 +1413,7 @@ export default function ReportsPage() {
             onClick={() => setShowStudentSummary((v) => !v)}
           >
             <span className="inline-flex items-center gap-2">
-              <Users className="w-4 h-4 text-[#3cadaf]" />
+              <Users className="w-4 h-4 text-sky-500" />
               Resumen por alumno
             </span>
             <span className="text-xs text-gray-500">{showStudentSummary ? '▼' : '▲'}</span>
@@ -1514,7 +1514,7 @@ export default function ReportsPage() {
             onClick={() => setShowPlanSummary((v) => !v)}
           >
             <span className="inline-flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-[#3cadaf]" />
+              <BarChart3 className="w-4 h-4 text-violet-500" />
               Resumen por plan
             </span>
             <span className="text-xs text-gray-500">{showPlanSummary ? '▼' : '▲'}</span>
@@ -1615,7 +1615,7 @@ export default function ReportsPage() {
           onClick={() => setShowAttendanceStudent((v) => !v)}
         >
           <span className="inline-flex items-center gap-2">
-            <UserCheck className="w-4 h-4 text-[#3cadaf]" />
+            <UserCheck className="w-4 h-4 text-emerald-500" />
             Asistencia / Uso de clases por alumno
           </span>
           <span className="text-xs text-gray-500">
@@ -2196,7 +2196,7 @@ export default function ReportsPage() {
           onClick={() => setShowAttendanceLocation((v) => !v)}
         >
           <span className="inline-flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-[#3cadaf]" />
+            <MapPin className="w-4 h-4 text-indigo-500" />
             Asistencia / Uso de clases por sede / cancha
           </span>
           <span className="text-xs text-gray-500">{showAttendanceLocation ? '▼' : '▲'}</span>
