@@ -149,6 +149,11 @@ export default function SchedulePage() {
   const [filterFrom, setFilterFrom] = useState<string>('');
   const [filterTo, setFilterTo] = useState<string>('');
   const [filterMode, setFilterMode] = useState<'none' | 'sede' | 'profesor' | 'alumno' | 'fecha'>('none');
+  // Search text inside filter dropdowns (to avoid listas muy largas)
+  const [locationFilterSearch, setLocationFilterSearch] = useState('');
+  const [courtFilterSearch, setCourtFilterSearch] = useState('');
+  const [coachFilterSearch, setCoachFilterSearch] = useState('');
+  const [studentFilterSearch, setStudentFilterSearch] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -1133,12 +1138,27 @@ export default function SchedulePage() {
                       <SelectValue placeholder="Todas" />
                     </SelectTrigger>
                     <SelectContent>
+                      <div className="p-1">
+                        <Input
+                          type="text"
+                          placeholder="Buscar sede..."
+                          value={locationFilterSearch}
+                          onChange={(e) => setLocationFilterSearch(e.target.value)}
+                          className="h-9 text-sm"
+                        />
+                      </div>
                       <SelectItem value="__all">Todas</SelectItem>
-                      {locations.map((l) => (
-                        <SelectItem key={l.id} value={l.id}>
-                          {l.name}
-                        </SelectItem>
-                      ))}
+                      {locations
+                        .filter((l) =>
+                          !locationFilterSearch
+                            ? true
+                            : l.name.toLowerCase().includes(locationFilterSearch.toLowerCase())
+                        )
+                        .map((l) => (
+                          <SelectItem key={l.id} value={l.id}>
+                            {l.name}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1155,9 +1175,23 @@ export default function SchedulePage() {
                       <SelectValue placeholder="Todas" />
                     </SelectTrigger>
                     <SelectContent>
+                      <div className="p-1">
+                        <Input
+                          type="text"
+                          placeholder="Buscar cancha..."
+                          value={courtFilterSearch}
+                          onChange={(e) => setCourtFilterSearch(e.target.value)}
+                          className="h-9 text-sm"
+                        />
+                      </div>
                       <SelectItem value="__all">Todas</SelectItem>
                       {courts
                         .filter((c) => !filterLocationId || c.location_id === filterLocationId)
+                        .filter((c) =>
+                          !courtFilterSearch
+                            ? true
+                            : c.name.toLowerCase().includes(courtFilterSearch.toLowerCase())
+                        )
                         .map((c) => (
                           <SelectItem key={c.id} value={c.id}>
                             {c.name}
@@ -1182,12 +1216,27 @@ export default function SchedulePage() {
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
+                    <div className="p-1">
+                      <Input
+                        type="text"
+                        placeholder="Buscar profesor..."
+                        value={coachFilterSearch}
+                        onChange={(e) => setCoachFilterSearch(e.target.value)}
+                        className="h-9 text-sm"
+                      />
+                    </div>
                     <SelectItem value="__all">Todos</SelectItem>
-                    {coaches.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.full_name ?? 'Coach'}
-                      </SelectItem>
-                    ))}
+                    {coaches
+                      .filter((c) => {
+                        if (!coachFilterSearch) return true;
+                        const label = (c.full_name || 'Coach').toLowerCase();
+                        return label.includes(coachFilterSearch.toLowerCase());
+                      })
+                      .map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.full_name ?? 'Coach'}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -1206,12 +1255,34 @@ export default function SchedulePage() {
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
+                    <div className="p-1">
+                      <Input
+                        type="text"
+                        placeholder="Buscar alumno..."
+                        value={studentFilterSearch}
+                        onChange={(e) => setStudentFilterSearch(e.target.value)}
+                        className="h-9 text-sm"
+                      />
+                    </div>
                     <SelectItem value="__all">Todos</SelectItem>
-                    {students.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.full_name ?? s.notes ?? s.level ?? s.id}
-                      </SelectItem>
-                    ))}
+                    {students
+                      .filter((s) => {
+                        if (!studentFilterSearch) return true;
+                        const label =
+                          (s.full_name || '') +
+                          ' ' +
+                          (s.notes || '') +
+                          ' ' +
+                          (s.level || '') +
+                          ' ' +
+                          s.id;
+                        return label.toLowerCase().includes(studentFilterSearch.toLowerCase());
+                      })
+                      .map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.full_name ?? s.notes ?? s.level ?? s.id}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
