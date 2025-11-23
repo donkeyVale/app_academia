@@ -660,13 +660,20 @@ export default function HomePage() {
               className="px-3 py-2 bg-[#3cadaf] hover:bg-[#31435d] text-white rounded"
               onClick={() => {
                 if (typeof window !== 'undefined') {
-                  const el = document.getElementById('install-app-help');
-                  if (el) {
-                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }
+                  // 1) Abrimos el acordeón de ayuda si aún no está abierto
                   if (!showInstallHelpOpen) {
                     setShowInstallHelpOpen(true);
                   }
+
+                  // 2) Esperamos un pequeño tiempo para que el contenido se monte y luego hacemos scroll
+                  setTimeout(() => {
+                    const el = document.getElementById('install-app-help');
+                    if (el) {
+                      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                  }, 120);
+
+                  // 3) Respetamos la preferencia de no volver a mostrar el popup
                   if (popupDontShowAgain) {
                     try {
                       window.localStorage.setItem('hide_install_help_reminder', 'true');
