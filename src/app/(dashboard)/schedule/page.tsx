@@ -1452,22 +1452,58 @@ export default function SchedulePage() {
               const location = court ? locationsMap[court.location_id] : undefined;
               const coach = coachesMap[cls.coach_id || ''];
               const alumnos = bookingsCount[cls.id] ?? 0;
+
+              const d = new Date(cls.date);
+              const yyyy = d.getFullYear();
+              const mm = String(d.getMonth() + 1).padStart(2, '0');
+              const dd = String(d.getDate()).padStart(2, '0');
+              const hh = String(d.getHours()).padStart(2, '0');
+              const min = String(d.getMinutes()).padStart(2, '0');
+
+              const tipoLabel = cls.type === 'individual' ? 'Individual' : 'Grupal';
+
               return (
-                <li key={cls.id} className="text-sm border rounded-lg p-3 bg-white shadow-sm max-w-full overflow-hidden">
+                <li
+                  key={cls.id}
+                  className="text-sm border rounded-lg p-3 bg-white shadow-sm max-w-full overflow-hidden transition hover:shadow-md hover:border-[#dbeafe]"
+                >
                   <div className="flex flex-col sm:flex-row items-start justify-between gap-3 max-w-full">
-                    <div className="space-y-1 min-w-0">
-                      <div className="font-semibold text-[#31435d]">
-                        <span className="font-bold">Fecha y hora:</span> {new Date(cls.date).toLocaleString()}
+                    <div className="space-y-1.5 min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center rounded-full bg-[#e0f2fe] px-2 py-0.5 text-[11px] font-medium text-[#075985]">
+                          {dd}/{mm}/{yyyy} • {hh}:{min}
+                        </span>
+                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
+                          {location?.name ?? 'Sede sin asignar'}
+                        </span>
                       </div>
                       <div className="text-xs text-gray-600 space-y-0.5">
-                        <p><span className="font-bold">Sede:</span> {location?.name ?? '-'}</p>
-                        <p><span className="font-bold">Cancha:</span> {court?.name ?? '-'} • <span className="font-bold">Profesor:</span> {coach?.full_name ?? 'Coach'}</p>
-                        <p><span className="font-bold">Tipo:</span> {cls.type} • <span className="font-bold">Alumnos/Cupo:</span> {alumnos}/{cls.capacity}</p>
+                        <p className="truncate">
+                          <span className="font-semibold text-slate-700">Cancha:</span> {court?.name ?? '-'}
+                        </p>
+                        <p className="truncate">
+                          <span className="font-semibold text-slate-700">Profesor:</span> {coach?.full_name ?? 'Coach'}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          <span
+                            className={
+                              "inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium " +
+                              (cls.type === 'individual'
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                : 'bg-indigo-50 text-indigo-700 border border-indigo-100')
+                            }
+                          >
+                            {tipoLabel}
+                          </span>
+                          <span className="inline-flex items-center rounded-full bg-slate-50 text-slate-700 border border-slate-200 px-2 py-0.5 text-[11px] font-medium">
+                            {alumnos}/{cls.capacity} alumnos
+                          </span>
+                        </div>
                       </div>
                     </div>
                     <div className="shrink-0 flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full sm:w-auto">
                       <button
-                        className="text-xs px-3 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50"
+                        className="text-[11px] sm:text-xs px-3 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50"
                         onClick={async () => {
                           if (!confirm('¿Cancelar y eliminar esta clase? Se eliminarán reservas y asistencias asociadas.')) return;
                           const { error: delErr } = await supabase.from('class_sessions').delete().eq('id', cls.id);
@@ -1492,13 +1528,13 @@ export default function SchedulePage() {
                         }}
                       >Cancelar</button>
                       <button
-                        className="text-xs px-3 py-1 rounded border border-[#3cadaf] text-[#3cadaf] hover:bg-[#e6f5f6]"
+                        className="text-[11px] sm:text-xs px-3 py-1 rounded border border-[#3cadaf] text-[#3cadaf] hover:bg-[#e6f5f6]"
                         onClick={() => openAttendance(cls)}
                       >
                         Asistencia
                       </button>
                       <button
-                        className="text-xs px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+                        className="text-[11px] sm:text-xs px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
                         onClick={() => openEdit(cls)}
                       >
                         Editar
