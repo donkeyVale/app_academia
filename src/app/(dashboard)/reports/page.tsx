@@ -4,6 +4,7 @@ import type React from "react";
 import { useEffect, useState } from "react";
 import { createClientBrowser } from "@/lib/supabase";
 import { toast } from "sonner";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Bar,
   BarChart,
@@ -18,7 +19,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { Calendar as CalendarIcon } from "lucide-react";
+import {
+  Calendar as CalendarIcon,
+  BarChart3,
+  UserCheck,
+  Users,
+  MapPin,
+  Download,
+  Eraser,
+} from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface PaymentReportRow {
   id: string;
@@ -1149,11 +1165,22 @@ export default function ReportsPage() {
           className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
           onClick={() => setShowIncome((v) => !v)}
         >
-          <span>Ingresos</span>
+          <span className="inline-flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-[#3cadaf]" />
+            Ingresos
+          </span>
           <span className="text-xs text-gray-500">{showIncome ? '▼' : '▲'}</span>
         </button>
-        {showIncome && (
-          <div className="p-4 space-y-4">
+        <AnimatePresence initial={false}>
+          {showIncome && (
+            <motion.div
+              key="income-content"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="p-4 space-y-4 origin-top"
+            >
             {/* Filtro de ingresos por fecha */}
             <form onSubmit={loadReport} className="space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1169,7 +1196,7 @@ export default function ReportsPage() {
                   <Button
                     type="button"
                     variant="outline"
-                    className="px-3 py-2 text-xs text-gray-700 bg-white hover:bg-gray-50"
+                    className="px-3 py-2 text-xs text-gray-700 bg-white hover:bg-gray-50 inline-flex items-center gap-1"
                     onClick={() => {
                       setFromDate("");
                       setToDate("");
@@ -1180,6 +1207,7 @@ export default function ReportsPage() {
                       setError(null);
                     }}
                   >
+                    <Eraser className="w-3 h-3" />
                     Limpiar
                   </Button>
                   <Button
@@ -1235,7 +1263,7 @@ export default function ReportsPage() {
                     <div className="relative">
                       <button
                         type="button"
-                        className="inline-flex items-center px-3 py-1 border rounded bg-white hover:bg-gray-50 text-[11px] text-gray-700"
+                        className="inline-flex items-center gap-1 px-3 py-1 border rounded bg-white hover:bg-gray-50 text-[11px] text-gray-700"
                         onClick={() =>
                           setExportMenu((m) => ({
                             income: !m.income,
@@ -1245,6 +1273,7 @@ export default function ReportsPage() {
                           }))
                         }
                       >
+                        <Download className="w-3 h-3" />
                         Exportar
                       </button>
                       {exportMenu.income && (
@@ -1362,8 +1391,9 @@ export default function ReportsPage() {
                 </>
               )}
             </div>
-          </div>
-        )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Resumen por alumno */}
@@ -1374,11 +1404,22 @@ export default function ReportsPage() {
             className="w-full flex items-center justify_between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
             onClick={() => setShowStudentSummary((v) => !v)}
           >
-            <span>Resumen por alumno</span>
+            <span className="inline-flex items-center gap-2">
+              <Users className="w-4 h-4 text-[#3cadaf]" />
+              Resumen por alumno
+            </span>
             <span className="text-xs text-gray-500">{showStudentSummary ? '▼' : '▲'}</span>
           </button>
-          {showStudentSummary && (
-            <div className="p-4 space-y-3">
+          <AnimatePresence initial={false}>
+            {showStudentSummary && (
+              <motion.div
+                key="student-summary-content"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+                className="p-4 space-y-3 origin-top"
+              >
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                 <p className="text-xs text-gray-500">
                   Ordenado por monto total pagado (de mayor a menor).
@@ -1451,8 +1492,9 @@ export default function ReportsPage() {
                   </tbody>
                 </table>
               </div>
-            </div>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       )}
       {/* Resumen por plan */}
@@ -1463,85 +1505,97 @@ export default function ReportsPage() {
             className="w_full flex items-center justify_between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
             onClick={() => setShowPlanSummary((v) => !v)}
           >
-            <span>Resumen por plan</span>
+            <span className="inline-flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-[#3cadaf]" />
+              Resumen por plan
+            </span>
             <span className="text-xs text-gray-500">{showPlanSummary ? '▼' : '▲'}</span>
           </button>
-          {showPlanSummary && (
-            <div className="p-4 space-y-3">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                <p className="text-xs text-gray-500">
-                  Ordenado por monto total ingresado (de mayor a menor).
-                </p>
-              </div>
+          <AnimatePresence initial={false}>
+            {showPlanSummary && (
+              <motion.div
+                key="plan-summary-content"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.18, ease: "easeOut" }}
+                className="p-4 space-y-3 origin-top"
+              >
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                  <p className="text-xs text-gray-500">
+                    Ordenado por monto total ingresado (de mayor a menor).
+                  </p>
+                </div>
 
-              {/* Mobile: tarjetas */}
-              <div className="mt-2 space-y-2 md:hidden">
-                {planSummary.map((p, idx) => (
-                  <button
-                    key={`${p.plan_name ?? 'sin-plan'}-${idx}`}
-                    type="button"
-                    className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1 text-left w-full"
-                    onClick={() => {
-                      const detail = rows.filter((r) => (r.plan_name ?? 'Sin nombre') === (p.plan_name ?? 'Sin nombre'));
-                      setPlanDetailRows(detail);
-                      setPlanDetailName(p.plan_name ?? 'Sin nombre');
-                      setPlanDetailModalOpen(true);
-                    }}
-                  >
-                    <div className="flex justify-between gap-2">
-                      <span className="font-semibold text-[#31435d]">
-                        {p.plan_name ?? 'Sin nombre'}
-                      </span>
-                      <span className="text-gray-500">
-                        {p.payments_count} pago{p.payments_count !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                    <div className="text-gray-600">
-                      <span className="font-semibold">Total:</span>{' '}
-                      {p.total_amount} PYG
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              {/* Desktop: tabla */}
-              <div className="overflow-x-auto mt-2 hidden md:block">
-                <table className="min-w-full text-xs md:text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 text-left">
-                      <th className="px-3 py-2 border-b">Plan</th>
-                      <th className="px-3 py-2 border-b text-right">Total ingresado</th>
-                      <th className="px-3 py-2 border-b text-right">Pagos</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {planSummary.map((p, idx) => (
-                      <tr
-                        key={`${p.plan_name ?? 'sin-plan'}-${idx}`}
-                        className="border-b last:border-b-0 cursor-pointer hover:bg-gray-50"
-                        onClick={() => {
-                          const detail = rows.filter((r) => (r.plan_name ?? 'Sin nombre') === (p.plan_name ?? 'Sin nombre'));
-                          setPlanDetailRows(detail);
-                          setPlanDetailName(p.plan_name ?? 'Sin nombre');
-                          setPlanDetailModalOpen(true);
-                        }}
-                      >
-                        <td className="px-3 py-2 align-top">
+                {/* Mobile: tarjetas */}
+                <div className="mt-2 space-y-2 md:hidden">
+                  {planSummary.map((p, idx) => (
+                    <button
+                      key={`${p.plan_name ?? 'sin-plan'}-${idx}`}
+                      type="button"
+                      className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1 text-left w-full"
+                      onClick={() => {
+                        const detail = rows.filter((r) => (r.plan_name ?? 'Sin nombre') === (p.plan_name ?? 'Sin nombre'));
+                        setPlanDetailRows(detail);
+                        setPlanDetailName(p.plan_name ?? 'Sin nombre');
+                        setPlanDetailModalOpen(true);
+                      }}
+                    >
+                      <div className="flex justify-between gap-2">
+                        <span className="font-semibold text-[#31435d]">
                           {p.plan_name ?? 'Sin nombre'}
-                        </td>
-                        <td className="px-3 py-2 align-top text-right">
-                          {p.total_amount} PYG
-                        </td>
-                        <td className="px-3 py-2 align-top text-right">
-                          {p.payments_count}
-                        </td>
+                        </span>
+                        <span className="text-gray-500">
+                          {p.payments_count} pago{p.payments_count !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <div className="text-gray-600">
+                        <span className="font-semibold">Total:</span>{' '}
+                        {p.total_amount} PYG
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Desktop: tabla */}
+                <div className="overflow-x-auto mt-2 hidden md:block">
+                  <table className="min-w-full text-xs md:text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 text-left">
+                        <th className="px-3 py-2 border-b">Plan</th>
+                        <th className="px-3 py-2 border-b text-right">Total ingresado</th>
+                        <th className="px-3 py-2 border-b text-right">Pagos</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+                    </thead>
+                    <tbody>
+                      {planSummary.map((p, idx) => (
+                        <tr
+                          key={`${p.plan_name ?? 'sin-plan'}-${idx}`}
+                          className="border-b last:border-b-0 cursor-pointer hover:bg-gray-50"
+                          onClick={() => {
+                            const detail = rows.filter((r) => (r.plan_name ?? 'Sin nombre') === (p.plan_name ?? 'Sin nombre'));
+                            setPlanDetailRows(detail);
+                            setPlanDetailName(p.plan_name ?? 'Sin nombre');
+                            setPlanDetailModalOpen(true);
+                          }}
+                        >
+                          <td className="px-3 py-2 align-top">
+                            {p.plan_name ?? 'Sin nombre'}
+                          </td>
+                          <td className="px-3 py-2 align-top text-right">
+                            {p.total_amount} PYG
+                          </td>
+                          <td className="px-3 py-2 align-top text-right">
+                            {p.payments_count}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       )}
       
@@ -1552,29 +1606,43 @@ export default function ReportsPage() {
           className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
           onClick={() => setShowAttendanceStudent((v) => !v)}
         >
-          <span>Asistencia / Uso de clases por alumno</span>
+          <span className="inline-flex items-center gap-2">
+            <UserCheck className="w-4 h-4 text-[#3cadaf]" />
+            Asistencia / Uso de clases por alumno
+          </span>
           <span className="text-xs text-gray-500">
             {showAttendanceStudent ? "▼" : "▲"}
           </span>
         </button>
-        {showAttendanceStudent && (
-          <div className="p-4 space-y-4">
-            <form onSubmit={loadAttendanceByStudent} className="space-y-3">
+        <AnimatePresence initial={false}>
+          {showAttendanceStudent && (
+            <motion.div
+              key="attendance-student-content"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="p-4 space-y-4 origin-top"
+            >
+              <form onSubmit={loadAttendanceByStudent} className="space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="md:col-span-2">
                   <label className="block text-sm mb-1">Alumno</label>
-                  <select
-                    className="border rounded p-2 w-full text-base md:text-sm"
+                  <Select
                     value={attendanceStudentId}
-                    onChange={(e) => setAttendanceStudentId(e.target.value)}
+                    onValueChange={(val) => setAttendanceStudentId(val)}
                   >
-                    <option value="">Selecciona un alumno</option>
-                    {attendanceStudents.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full text-sm">
+                      <SelectValue placeholder="Selecciona un alumno" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {attendanceStudents.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Desde</label>
@@ -1592,7 +1660,7 @@ export default function ReportsPage() {
                     <>
                       <button
                         type="button"
-                        className="border rounded px-3 py-2 text-xs text-gray-700 bg-white hover:bg-gray-50"
+                        className="border rounded px-3 py-2 text-xs text-gray-700 bg-white hover:bg-gray-50 inline-flex items-center gap-1"
                         onClick={() =>
                           setExportMenu((m) => ({
                             income: false,
@@ -1602,6 +1670,7 @@ export default function ReportsPage() {
                           }))
                         }
                       >
+                        <Download className="w-3 h-3" />
                         Exportar
                       </button>
                       {exportMenu.attendanceStudent && (
@@ -1660,7 +1729,7 @@ export default function ReportsPage() {
                 </div>
                 <button
                   type="button"
-                  className="border rounded px-3 py-2 text-xs text-gray-700 bg-white hover:bg-gray-50"
+                  className="border rounded px-3 py-2 text-xs text-gray-700 bg-white hover:bg-gray-50 inline-flex items-center gap-1"
                   onClick={() => {
                     setAttendanceFrom("");
                     setAttendanceTo("");
@@ -1669,6 +1738,7 @@ export default function ReportsPage() {
                     setError(null);
                   }}
                 >
+                  <Eraser className="w-3 h-3" />
                   Limpiar
                 </button>
                 <button
@@ -1831,8 +1901,9 @@ export default function ReportsPage() {
                 </div>
               </>
             )}
-          </div>
-        )}
+          </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Asistencia / Uso de clases por profesor */}
@@ -1842,27 +1913,38 @@ export default function ReportsPage() {
           className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
           onClick={() => setShowAttendanceCoach((v) => !v)}
         >
-          <span>Asistencia / Uso de clases por profesor</span>
+          <span className="inline-flex items-center gap-2">
+            <Users className="w-4 h-4 text-[#3cadaf]" />
+            Asistencia / Uso de clases por profesor
+          </span>
           <span className="text-xs text-gray-500">{showAttendanceCoach ? '▼' : '▲'}</span>
         </button>
-        {showAttendanceCoach && (
-          <div className="p-4 space-y-4">
-            <form onSubmit={loadAttendanceByCoach} className="space-y-3">
+        <AnimatePresence initial={false}>
+          {showAttendanceCoach && (
+            <motion.div
+              key="attendance-coach-content"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="p-4 space-y-4 origin-top"
+            >
+              <form onSubmit={loadAttendanceByCoach} className="space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="md:col-span-2">
                   <label className="block text-sm mb-1">Profesor</label>
-                  <select
-                    className="border rounded p-2 w-full text-base md:text-sm"
-                    value={coachId}
-                    onChange={(e) => setCoachId(e.target.value)}
-                  >
-                    <option value="">Selecciona un profesor</option>
-                    {coachOptions.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.label}
-                      </option>
-                    ))}
-                  </select>
+                  <Select value={coachId} onValueChange={(val) => setCoachId(val)}>
+                    <SelectTrigger className="w-full text-sm">
+                      <SelectValue placeholder="Selecciona un profesor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {coachOptions.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Desde</label>
@@ -1941,7 +2023,7 @@ export default function ReportsPage() {
                 </div>
                 <button
                   type="button"
-                  className="border rounded px-3 py-2 text-xs text-gray-700 bg-white hover:bg-gray-50"
+                  className="border rounded px-3 py-2 text-xs text-gray-700 bg-white hover:bg-gray-50 inline-flex items-center gap-1"
                   onClick={() => {
                     setCoachFrom("");
                     setCoachTo("");
@@ -1949,6 +2031,7 @@ export default function ReportsPage() {
                     setCoachSummary(null);
                   }}
                 >
+                  <Eraser className="w-3 h-3" />
                   Limpiar
                 </button>
                 <button
@@ -2092,8 +2175,9 @@ export default function ReportsPage() {
                 </div>
               </>
             )}
-          </div>
-        )}
+          </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Asistencia / Uso de clases por sede / cancha */}
@@ -2103,48 +2187,65 @@ export default function ReportsPage() {
           className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
           onClick={() => setShowAttendanceLocation((v) => !v)}
         >
-          <span>Asistencia / Uso de clases por sede / cancha</span>
+          <span className="inline-flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-[#3cadaf]" />
+            Asistencia / Uso de clases por sede / cancha
+          </span>
           <span className="text-xs text-gray-500">{showAttendanceLocation ? '▼' : '▲'}</span>
         </button>
-        {showAttendanceLocation && (
-          <div className="p-4 space-y-4">
-            <form onSubmit={loadAttendanceByLocation} className="space-y-3">
+        <AnimatePresence initial={false}>
+          {showAttendanceLocation && (
+            <motion.div
+              key="attendance-location-content"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="p-4 space-y-4 origin-top"
+            >
+              <form onSubmit={loadAttendanceByLocation} className="space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-sm mb-1">Sede</label>
-                  <select
-                    className="border rounded p-2 w-full text-base md:text-sm"
+                  <Select
                     value={locationId}
-                    onChange={(e) => {
-                      setLocationId(e.target.value);
+                    onValueChange={(val) => {
+                      setLocationId(val);
                       setCourtId("");
                     }}
                   >
-                    <option value="">Selecciona una sede</option>
-                    {locationOptions.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.label}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full text-sm">
+                      <SelectValue placeholder="Selecciona una sede" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {locationOptions.map((l) => (
+                        <SelectItem key={l.id} value={l.id}>
+                          {l.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-sm mb-1">Cancha (opcional)</label>
-                  <select
-                    className="border rounded p-2 w-full text-base md:text-sm"
+                  <Select
                     value={courtId}
-                    onChange={(e) => setCourtId(e.target.value)}
+                    onValueChange={(val) => setCourtId(val)}
                     disabled={!locationId}
                   >
-                    <option value="">Todas las canchas</option>
-                    {courtOptions
-                      .filter((c) => !locationId || c.location_id === locationId)
-                      .map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.label}
-                        </option>
-                      ))}
-                  </select>
+                    <SelectTrigger className="w-full text-sm">
+                      <SelectValue placeholder="Todas las canchas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {courtOptions
+                        .filter((c) => !locationId || c.location_id === locationId)
+                        .map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.label}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Desde</label>
@@ -2226,7 +2327,7 @@ export default function ReportsPage() {
                 <div className="flex justify-end gap-2">
                   <button
                     type="button"
-                    className="border rounded px-3 py-2 text-xs text-gray-700 bg-white hover:bg-gray-50"
+                    className="border rounded px-3 py-2 text-xs text-gray-700 bg-white hover:bg-gray-50 inline-flex items-center gap-1"
                     onClick={() => {
                       setLocationId("");
                       setCourtId("");
@@ -2237,6 +2338,7 @@ export default function ReportsPage() {
                       setError(null);
                     }}
                   >
+                    <Eraser className="w-3 h-3" />
                     Limpiar
                   </button>
                   <button
@@ -2397,8 +2499,9 @@ export default function ReportsPage() {
                 </div>
               </>
             )}
-          </div>
-        )}
+          </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Modal: detalle por alumno */}
