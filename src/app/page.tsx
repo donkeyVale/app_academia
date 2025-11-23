@@ -3,6 +3,16 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClientBrowser } from '@/lib/supabase';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Smartphone } from 'lucide-react';
 
 const iconColor = "#3cadaf";
 
@@ -536,119 +546,141 @@ export default function HomePage() {
         </div>
       )}
 
-      <div className="border rounded-lg bg-white shadow-sm">
+      <div className="border rounded-lg bg-white shadow-sm overflow-hidden">
         <button
           type="button"
           className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-[#f0f9fb] hover:bg-[#e1f3f7] rounded-t-lg"
           onClick={() => setShowInstallHelpOpen((v) => !v)}
         >
-          <span className="font-semibold text-[#31435d]">¿Cómo instalar esta app en tu celular?</span>
+          <span className="inline-flex items-center gap-2 font-semibold text-[#31435d]">
+            <Smartphone className="w-4 h-4 text-[#3cadaf]" />
+            ¿Cómo instalar esta app en tu celular?
+          </span>
           <span className="text-xs text-gray-500">{showInstallHelpOpen ? '▼' : '▲'}</span>
         </button>
-        {showInstallHelpOpen && (
-          <div id="install-app-help" className="p-4 text-sm space-y-3 bg-[#f0f9fb] border-t border-[#3cadaf]/20">
-            <p className="text-gray-600">
-              Seguí estos pasos para tener acceso rápido desde la pantalla de inicio de tu celular.
-            </p>
+        <AnimatePresence initial={false}>
+          {showInstallHelpOpen && (
+            <motion.div
+              key="install-help-content"
+              id="install-app-help"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              className="p-4 text-sm space-y-3 bg-[#f0f9fb] border-t border-[#3cadaf]/20 origin-top"
+            >
+              <p className="text-gray-600">
+                Seguí estos pasos para tener acceso rápido desde la pantalla de inicio de tu celular.
+              </p>
 
-            <div>
-              <h3 className="font-semibold text-[#31435d]">iPhone (Safari)</h3>
-              <ol className="list-decimal list-inside text-gray-700 space-y-1 mt-1">
-                <li>Abrí este enlace en Safari.</li>
-                <li>Tocá el botón <strong>Compartir</strong> (icono de cuadrado con flecha hacia arriba).</li>
-                <li>En el menú que se abre, tocá los <strong>tres puntitos</strong> (Más opciones).</li>
-                <li>Elegí <strong>"Agregar a inicio"</strong> o <strong>"Agregar a pantalla de inicio"</strong>.</li>
-                <li>Confirmá con <strong>Agregar</strong>.</li>
-              </ol>
-            </div>
+              <div>
+                <h3 className="font-semibold text-[#31435d]">iPhone (Safari)</h3>
+                <ol className="list-decimal list-inside text-gray-700 space-y-1 mt-1">
+                  <li>Abrí este enlace en Safari.</li>
+                  <li>Tocá el botón <strong>Compartir</strong> (icono de cuadrado con flecha hacia arriba).</li>
+                  <li>En el menú que se abre, tocá los <strong>tres puntitos</strong> (Más opciones).</li>
+                  <li>Elegí <strong>"Agregar a inicio"</strong> o <strong>"Agregar a pantalla de inicio"</strong>.</li>
+                  <li>Confirmá con <strong>Agregar</strong>.</li>
+                </ol>
+              </div>
 
-            <div>
-              <h3 className="font-semibold text-[#31435d]">Android (Chrome)</h3>
-              <ol className="list-decimal list-inside text-gray-700 space-y-1 mt-1">
-                <li>Abrí este enlace en Chrome.</li>
-                <li>Tocá el botón de <strong>tres puntos</strong> arriba a la derecha.</li>
-                <li>Elegí <strong>"Agregar a pantalla principal"</strong> o <strong>"Instalar app"</strong>.</li>
-                <li>Confirmá cuando aparezca el mensaje.</li>
-              </ol>
-            </div>
+              <div>
+                <h3 className="font-semibold text-[#31435d]">Android (Chrome)</h3>
+                <ol className="list-decimal list-inside text-gray-700 space-y-1 mt-1">
+                  <li>Abrí este enlace en Chrome.</li>
+                  <li>Tocá el botón de <strong>tres puntos</strong> arriba a la derecha.</li>
+                  <li>Elegí <strong>"Agregar a pantalla principal"</strong> o <strong>"Instalar app"</strong>.</li>
+                  <li>Confirmá cuando aparezca el mensaje.</li>
+                </ol>
+              </div>
 
-            <p className="text-gray-600">
-              Una vez instalado, vas a ver el icono de la academia en tu pantalla de inicio y podés entrar directo como si fuera una app.
-            </p>
-          </div>
-        )}
+              <p className="text-gray-600">
+                Una vez instalado, vas a ver el icono de la academia en tu pantalla de inicio y podés entrar directo como si fuera una app.
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      {showInstallPopup && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white w-full max-w-md rounded-lg shadow-lg flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b">
-              <h2 className="text-lg font-semibold text-[#31435d]">Instalá esta app en tu celular</h2>
+      <Dialog open={showInstallPopup} onOpenChange={setShowInstallPopup}
+      >
+        <DialogContent
+          className="w-full max-w-md sm:max-w-lg max-h-[90vh] p-0 flex flex-col rounded-xl border border-gray-200 shadow-xl bg-slate-50/95 backdrop-blur data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
+        >
+          <DialogHeader className="px-4 pt-4 pb-2 border-b bg-white/80 backdrop-blur-sm rounded-t-xl">
+            <div className="flex items-center gap-2">
+              <Smartphone className="w-4 h-4 text-[#3cadaf]" />
+              <DialogTitle className="text-lg font-semibold text-[#31435d]">
+                Instalá esta app en tu celular
+              </DialogTitle>
             </div>
-            <div className="px-4 py-3 overflow-y-auto text-sm space-y-3">
-              <p className="text-gray-700">
-                Tenés disponible una guía rápida para instalar esta app en la pantalla de inicio de tu celular.
-              </p>
-              <p className="text-gray-600">
-                Podés leerla cuando quieras en la sección <strong>"¿Cómo instalar esta app en tu celular?"</strong> al final de esta pantalla.
-              </p>
-              <div className="flex items-center gap-2 text-xs text-gray-600">
-                <input
-                  id="dont-show-install-popup"
-                  type="checkbox"
-                  className="rounded border-gray-300"
-                  checked={popupDontShowAgain}
-                  onChange={(e) => setPopupDontShowAgain(e.target.checked)}
-                />
-                <label htmlFor="dont-show-install-popup">
-                  No volver a mostrar este recordatorio.
-                </label>
-              </div>
+            <DialogDescription className="sr-only">
+              Recordatorio para leer la guía de instalación de la app en tu celular
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-4 py-3 overflow-y-auto text-sm space-y-3">
+            <p className="text-gray-700">
+              Tenés disponible una guía rápida para instalar esta app en la pantalla de inicio de tu celular.
+            </p>
+            <p className="text-gray-600">
+              Podés leerla cuando quieras en la sección <strong>"¿Cómo instalar esta app en tu celular?"</strong> al final de esta pantalla.
+            </p>
+            <div className="flex items-center gap-2 text-xs text-gray-600">
+              <input
+                id="dont-show-install-popup"
+                type="checkbox"
+                className="rounded border-gray-300"
+                checked={popupDontShowAgain}
+                onChange={(e) => setPopupDontShowAgain(e.target.checked)}
+              />
+              <label htmlFor="dont-show-install-popup">
+                No volver a mostrar este recordatorio.
+              </label>
             </div>
-            <div className="flex justify-end gap-2 px-4 py-3 border-t bg-white text-xs">
-              <button
-                type="button"
-                className="px-3 py-2 border rounded"
-                onClick={() => {
-                  if (typeof window !== 'undefined' && popupDontShowAgain) {
+          </div>
+          <DialogFooter className="flex justify-end gap-2 px-4 py-3 border-t bg-white text-xs rounded-b-xl">
+            <button
+              type="button"
+              className="px-3 py-2 border rounded"
+              onClick={() => {
+                if (typeof window !== 'undefined' && popupDontShowAgain) {
+                  try {
+                    window.localStorage.setItem('hide_install_help_reminder', 'true');
+                  } catch {}
+                }
+                setShowInstallPopup(false);
+              }}
+            >
+              Cerrar
+            </button>
+            <button
+              type="button"
+              className="px-3 py-2 bg-[#3cadaf] hover:bg-[#31435d] text-white rounded"
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  const el = document.getElementById('install-app-help');
+                  if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                  if (!showInstallHelpOpen) {
+                    setShowInstallHelpOpen(true);
+                  }
+                  if (popupDontShowAgain) {
                     try {
                       window.localStorage.setItem('hide_install_help_reminder', 'true');
                     } catch {}
                   }
-                  setShowInstallPopup(false);
-                }}
-              >
-                Cerrar
-              </button>
-              <button
-                type="button"
-                className="px-3 py-2 bg-[#3cadaf] hover:bg-[#31435d] text-white rounded"
-                onClick={() => {
-                  if (typeof window !== 'undefined') {
-                    const el = document.getElementById('install-app-help');
-                    if (el) {
-                      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }
-                    if (!showInstallHelpOpen) {
-                      setShowInstallHelpOpen(true);
-                    }
-                    if (popupDontShowAgain) {
-                      try {
-                        window.localStorage.setItem('hide_install_help_reminder', 'true');
-                      } catch {}
-                    }
-                  }
-                  setShowInstallPopup(false);
-                }}
-              >
-                Ver instrucciones ahora
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+                }
+                setShowInstallPopup(false);
+              }}
+            >
+              Ver instrucciones ahora
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
