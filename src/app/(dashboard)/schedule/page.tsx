@@ -1149,7 +1149,7 @@ export default function SchedulePage() {
                           onChange={(e) => setLocationFilterSearch(e.target.value)}
                           className="h-10 text-base"
                         />
-                        <div className="max-h-52 overflow-auto border rounded-md divide-y text-xs">
+                        <div className="max-h-52 overflow-auto border rounded-md divide-y text-sm">
                           <button
                             type="button"
                             onClick={() => {
@@ -1207,7 +1207,7 @@ export default function SchedulePage() {
                           onChange={(e) => setCourtFilterSearch(e.target.value)}
                           className="h-10 text-base"
                         />
-                        <div className="max-h-52 overflow-auto border rounded-md divide-y text-xs">
+                        <div className="max-h-52 overflow-auto border rounded-md divide-y text-sm">
                           <button
                             type="button"
                             onClick={() => setFilterCourtId('')}
