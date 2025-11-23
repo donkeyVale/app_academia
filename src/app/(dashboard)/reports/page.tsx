@@ -1507,10 +1507,10 @@ export default function ReportsPage() {
       )}
       {/* Resumen por plan */}
       {planSummary.length > 0 && (
-        <div className="border rounded-lg bg-white shadow_sm">
+        <div className="border rounded-lg bg-white shadow-sm overflow-hidden">
           <button
             type="button"
-            className="w_full flex items-center justify_between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+            className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
             onClick={() => setShowPlanSummary((v) => !v)}
           >
             <span className="inline-flex items-center gap-2">
@@ -2520,7 +2520,7 @@ export default function ReportsPage() {
         >
           <DialogHeader className="px-4 pt-4 pb-2 border-b bg-white/70 backdrop-blur-sm rounded-t-xl">
             <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-[#3cadaf]" />
+              <Users className="w-4 h-4 text-sky-500" />
               <DialogTitle className="text-lg font-semibold text-[#31435d]">
                 Pagos del alumno
               </DialogTitle>
@@ -2590,7 +2590,7 @@ export default function ReportsPage() {
         >
           <DialogHeader className="px-4 pt-4 pb-2 border-b bg-white/70 backdrop-blur-sm rounded-t-xl">
             <div className="flex items-center gap-2">
-              <BarChart3 className="w-4 h-4 text-[#3cadaf]" />
+              <BarChart3 className="w-4 h-4 text-violet-500" />
               <DialogTitle className="text-lg font-semibold text-[#31435d]">
                 Pagos del plan
               </DialogTitle>
@@ -2660,7 +2660,7 @@ export default function ReportsPage() {
         >
           <DialogHeader className="px-4 pt-4 pb-2 border-b bg-white/70 backdrop-blur-sm rounded-t-xl">
             <div className="flex items-center gap-2">
-              <UserCheck className="w-4 h-4 text-[#3cadaf]" />
+              <UserCheck className="w-4 h-4 text-emerald-500" />
               <DialogTitle className="text-lg font-semibold text-[#31435d]">
                 Asistencia de la clase
               </DialogTitle>
