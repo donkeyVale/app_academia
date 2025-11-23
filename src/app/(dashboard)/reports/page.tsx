@@ -2515,7 +2515,9 @@ export default function ReportsPage() {
       {/* Modal: detalle por alumno */}
       <Dialog open={studentDetailModalOpen} onOpenChange={setStudentDetailModalOpen}
       >
-        <DialogContent className="max-w-md max-h-[90vh] p-0 flex flex-col">
+        <DialogContent
+          className="w-full max-w-md sm:max-w-lg max-h-[90vh] p-0 flex flex-col rounded-xl border border-gray-200 shadow-xl"
+        >
           <DialogHeader className="px-4 pt-4 pb-2 border-b">
             <DialogTitle className="text-lg font-semibold text-[#31435d]">
               Pagos del alumno
@@ -2580,7 +2582,9 @@ export default function ReportsPage() {
       {/* Modal: detalle por plan */}
       <Dialog open={planDetailModalOpen} onOpenChange={setPlanDetailModalOpen}
       >
-        <DialogContent className="max-w-md max-h-[90vh] p-0 flex flex-col">
+        <DialogContent
+          className="w-full max-w-md sm:max-w-lg max-h-[90vh] p-0 flex flex-col rounded-xl border border-gray-200 shadow-xl"
+        >
           <DialogHeader className="px-4 pt-4 pb-2 border-b">
             <DialogTitle className="text-lg font-semibold text-[#31435d]">
               Pagos del plan
@@ -2645,7 +2649,9 @@ export default function ReportsPage() {
       {/* Modal: detalle de asistencia por clase (sede / cancha) */}
       <Dialog open={locationDetailOpen && !!locationDetailInfo} onOpenChange={setLocationDetailOpen}
       >
-        <DialogContent className="max-w-md max-h-[90vh] p-0 flex flex-col">
+        <DialogContent
+          className="w-full max-w-md sm:max-w-lg max-h-[90vh] p-0 flex flex-col rounded-xl border border-gray-200 shadow-xl"
+        >
           <DialogHeader className="px-4 pt-4 pb-2 border-b">
             <DialogTitle className="text-lg font-semibold text-[#31435d]">
               Asistencia de la clase
