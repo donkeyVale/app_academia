@@ -5,6 +5,7 @@ import { createClientBrowser } from '@/lib/supabase';
 import { logAudit } from '@/lib/audit';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import {
@@ -969,39 +970,94 @@ export default function SchedulePage() {
                 />
               </div>
               <div>
-          <label className="block text-sm mb-1">Alumnos (selección múltiple)</label>
-          <input
-            type="text"
-            className="border rounded p-2 w-full mb-2"
-            placeholder="Buscar alumnos..."
-            value={studentQuery}
-            onChange={(e) => setStudentQuery(e.target.value)}
-          />
-          <select multiple className="border rounded p-2 w-full h-28" value={selectedStudents} onChange={(e) => {
-            const opts = Array.from(e.target.selectedOptions).map(o => o.value);
-            if (opts.length > 4) {
-              alert('Máximo 4 alumnos por clase');
-              // no aplicar selección mayor a 4
-              return;
-            }
-            setSelectedStudents(opts);
-          }}>
-            {students
-              .filter((s) => {
-                const t = (studentQuery || '').toLowerCase();
-                if (!t) return true;
-                const label =
-                  (s.full_name || '') + ' ' + (s.notes || '') + ' ' + (s.level || '') + ' ' + s.id;
-                return label.toLowerCase().includes(t);
-              })
-              .map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.full_name ?? s.notes ?? s.level ?? s.id}
-                </option>
-              ))}
-          </select>
-          <p className="text-xs text-gray-500">Se crearán reservas para los alumnos seleccionados.</p>
-        </div>
+                <label className="block text-sm mb-1">Alumnos (selección múltiple)</label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-between text-sm font-normal"
+                    >
+                      <span className="truncate mr-2">
+                        {selectedStudents.length === 0
+                          ? 'Selecciona hasta 4 alumnos'
+                          : selectedStudents.length === 1
+                          ? '1 alumno seleccionado'
+                          : `${selectedStudents.length} alumnos seleccionados`}
+                      </span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 p-3" align="start">
+                    <div className="space-y-2">
+                      <Input
+                        type="text"
+                        placeholder="Buscar alumnos..."
+                        value={studentQuery}
+                        onChange={(e) => setStudentQuery(e.target.value)}
+                        className="h-8 text-xs"
+                      />
+                      <div className="max-h-52 overflow-auto border rounded-md divide-y">
+                        {students
+                          .filter((s) => {
+                            const t = (studentQuery || '').toLowerCase();
+                            if (!t) return true;
+                            const label =
+                              (s.full_name || '') +
+                              ' ' +
+                              (s.notes || '') +
+                              ' ' +
+                              (s.level || '') +
+                              ' ' +
+                              s.id;
+                            return label.toLowerCase().includes(t);
+                          })
+                          .map((s) => {
+                            const id = s.id;
+                            const checked = selectedStudents.includes(id);
+                            const toggle = () => {
+                              if (!checked && selectedStudents.length >= 4) {
+                                alert('Máximo 4 alumnos por clase');
+                                return;
+                              }
+                              setSelectedStudents((prev) =>
+                                checked
+                                  ? prev.filter((x) => x !== id)
+                                  : [...prev, id]
+                              );
+                            };
+                            return (
+                              <button
+                                key={id}
+                                type="button"
+                                onClick={toggle}
+                                className="w-full flex items-center justify-between px-2 py-1.5 text-xs hover:bg-slate-50"
+                              >
+                                <span className="truncate mr-2">
+                                  {s.full_name ?? s.notes ?? s.level ?? s.id}
+                                </span>
+                                <input
+                                  type="checkbox"
+                                  readOnly
+                                  checked={checked}
+                                  className="h-3.5 w-3.5 rounded border-gray-300"
+                                />
+                              </button>
+                            );
+                          })}
+                        {students.length === 0 && (
+                          <div className="px-2 py-1.5 text-xs text-gray-500">
+                            No hay alumnos cargados.
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-gray-500">
+                        Podés seleccionar entre 1 y 4 alumnos. Se crearán reservas para los alumnos
+                        seleccionados.
+                      </p>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
         <button className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50" disabled={saving}>
           {saving ? 'Creando...' : 'Crear clase'}
