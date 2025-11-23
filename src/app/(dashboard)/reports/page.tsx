@@ -2516,12 +2516,15 @@ export default function ReportsPage() {
       <Dialog open={studentDetailModalOpen} onOpenChange={setStudentDetailModalOpen}
       >
         <DialogContent
-          className="w-full max-w-md sm:max-w-lg max-h-[90vh] p-0 flex flex-col rounded-xl border border-gray-200 shadow-xl"
+          className="w-full max-w-md sm:max-w-lg max-h-[90vh] p-0 flex flex-col rounded-xl border border-gray-200 shadow-xl bg-slate-50/95 backdrop-blur data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
         >
-          <DialogHeader className="px-4 pt-4 pb-2 border-b">
-            <DialogTitle className="text-lg font-semibold text-[#31435d]">
-              Pagos del alumno
-            </DialogTitle>
+          <DialogHeader className="px-4 pt-4 pb-2 border-b bg-white/70 backdrop-blur-sm rounded-t-xl">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-[#3cadaf]" />
+              <DialogTitle className="text-lg font-semibold text-[#31435d]">
+                Pagos del alumno
+              </DialogTitle>
+            </div>
             <DialogDescription className="sr-only">
               Detalle de pagos del alumno en el periodo seleccionado
             </DialogDescription>
@@ -2583,12 +2586,15 @@ export default function ReportsPage() {
       <Dialog open={planDetailModalOpen} onOpenChange={setPlanDetailModalOpen}
       >
         <DialogContent
-          className="w-full max-w-md sm:max-w-lg max-h-[90vh] p-0 flex flex-col rounded-xl border border-gray-200 shadow-xl"
+          className="w-full max-w-md sm:max-w-lg max-h-[90vh] p-0 flex flex-col rounded-xl border border-gray-200 shadow-xl bg-slate-50/95 backdrop-blur data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
         >
-          <DialogHeader className="px-4 pt-4 pb-2 border-b">
-            <DialogTitle className="text-lg font-semibold text-[#31435d]">
-              Pagos del plan
-            </DialogTitle>
+          <DialogHeader className="px-4 pt-4 pb-2 border-b bg-white/70 backdrop-blur-sm rounded-t-xl">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="w-4 h-4 text-[#3cadaf]" />
+              <DialogTitle className="text-lg font-semibold text-[#31435d]">
+                Pagos del plan
+              </DialogTitle>
+            </div>
             <DialogDescription className="sr-only">
               Detalle de pagos del plan en el periodo seleccionado
             </DialogDescription>
@@ -2650,12 +2656,15 @@ export default function ReportsPage() {
       <Dialog open={locationDetailOpen && !!locationDetailInfo} onOpenChange={setLocationDetailOpen}
       >
         <DialogContent
-          className="w-full max-w-md sm:max-w-lg max-h-[90vh] p-0 flex flex-col rounded-xl border border-gray-200 shadow-xl"
+          className="w-full max-w-md sm:max-w-lg max-h-[90vh] p-0 flex flex-col rounded-xl border border-gray-200 shadow-xl bg-slate-50/95 backdrop-blur data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
         >
-          <DialogHeader className="px-4 pt-4 pb-2 border-b">
-            <DialogTitle className="text-lg font-semibold text-[#31435d]">
-              Asistencia de la clase
-            </DialogTitle>
+          <DialogHeader className="px-4 pt-4 pb-2 border-b bg-white/70 backdrop-blur-sm rounded-t-xl">
+            <div className="flex items-center gap-2">
+              <UserCheck className="w-4 h-4 text-[#3cadaf]" />
+              <DialogTitle className="text-lg font-semibold text-[#31435d]">
+                Asistencia de la clase
+              </DialogTitle>
+            </div>
             <DialogDescription className="sr-only">
               Detalle de asistencia por alumno para la clase seleccionada
             </DialogDescription>
