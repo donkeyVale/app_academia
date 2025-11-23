@@ -1410,20 +1410,30 @@ export default function SchedulePage() {
                 </div>
                 <div className="min-w-0 w-full pr-1">
                   <label className="block text-xs mb-1">Desde</label>
-                  <input
-                    type="datetime-local"
-                    className="border rounded p-2 w-full text-xs"
-                    value={filterFrom}
-                    onChange={(e) => setFilterFrom(e.target.value)}
+                  <DatePickerField
+                    value={filterFrom ? filterFrom.slice(0, 10) : ''}
+                    onChange={(value) => {
+                      if (!value) {
+                        setFilterFrom('');
+                        return;
+                      }
+                      // Usamos inicio de día para el filtro "Desde"
+                      setFilterFrom(`${value}T00:00`);
+                    }}
                   />
                 </div>
                 <div className="min-w-0 w-full pr-1">
                   <label className="block text-xs mb-1">Hasta</label>
-                  <input
-                    type="datetime-local"
-                    className="border rounded p-2 w-full text-xs"
-                    value={filterTo}
-                    onChange={(e) => setFilterTo(e.target.value)}
+                  <DatePickerField
+                    value={filterTo ? filterTo.slice(0, 10) : ''}
+                    onChange={(value) => {
+                      if (!value) {
+                        setFilterTo('');
+                        return;
+                      }
+                      // Usamos fin de día para el filtro "Hasta"
+                      setFilterTo(`${value}T23:59`);
+                    }}
                   />
                 </div>
               </>
