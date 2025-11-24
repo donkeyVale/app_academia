@@ -849,8 +849,8 @@ export default function SchedulePage() {
           onClick={() => setShowCreateSection((v) => !v)}
         >
           <span className="inline-flex items-center gap-2 text-[#31435d]">
-            <Clock className="w-4 h-4 text-[#3cadaf]" />
-            Crear clase
+            <Clock className="w-4 h-4 text-emerald-500" />
+            Crear nueva clase
           </span>
           <span className="text-xs text-gray-500">{showCreateSection ? '▼' : '▲'}</span>
         </button>
@@ -1097,8 +1097,8 @@ export default function SchedulePage() {
           onClick={() => setShowUpcomingSection((v) => !v)}
         >
           <span className="inline-flex items-center gap-2 text-[#31435d]">
-            <CalendarDays className="w-4 h-4 text-[#3cadaf]" />
-            Próximas clases
+            <CalendarDays className="w-4 h-4 text-sky-500" />
+            Próximas clases programadas
           </span>
           <span className="text-xs text-gray-500">{showUpcomingSection ? '▼' : '▲'}</span>
         </button>
@@ -1109,37 +1109,41 @@ export default function SchedulePage() {
             transition={{ duration: 0.18, ease: 'easeOut' }}
             className="space-y-6 p-4 origin-top"
           >
-            <div className="space-y-3 max-w-full">
-              <h2 className="text-lg font-semibold text-[#31435d]">Próximas clases</h2>
-        <div className="space-y-2 p-3 border rounded-lg bg-[#f0f9fb] max-w-full w-full overflow-hidden">
-          <div className="grid gap-2 md:grid-cols-5 items-end w-full max-w-full">
-            <div>
-              <label className="block text-xs mb-1 font-semibold">Filtrar por</label>
-              <Select
-                value={filterMode}
-                onValueChange={(mode) => {
-                  const typed = mode as typeof filterMode;
-                  setFilterMode(typed);
-                  setFilterLocationId('');
-                  setFilterCourtId('');
-                  setFilterCoachId('');
-                  setFilterStudentId('');
-                  setFilterFrom('');
-                  setFilterTo('');
-                }}
-              >
-                <SelectTrigger className="w-full h-9 text-xs">
-                  <SelectValue placeholder="Sin filtro" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Sin filtro</SelectItem>
-                  <SelectItem value="sede">Sede / Cancha</SelectItem>
-                  <SelectItem value="profesor">Profesor</SelectItem>
-                  <SelectItem value="alumno">Alumno</SelectItem>
-                  <SelectItem value="fecha">Fecha</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="space-y-1 max-w-full">
+              <h2 className="text-lg font-semibold text-[#31435d]">Próximas clases programadas</h2>
+              <p className="text-xs text-gray-600">
+                Revisá y filtrá las clases que aún no se dictaron para organizar tu agenda.
+              </p>
             </div>
+            <div className="space-y-2 p-3 border rounded-lg bg-[#f0f9fb] max-w-full w-full overflow-hidden">
+              <div className="grid gap-2 md:grid-cols-5 items-end w-full max-w-full">
+                <div>
+                  <label className="block text-xs mb-1 font-semibold">Filtrar por</label>
+                  <Select
+                    value={filterMode}
+                    onValueChange={(mode) => {
+                      const typed = mode as typeof filterMode;
+                      setFilterMode(typed);
+                      setFilterLocationId('');
+                      setFilterCourtId('');
+                      setFilterCoachId('');
+                      setFilterStudentId('');
+                      setFilterFrom('');
+                      setFilterTo('');
+                    }}
+                  >
+                    <SelectTrigger className="w-full h-9 text-xs">
+                      <SelectValue placeholder="Sin filtro" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Sin filtro</SelectItem>
+                      <SelectItem value="sede">Sede / Cancha</SelectItem>
+                      <SelectItem value="profesor">Profesor</SelectItem>
+                      <SelectItem value="alumno">Alumno</SelectItem>
+                      <SelectItem value="fecha">Fecha</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
             {filterMode === 'sede' && (
               <>
                 <div>
@@ -1581,8 +1585,6 @@ export default function SchedulePage() {
           )}
           </>
         )}
-            </div>
-
           </motion.div>
         )}
       </div>
@@ -1595,8 +1597,8 @@ export default function SchedulePage() {
             onClick={() => setShowRecentSection((v) => !v)}
           >
             <span className="inline-flex items-center gap-2 text-[#31435d]">
-              <CalendarDays className="h-4 w-4 text-[#3cadaf]" />
-              Clases recientes (últimas 6 horas)
+              <CalendarDays className="h-4 w-4 text-violet-500" />
+              Clases recientes para asistencia
             </span>
             <span className="text-xs text-gray-500">{showRecentSection ? '▼' : '▲'}</span>
           </button>
