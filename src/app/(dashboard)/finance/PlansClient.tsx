@@ -108,7 +108,6 @@ export default function PlansClient() {
   const [showStudentSummary, setShowStudentSummary] = useState(false);
   const [showPaymentsSection, setShowPaymentsSection] = useState(false);
   const [recentPlansSearch, setRecentPlansSearch] = useState('');
-  const [assignStudentSearch, setAssignStudentSearch] = useState('');
   const [reportStudentSearch, setReportStudentSearch] = useState('');
 
   // Edición de plan existente
@@ -852,14 +851,6 @@ export default function PlansClient() {
           <h2 className="text-lg font-semibold mb-2">Asignar plan a alumno</h2>
           <form onSubmit={onAssignPlan} className="grid gap-3 max-w-xl">
             <div>
-              <label className="block text-xs mb-1 text-gray-600">Buscar jugador</label>
-              <input
-                type="text"
-                className="mb-2 border rounded px-3 w-full h-10 text-base md:text-sm"
-                placeholder="Ej.: Juan Pérez, nivel, notas"
-                value={assignStudentSearch}
-                onChange={(e) => setAssignStudentSearch(e.target.value)}
-              />
               <label className="block text-sm mb-1">Alumno</label>
               <select
                 className="border rounded px-3 w-full h-10 text-base md:text-sm"
@@ -867,14 +858,7 @@ export default function PlansClient() {
                 onChange={(e) => setSelectedStudentId(e.target.value)}
               >
                 <option value="">Selecciona un alumno</option>
-                {students
-                  .filter((s) => {
-                    if (!assignStudentSearch.trim()) return true;
-                    const term = assignStudentSearch.toLowerCase();
-                    const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
-                    return displayName.includes(term);
-                  })
-                  .map((s) => (
+                {students.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.full_name ?? s.notes ?? s.level ?? s.id}
                   </option>
