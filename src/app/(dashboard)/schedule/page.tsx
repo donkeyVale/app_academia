@@ -1588,10 +1588,10 @@ export default function SchedulePage() {
       </div>
 
       {recentClasses.length > 0 && (
-        <div className="border rounded-lg bg-white shadow-sm overflow-x-hidden max-w-full">
+        <div className="border rounded-lg bg-white shadow-sm overflow-hidden">
           <button
             type="button"
-            className="flex w-full items-center justify-between rounded-t-lg bg-gray-50 px-4 py-2 text-left text-sm font-medium hover:bg-gray-100"
+            className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
             onClick={() => setShowRecentSection((v) => !v)}
           >
             <span className="inline-flex items-center gap-2 font-semibold text-[#31435d]">
@@ -1600,12 +1600,20 @@ export default function SchedulePage() {
             </span>
             <span className="text-xs text-gray-500">{showRecentSection ? '▼' : '▲'}</span>
           </button>
-          {showRecentSection && (
-            <div className="space-y-3 p-4 max-w-full">
-              <p className="text-xs text-gray-500">
-                Usá esta lista para marcar asistencia en clases que ya terminaron pero aún son recientes (últimas 6 horas).
-              </p>
-              <ul className="space-y-3 max-w-full">
+          <AnimatePresence initial={false}>
+            {showRecentSection && (
+              <motion.div
+                key="recent-classes-section"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.18, ease: 'easeOut' }}
+                className="p-4 space-y-3 origin-top max-w-full"
+              >
+                <p className="text-xs text-gray-500">
+                  Usá esta lista para marcar asistencia en clases que ya terminaron pero aún son recientes (últimas 6 horas).
+                </p>
+                <ul className="space-y-3 max-w-full">
                 {(showAllRecent ? recentClasses : recentClasses.slice(0, 5)).map((cls) => {
                   const d = new Date(cls.date);
                   const yyyy = d.getFullYear();
@@ -1661,8 +1669,9 @@ export default function SchedulePage() {
                   </button>
                 </div>
               )}
-            </div>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       )}
 
