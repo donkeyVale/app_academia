@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 const iconColor = "#3cadaf";
 
@@ -213,19 +214,25 @@ export default function PlansClient() {
     setError(null);
     try {
       if (!planName.trim()) {
-        setError('Ingresa un nombre para el plan');
+        const msg = 'Ingresa un nombre para el plan';
+        setError(msg);
+        toast.error(msg);
         setSaving(false);
         return;
       }
       const classes = Number(planClasses);
       const price = Number(planPrice);
       if (!classes || classes <= 0) {
-        setError('Las clases incluidas deben ser mayores a 0');
+        const msg = 'Las clases incluidas deben ser mayores a 0';
+        setError(msg);
+        toast.error(msg);
         setSaving(false);
         return;
       }
       if (!price || price <= 0) {
-        setError('El precio debe ser mayor a 0');
+        const msg = 'El precio debe ser mayor a 0';
+        setError(msg);
+        toast.error(msg);
         setSaving(false);
         return;
       }
@@ -247,8 +254,11 @@ export default function PlansClient() {
       setPlanName('');
       setPlanClasses('');
       setPlanPrice('');
+      toast.success('Plan creado correctamente');
     } catch (err: any) {
-      setError(err.message || 'Error creando plan');
+      const msg = err.message || 'Error creando plan';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -268,7 +278,9 @@ export default function PlansClient() {
       if (spErr) throw spErr;
       const hasActive = (count ?? 0) > 0;
       if (hasActive) {
-        setError('No se puede eliminar este plan porque hay alumnos con clases pendientes de este plan.');
+        const msg = 'No se puede eliminar este plan porque hay alumnos con clases pendientes de este plan.';
+        setError(msg);
+        toast.error(msg);
         setSaving(false);
         return;
       }
@@ -282,8 +294,11 @@ export default function PlansClient() {
         .order('classes_included');
       if (pErr) throw pErr;
       setPlans((plansData as Plan[]) ?? []);
+      toast.success('Plan eliminado correctamente');
     } catch (err: any) {
-      setError(err.message || 'Error eliminando plan');
+      const msg = err.message || 'Error eliminando plan';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -306,17 +321,23 @@ export default function PlansClient() {
       const classes = Number(editPlanClasses);
       const price = Number(editPlanPrice);
       if (!name) {
-        setError('Ingresa un nombre para el plan');
+        const msg = 'Ingresa un nombre para el plan';
+        setError(msg);
+        toast.error(msg);
         setSaving(false);
         return;
       }
       if (!classes || classes <= 0) {
-        setError('Las clases incluidas deben ser mayores a 0');
+        const msg = 'Las clases incluidas deben ser mayores a 0';
+        setError(msg);
+        toast.error(msg);
         setSaving(false);
         return;
       }
       if (!price || price <= 0) {
-        setError('El precio debe ser mayor a 0');
+        const msg = 'El precio debe ser mayor a 0';
+        setError(msg);
+        toast.error(msg);
         setSaving(false);
         return;
       }
@@ -338,8 +359,11 @@ export default function PlansClient() {
       setEditPlanName('');
       setEditPlanClasses('');
       setEditPlanPrice('');
+      toast.success('Plan actualizado correctamente');
     } catch (err: any) {
-      setError(err.message || 'Error actualizando plan');
+      const msg = err.message || 'Error actualizando plan';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -348,7 +372,9 @@ export default function PlansClient() {
   const onLoadReport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reportStudentId) {
-      setError('Selecciona un alumno para ver el resumen');
+      const msg = 'Selecciona un alumno para ver el resumen';
+      setError(msg);
+      toast.error(msg);
       return;
     }
     setReportLoading(true);
@@ -366,7 +392,9 @@ export default function PlansClient() {
       if (!spData || spData.length === 0) {
         setReportSummary(null);
         setReportHistory([]);
-        setError('Este alumno aún no tiene planes asignados.');
+        const msg = 'Este alumno aún no tiene planes asignados.';
+        setError(msg);
+        toast.error(msg);
         setReportLoading(false);
         return;
       }
@@ -421,7 +449,9 @@ export default function PlansClient() {
       rows.sort((a, b) => b.date.localeCompare(a.date));
       setReportHistory(rows);
     } catch (err: any) {
-      setError(err.message || 'Error cargando resumen');
+      const msg = err.message || 'Error cargando resumen';
+      setError(msg);
+      toast.error(msg);
       setReportSummary(null);
       setReportHistory([]);
     } finally {
@@ -435,14 +465,18 @@ export default function PlansClient() {
     setError(null);
     try {
       if (!selectedStudentId || !selectedPlanId) {
-        setError('Selecciona alumno y plan');
+        const msg = 'Selecciona alumno y plan';
+        setError(msg);
+        toast.error(msg);
         setSaving(false);
         return;
       }
       const plan = plans.find((p) => p.id === selectedPlanId);
       const remaining = Number(remainingClassesInput || (plan?.classes_included ?? 0));
       if (!remaining || remaining <= 0) {
-        setError('Las clases restantes deben ser mayores a 0');
+        const msg = 'Las clases restantes deben ser mayores a 0';
+        setError(msg);
+        toast.error(msg);
         setSaving(false);
         return;
       }
@@ -455,12 +489,16 @@ export default function PlansClient() {
         finalPrice = Math.max(0, basePrice - discountNum);
       }
       if (!basePrice || basePrice <= 0) {
-        setError('El plan seleccionado no tiene un precio válido.');
+        const msg = 'El plan seleccionado no tiene un precio válido.';
+        setError(msg);
+        toast.error(msg);
         setSaving(false);
         return;
       }
       if (!finalPrice || finalPrice <= 0) {
-        setError('El precio final debe ser mayor a 0 (revisa el descuento aplicado).');
+        const msg = 'El precio final debe ser mayor a 0 (revisa el descuento aplicado).';
+        setError(msg);
+        toast.error(msg);
         setSaving(false);
         return;
       }
@@ -487,8 +525,11 @@ export default function PlansClient() {
       setRemainingClassesInput('');
       setDiscountType('none');
       setDiscountValue('');
+      toast.success('Plan asignado al alumno');
     } catch (err: any) {
-      setError(err.message || 'Error asignando plan');
+      const msg = err.message || 'Error asignando plan';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -500,13 +541,17 @@ export default function PlansClient() {
     setError(null);
     try {
       if (!paymentStudentId || !paymentStudentPlanId) {
-        setError('Selecciona alumno y plan para registrar el pago');
+        const msg = 'Selecciona alumno y plan para registrar el pago';
+        setError(msg);
+        toast.error(msg);
         setSaving(false);
         return;
       }
       const amountNum = Number(paymentAmount);
       if (!amountNum || amountNum <= 0) {
-        setError('El monto del pago debe ser mayor a 0');
+        const msg = 'El monto del pago debe ser mayor a 0';
+        setError(msg);
+        toast.error(msg);
         setSaving(false);
         return;
       }
@@ -521,9 +566,7 @@ export default function PlansClient() {
         if (newTotalPaid > finalPrice) {
           const mensaje = `El total pagado (${newTotalPaid} PYG) no puede superar el valor del plan (${finalPrice} PYG). Ajusta el monto del pago.`;
           setError(mensaje);
-          if (typeof window !== 'undefined') {
-            window.alert(mensaje);
-          }
+          toast.error(mensaje);
           setSaving(false);
           return;
         }
@@ -566,8 +609,11 @@ export default function PlansClient() {
       setPaymentNotes('');
       setPaymentStatus('pagado');
       setPaymentModalOpen(false);
+      toast.success('Pago registrado correctamente');
     } catch (err: any) {
-      setError(err.message || 'Error registrando pago');
+      const msg = err.message || 'Error registrando pago';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
