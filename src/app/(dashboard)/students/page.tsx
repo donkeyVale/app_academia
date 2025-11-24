@@ -298,9 +298,9 @@ export default function StudentsPage() {
   if (checking) {
     return (
       <section className="mt-4 space-y-4 max-w-5xl mx-auto px-4">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-2">
           <Users className="h-5 w-5 text-[#3cadaf] flex-shrink-0" />
-          <div className="space-y-1">
+          <div className="space-y-0.5">
             <h1 className="text-2xl font-semibold text-[#31435d]">Alumnos</h1>
             <p className="text-sm text-gray-600">Cargando...</p>
           </div>
@@ -311,9 +311,9 @@ export default function StudentsPage() {
 
   return (
     <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4 overflow-x-hidden">
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex items-center gap-2">
         <Users className="h-5 w-5 text-[#3cadaf] flex-shrink-0" />
-        <div className="space-y-1">
+        <div className="space-y-0.5">
           <h1 className="text-2xl font-semibold text-[#31435d]">Alumnos</h1>
           <p className="text-sm text-gray-600">
             Listado de alumnos con su plan activo y clases restantes (si corresponde).

@@ -163,7 +163,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           )}
         </AnimatePresence>
       </header>
-      <main className="w-full flex justify-center px-4 py-3">
+      <main className="w-full flex justify-center px-4 py-3 overflow-x-hidden">
         <div className="w-full max-w-5xl">{children}</div>
       </main>
     </div>
