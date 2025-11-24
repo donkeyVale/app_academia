@@ -110,7 +110,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.18, ease: 'easeOut' }}
-              className="mx-auto mt-1 flex w-full max-w-[220px] origin-top-right flex-col gap-1 rounded-xl border border-[#dbeafe] bg-[#f1f5f9] px-3 py-2 text-sm shadow-md"
+              className="mt-1 ml-auto flex w-full max-w-[220px] origin-top-right flex-col gap-1 rounded-xl border border-[#dbeafe] bg-[#f1f5f9] px-3 py-2 text-sm shadow-md"
             >
               <p className="px-3 pb-1 text-[11px] uppercase tracking-wide text-gray-400">
                 Navegación rápida

@@ -416,20 +416,20 @@ export default function StudentsPage() {
               </button>
             </div>
             <div className="px-4 py-3 overflow-y-auto text-sm">
-              {historyLoading && <p className="text-xs text-gray-600">Cargando historial...</p>}
-              {historyError && <p className="mb-2 text-xs text-red-600">{historyError}</p>}
+              {historyLoading && <p className="text-sm text-gray-600">Cargando historial...</p>}
+              {historyError && <p className="mb-2 text-sm text-red-600">{historyError}</p>}
               {!historyLoading && !historyError && historyItems.length === 0 && (
-                <p className="text-xs text-gray-600">Este alumno aún no tiene clases registradas.</p>
+                <p className="text-sm text-gray-600">Este alumno aún no tiene clases registradas.</p>
               )}
               {!historyLoading && !historyError && historyItems.length > 0 && (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[320px] border-collapse text-xs">
+                  <table className="w-full min-w-[320px] border-collapse text-sm">
                     <thead>
-                      <tr className="border-b bg-gray-50 text-[11px] text-gray-600">
-                        <th className="py-1 px-2 text-left font-medium">Fecha</th>
-                        <th className="py-1 px-2 text-left font-medium">Hora</th>
-                        <th className="py-1 px-2 text-left font-medium">Cancha</th>
-                        <th className="py-1 px-2 text-left font-medium">Profesor</th>
+                      <tr className="border-b bg-gray-50 text-xs text-gray-600">
+                        <th className="py-1.5 px-2 text-left font-medium">Fecha</th>
+                        <th className="py-1.5 px-2 text-left font-medium">Hora</th>
+                        <th className="py-1.5 px-2 text-left font-medium">Cancha</th>
+                        <th className="py-1.5 px-2 text-left font-medium">Profesor</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -442,10 +442,10 @@ export default function StudentsPage() {
                         const min = String(d.getMinutes()).padStart(2, '0');
                         return (
                           <tr key={item.id} className="border-b last:border-b-0">
-                            <td className="py-1 px-2">{`${dd}/${mm}/${yyyy}`}</td>
-                            <td className="py-1 px-2">{`${hh}:${min}`}</td>
-                            <td className="py-1 px-2">{item.courtName ?? '-'}</td>
-                            <td className="py-1 px-2">{item.coachName ?? '-'}</td>
+                            <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
+                            <td className="py-1.5 px-2">{`${hh}:${min}`}</td>
+                            <td className="py-1.5 px-2">{item.courtName ?? '-'}</td>
+                            <td className="py-1.5 px-2">{item.coachName ?? '-'}</td>
                           </tr>
                         );
                       })}
