@@ -296,7 +296,7 @@ export default function StudentsPage() {
 
   if (checking) {
     return (
-      <section className="space-y-3">
+      <section className="space-y-4 py-4">
         <div className="flex items-center gap-2">
           <IconStudents />
           <h1 className="text-2xl font-semibold text-[#31435d]">Alumnos</h1>
@@ -307,7 +307,7 @@ export default function StudentsPage() {
   }
 
   return (
-    <section className="space-y-4 py-4">
+    <section className="space-y-6 py-4 overflow-x-hidden">
       <div className="flex items-center gap-2">
         <IconStudents />
         <h1 className="text-2xl font-semibold text-[#31435d]">Alumnos</h1>
@@ -318,60 +318,90 @@ export default function StudentsPage() {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <div className="border rounded-lg bg-white p-4 shadow-sm border-t-4 border-[#3cadaf]">
-        {loading ? (
-          <p className="text-sm text-gray-600">Cargando alumnos...</p>
-        ) : students.length === 0 ? (
-          <p className="text-sm text-gray-600">Todavía no hay alumnos registrados.</p>
-        ) : (
-          <div>
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="border-b bg-gray-50">
-                  <th className="text-left py-2 px-3">Alumno</th>
-                  <th className="text-left py-2 px-3">Plan</th>
-                  <th className="text-left py-2 px-3">Clases restantes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {students.map((s) => {
-                  const planInfo = plansByStudent[s.id];
-                  const planId = planInfo?.plan_id ?? null;
-                  const planName = planId ? planNamesById[planId] ?? '-' : '-';
-                  const remaining = planInfo?.remaining_classes ?? null;
+      <div className="border rounded-lg bg-white shadow-sm border-t-4 border-[#3cadaf]">
+        <div className="px-4 py-3 border-b bg-gray-50 rounded-t-lg flex items-center justify-between">
+          <p className="text-sm font-semibold text-[#31435d]">Listado general</p>
+          <span className="text-xs text-gray-500">
+            {loading ? 'Cargando...' : `${students.length} alumno${students.length === 1 ? '' : 's'}`}
+          </span>
+        </div>
+        <div className="px-4 py-3">
+          {loading ? (
+            <p className="text-sm text-gray-600">Cargando alumnos...</p>
+          ) : students.length === 0 ? (
+            <p className="text-sm text-gray-600">Todavía no hay alumnos registrados.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse min-w-[320px]">
+                <thead>
+                  <tr className="border-b bg-gray-50 text-xs text-gray-600">
+                    <th className="py-2 px-3 text-left font-medium">Alumno</th>
+                    <th className="py-2 px-3 text-left font-medium">Plan</th>
+                    <th className="py-2 px-3 text-center font-medium">Clases restantes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {students.map((s) => {
+                    const planInfo = plansByStudent[s.id];
+                    const planId = planInfo?.plan_id ?? null;
+                    const planName = planId ? planNamesById[planId] ?? '-' : '-';
+                    const remaining = planInfo?.remaining_classes ?? null;
 
-                  const profile = s.user_id ? profilesByUser[s.user_id] : undefined;
-                  const displayName = profile?.full_name || '(Sin nombre vinculado)';
+                    const profile = s.user_id ? profilesByUser[s.user_id] : undefined;
+                    const displayName = profile?.full_name || '(Sin nombre vinculado)';
 
-                  return (
-                    <tr
-                      key={s.id}
-                      className="border-b last:border-b-0 hover:bg-gray-50 cursor-pointer"
-                      onClick={() => openHistory(s.id, displayName)}
-                    >
-                      <td className="py-2 px-3">{displayName}</td>
-                      <td className="py-2 px-3">{planName}</td>
-                      <td className="py-2 px-3 text-center">{remaining !== null ? remaining : '-'}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+                    return (
+                      <tr
+                        key={s.id}
+                        className="border-b last:border-b-0 hover:bg-slate-50 cursor-pointer transition-colors"
+                        onClick={() => openHistory(s.id, displayName)}
+                      >
+                        <td className="py-2 px-3">
+                          <span className="block font-medium text-slate-800 truncate">{displayName}</span>
+                          {s.notes && (
+                            <span className="mt-0.5 block text-xs text-gray-500 truncate">{s.notes}</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-3">
+                          <span className="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200">
+                            {planName}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          <span
+                            className={
+                              "inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-semibold " +
+                              (remaining !== null && remaining > 0
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                                : remaining === 0
+                                ? "bg-amber-50 text-amber-700 border border-amber-100"
+                                : "bg-slate-50 text-slate-500 border border-slate-200")
+                            }
+                          >
+                            {remaining !== null ? remaining : '-'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
       {historyStudent && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white w-full max-w-lg rounded-lg shadow-lg flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b">
-              <div>
-                <h2 className="text-lg font-semibold text-[#31435d]">Historial de clases</h2>
-                <p className="text-xs text-gray-600">{historyStudent.name}</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3 py-4">
+          <div className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-lg bg-white shadow-xl border border-slate-200">
+            <div className="flex items-center justify-between border-b px-4 pt-4 pb-3">
+              <div className="space-y-0.5">
+                <h2 className="text-base font-semibold text-[#31435d]">Historial de clases</h2>
+                <p className="text-xs text-gray-500">{historyStudent.name}</p>
               </div>
               <button
                 type="button"
-                className="text-xs text-gray-600 hover:underline"
+                className="text-xs text-gray-500 hover:text-gray-700 underline-offset-2 hover:underline"
                 onClick={() => {
                   setHistoryStudent(null);
                   setHistoryItems([]);
@@ -383,39 +413,41 @@ export default function StudentsPage() {
             </div>
             <div className="px-4 py-3 overflow-y-auto text-sm">
               {historyLoading && <p className="text-xs text-gray-600">Cargando historial...</p>}
-              {historyError && <p className="text-xs text-red-600 mb-2">{historyError}</p>}
+              {historyError && <p className="mb-2 text-xs text-red-600">{historyError}</p>}
               {!historyLoading && !historyError && historyItems.length === 0 && (
                 <p className="text-xs text-gray-600">Este alumno aún no tiene clases registradas.</p>
               )}
               {!historyLoading && !historyError && historyItems.length > 0 && (
-                <table className="w-full text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b bg-gray-50">
-                      <th className="text-left py-1 px-2">Fecha</th>
-                      <th className="text-left py-1 px-2">Hora</th>
-                      <th className="text-left py-1 px-2">Cancha</th>
-                      <th className="text-left py-1 px-2">Profesor</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {historyItems.map((item) => {
-                      const d = new Date(item.date);
-                      const yyyy = d.getFullYear();
-                      const mm = String(d.getMonth() + 1).padStart(2, '0');
-                      const dd = String(d.getDate()).padStart(2, '0');
-                      const hh = String(d.getHours()).padStart(2, '0');
-                      const min = String(d.getMinutes()).padStart(2, '0');
-                      return (
-                        <tr key={item.id} className="border-b last:border-b-0">
-                          <td className="py-1 px-2">{`${dd}/${mm}/${yyyy}`}</td>
-                          <td className="py-1 px-2">{`${hh}:${min}`}</td>
-                          <td className="py-1 px-2">{item.courtName ?? '-'}</td>
-                          <td className="py-1 px-2">{item.coachName ?? '-'}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[320px] border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b bg-gray-50 text-[11px] text-gray-600">
+                        <th className="py-1 px-2 text-left font-medium">Fecha</th>
+                        <th className="py-1 px-2 text-left font-medium">Hora</th>
+                        <th className="py-1 px-2 text-left font-medium">Cancha</th>
+                        <th className="py-1 px-2 text-left font-medium">Profesor</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {historyItems.map((item) => {
+                        const d = new Date(item.date);
+                        const yyyy = d.getFullYear();
+                        const mm = String(d.getMonth() + 1).padStart(2, '0');
+                        const dd = String(d.getDate()).padStart(2, '0');
+                        const hh = String(d.getHours()).padStart(2, '0');
+                        const min = String(d.getMinutes()).padStart(2, '0');
+                        return (
+                          <tr key={item.id} className="border-b last:border-b-0">
+                            <td className="py-1 px-2">{`${dd}/${mm}/${yyyy}`}</td>
+                            <td className="py-1 px-2">{`${hh}:${min}`}</td>
+                            <td className="py-1 px-2">{item.courtName ?? '-'}</td>
+                            <td className="py-1 px-2">{item.coachName ?? '-'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           </div>
