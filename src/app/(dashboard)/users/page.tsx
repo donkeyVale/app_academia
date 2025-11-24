@@ -2,24 +2,73 @@
 
 import { useEffect, useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
-import { Users } from 'lucide-react';
+import { Users, UserPlus, ListChecks } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 
 const ROLES = ['admin', 'coach', 'student'] as const;
-const iconColor = "#3cadaf";
 
-const IconUsers = (props: React.SVGProps<SVGSVGElement>) => (
-  <svg
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-    className="w-5 h-5"
-    {...props}
-  >
-    <circle cx="8" cy="9" r="3" stroke={iconColor} fill="none" strokeWidth="1.6" />
-    <circle cx="16" cy="9" r="3" stroke={iconColor} fill="none" strokeWidth="1.6" />
-    <path d="M3 19c0-2.2 2.2-4 5-4" stroke={iconColor} strokeWidth="1.6" fill="none" />
-    <path d="M21 19c0-2.2-2.2-4-5-4" stroke={iconColor} strokeWidth="1.6" fill="none" />
-  </svg>
-);
+type DatePickerFieldProps = {
+  value: string;
+  onChange: (value: string) => void;
+};
+
+function parseYmd(value: string): Date | undefined {
+  if (!value) return undefined;
+  const parts = value.split('-');
+  if (parts.length !== 3) return undefined;
+  const [y, m, d] = parts.map((p) => Number(p));
+  if (!y || !m || !d) return undefined;
+  const date = new Date(y, m - 1, d);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date;
+}
+
+function formatYmd(date: Date | undefined): string {
+  if (!date) return '';
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function formatDisplay(date: Date | undefined): string {
+  if (!date) return 'Seleccionar fecha';
+  return date.toLocaleDateString('es-PY');
+}
+
+function DatePickerField({ value, onChange }: DatePickerFieldProps) {
+  const selectedDate = parseYmd(value);
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full justify-start text-left text-sm font-normal flex items-center gap-2 h-10"
+        >
+          <Calendar className="h-4 w-4 text-gray-500" />
+          <span className={selectedDate ? '' : 'text-gray-400'}>
+            {formatDisplay(selectedDate)}
+          </span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={selectedDate}
+          onSelect={(date) => {
+            if (!date) return;
+            onChange(formatYmd(date));
+          }}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 type Role = (typeof ROLES)[number];
 
@@ -181,35 +230,40 @@ export default function UsersPage() {
 
   if (forbidden) {
     return (
-      <section className="w-full max-w-5xl mx-auto px-4 py-6 space-y-4">
-        <div className="flex items-center gap-2">
-          <Users className="h-5 w-5 text-[#3cadaf]" />
-          <h1 className="text-2xl font-semibold text-[#31435d]">Usuarios</h1>
+      <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4">
+        <div className="flex items-start gap-2">
+          <Users className="h-5 w-5 text-[#3cadaf] flex-shrink-0" />
+          <div className="space-y-0.5">
+            <h1 className="text-2xl font-semibold text-[#31435d]">Usuarios</h1>
+            <p className="text-sm text-gray-600">Solo administradores pueden acceder a este módulo.</p>
+          </div>
         </div>
-        <p className="text-sm text-red-600">Solo administradores pueden acceder a este módulo.</p>
       </section>
     );
   }
 
   return (
-    <section className="w-full max-w-5xl mx-auto px-4 py-6 space-y-6">
-      <div>
-        <div className="flex items-center gap-2 mb-1">
-          <Users className="h-5 w-5 text-[#3cadaf]" />
+    <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4">
+      <div className="flex items-start gap-2">
+        <Users className="h-5 w-5 text-[#3cadaf] flex-shrink-0" />
+        <div className="space-y-0.5">
           <h1 className="text-2xl font-semibold text-[#31435d]">Usuarios</h1>
+          <p className="text-sm text-gray-600">
+            Creá usuarios de acceso al sistema y asignales uno o varios roles.
+          </p>
         </div>
-        <p className="text-sm text-gray-600">
-          Creá usuarios de acceso al sistema y asignales uno o varios roles.
-        </p>
       </div>
 
-      <div className="border rounded-lg bg-white shadow-sm border-t-4 border-[#3cadaf]">
+      <div className="border rounded-lg bg-white shadow-sm">
         <button
           type="button"
-          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-semibold bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
           onClick={() => setShowCreateUser((v) => !v)}
         >
-          <span>Crear usuario</span>
+          <span className="inline-flex items-center gap-2">
+            <UserPlus className="w-4 h-4 text-emerald-500" />
+            <span>Crear y gestionar usuarios</span>
+          </span>
           <span className="text-xs text-gray-500">{showCreateUser ? '▼' : '▲'}</span>
         </button>
         {showCreateUser && (
@@ -273,13 +327,7 @@ export default function UsersPage() {
             </div>
             <div>
               <label className="block text-sm mb-1">Fecha de nacimiento</label>
-              <input
-                type="date"
-                className="border rounded p-2 w-full"
-                value={birthDate}
-                onChange={(e) => setBirthDate(e.target.value)}
-                required
-              />
+              <DatePickerField value={birthDate} onChange={setBirthDate} />
             </div>
           </div>
 
@@ -320,10 +368,13 @@ export default function UsersPage() {
       <div className="border rounded-lg bg-white shadow-sm">
         <button
           type="button"
-          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-semibold bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
           onClick={() => setShowUsersList((v) => !v)}
         >
-          <span>Usuarios registrados</span>
+          <span className="inline-flex items-center gap-2">
+            <ListChecks className="w-4 h-4 text-sky-500" />
+            <span>Usuarios registrados</span>
+          </span>
           <span className="text-xs text-gray-500">{showUsersList ? '▼' : '▲'}</span>
         </button>
         {showUsersList && (
