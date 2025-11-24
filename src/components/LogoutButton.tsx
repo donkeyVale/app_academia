@@ -7,7 +7,7 @@ export default function LogoutButton() {
   return (
     <button
       type="button"
-      className="text-sm underline ml-auto"
+      className="text-sm"
       onClick={async () => {
         await supabase.auth.signOut();
         window.location.href = '/(auth)/login';
