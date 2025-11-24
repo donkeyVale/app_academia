@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
-import { Users, UserPlus, ListChecks } from 'lucide-react';
+import { Users, UserPlus, ListChecks, Calendar as CalendarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -49,7 +49,7 @@ function DatePickerField({ value, onChange }: DatePickerFieldProps) {
           variant="outline"
           className="w-full justify-start text-left text-sm font-normal flex items-center gap-2 h-10"
         >
-          <Calendar className="h-4 w-4 text-gray-500" />
+          <CalendarIcon className="h-4 w-4 text-gray-500" />
           <span className={selectedDate ? '' : 'text-gray-400'}>
             {formatDisplay(selectedDate)}
           </span>
