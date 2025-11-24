@@ -297,25 +297,23 @@ export default function StudentsPage() {
 
   if (checking) {
     return (
-      <section className="space-y-4 py-4">
-        <div className="flex items-center gap-2">
-          <IconStudents />
+      <section className="mt-4 space-y-4 max-w-5xl mx-auto px-4">
+        <div className="space-y-1">
           <h1 className="text-2xl font-semibold text-[#31435d]">Alumnos</h1>
+          <p className="text-sm text-gray-600">Cargando...</p>
         </div>
-        <p className="text-sm text-gray-600">Cargando...</p>
       </section>
     );
   }
 
   return (
-    <section className="space-y-6 py-4 overflow-x-hidden">
-      <div className="flex items-center gap-2">
-        <IconStudents />
+    <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4 overflow-x-hidden">
+      <div className="space-y-1">
         <h1 className="text-2xl font-semibold text-[#31435d]">Alumnos</h1>
+        <p className="text-sm text-gray-600">
+          Listado de alumnos con su plan activo y clases restantes (si corresponde).
+        </p>
       </div>
-      <p className="text-sm text-gray-600">
-        Listado de alumnos con su plan activo y clases restantes (si corresponde).
-      </p>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
