@@ -109,6 +109,7 @@ export default function PlansClient() {
   const [showPaymentsSection, setShowPaymentsSection] = useState(false);
   const [recentPlansSearch, setRecentPlansSearch] = useState('');
   const [reportStudentSearch, setReportStudentSearch] = useState('');
+  const [assignStudentQuery, setAssignStudentQuery] = useState('');
 
   // Edición de plan existente
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
@@ -852,18 +853,48 @@ export default function PlansClient() {
           <form onSubmit={onAssignPlan} className="grid gap-3 max-w-xl">
             <div>
               <label className="block text-sm mb-1">Alumno</label>
-              <select
-                className="border rounded px-3 w-full h-10 text-base md:text-sm"
-                value={selectedStudentId}
-                onChange={(e) => setSelectedStudentId(e.target.value)}
-              >
-                <option value="">Selecciona un alumno</option>
-                {students.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.full_name ?? s.notes ?? s.level ?? s.id}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <input
+                  type="text"
+                  className="border rounded px-3 w-full h-10 text-base md:text-sm"
+                  placeholder="Escribe para buscar alumno"
+                  value={assignStudentQuery}
+                  onChange={(e) => setAssignStudentQuery(e.target.value)}
+                />
+                {assignStudentQuery.trim().length > 0 && (
+                  <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border bg-white shadow-sm text-sm">
+                    {students
+                      .filter((s) => {
+                        const term = assignStudentQuery.toLowerCase();
+                        const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
+                        return displayName.includes(term);
+                      })
+                      .slice(0, 20)
+                      .map((s) => {
+                        const displayName = s.full_name ?? s.notes ?? s.level ?? s.id;
+                        return (
+                          <li
+                            key={s.id}
+                            className="cursor-pointer px-3 py-1.5 hover:bg-gray-100"
+                            onClick={() => {
+                              setSelectedStudentId(s.id);
+                              setAssignStudentQuery(displayName || '');
+                            }}
+                          >
+                            {displayName}
+                          </li>
+                        );
+                      })}
+                    {students.filter((s) => {
+                      const term = assignStudentQuery.toLowerCase();
+                      const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
+                      return displayName.includes(term);
+                    }).length === 0 && (
+                      <li className="px-3 py-1.5 text-gray-500">Sin resultados</li>
+                    )}
+                  </ul>
+                )}
+              </div>
             </div>
             <div>
               <label className="block text-sm mb-1">Plan</label>
@@ -1053,34 +1084,49 @@ export default function PlansClient() {
           <h2 className="text-lg font-semibold mb-2">Resumen por alumno</h2>
           <form onSubmit={onLoadReport} className="grid gap-3 max-w-xl mb-4">
             <div>
-              <label className="block text-xs mb-1 text-gray-600">Buscar jugador</label>
-              <input
-                type="text"
-                className="mb-2 border rounded px-3 w-full h-10 text-base md:text-sm"
-                placeholder="Ej.: Juan Pérez, nivel, notas"
-                value={reportStudentSearch}
-                onChange={(e) => setReportStudentSearch(e.target.value)}
-              />
               <label className="block text-sm mb-1">Alumno</label>
-              <select
-                className="border rounded px-3 w-full h-10 text-base md:text-sm"
-                value={reportStudentId}
-                onChange={(e) => setReportStudentId(e.target.value)}
-              >
-                <option value="">Selecciona un alumno</option>
-                {students
-                  .filter((s) => {
-                    if (!reportStudentSearch.trim()) return true;
-                    const term = reportStudentSearch.toLowerCase();
-                    const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
-                    return displayName.includes(term);
-                  })
-                  .map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.full_name ?? s.notes ?? s.level ?? s.id}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <input
+                  type="text"
+                  className="border rounded px-3 w-full h-10 text-base md:text-sm"
+                  placeholder="Escribe para buscar alumno"
+                  value={reportStudentSearch}
+                  onChange={(e) => setReportStudentSearch(e.target.value)}
+                />
+                {reportStudentSearch.trim().length > 0 && (
+                  <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border bg-white shadow-sm text-sm">
+                    {students
+                      .filter((s) => {
+                        const term = reportStudentSearch.toLowerCase();
+                        const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
+                        return displayName.includes(term);
+                      })
+                      .slice(0, 20)
+                      .map((s) => {
+                        const displayName = s.full_name ?? s.notes ?? s.level ?? s.id;
+                        return (
+                          <li
+                            key={s.id}
+                            className="cursor-pointer px-3 py-1.5 hover:bg-gray-100"
+                            onClick={() => {
+                              setReportStudentId(s.id);
+                              setReportStudentSearch(displayName || '');
+                            }}
+                          >
+                            {displayName}
+                          </li>
+                        );
+                      })}
+                    {students.filter((s) => {
+                      const term = reportStudentSearch.toLowerCase();
+                      const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
+                      return displayName.includes(term);
+                    }).length === 0 && (
+                      <li className="px-3 py-1.5 text-gray-500">Sin resultados</li>
+                    )}
+                  </ul>
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -1144,38 +1190,50 @@ export default function PlansClient() {
           </div>
           <form onSubmit={onCreatePayment} className="px-4 py-3 overflow-y-auto text-sm space-y-3">
             <div>
-              <label className="block text-xs mb-1 text-gray-600">Buscar jugador</label>
-              <input
-                type="text"
-                className="mb-2 border rounded px-3 w-full h-10 text-base md:text-sm"
-                placeholder="Ej.: Juan Pérez, nivel, notas"
-                value={paymentStudentSearch}
-                onChange={(e) => setPaymentStudentSearch(e.target.value)}
-              />
               <label className="block text-sm mb-1">Alumno</label>
-              <select
-                className="border rounded p-2 w-full text-base md:text-sm"
-                value={paymentStudentId}
-                onChange={(e) => {
-                  const id = e.target.value;
-                  setPaymentStudentId(id);
-                  setPaymentStudentPlanId('');
-                }}
-              >
-                <option value="">Selecciona un alumno</option>
-                {students
-                  .filter((s) => {
-                    if (!paymentStudentSearch.trim()) return true;
-                    const term = paymentStudentSearch.toLowerCase();
-                    const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
-                    return displayName.includes(term);
-                  })
-                  .map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.full_name ?? s.notes ?? s.level ?? s.id}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <input
+                  type="text"
+                  className="border rounded px-3 w-full h-10 text-base md:text-sm"
+                  placeholder="Escribe para buscar alumno"
+                  value={paymentStudentSearch}
+                  onChange={(e) => setPaymentStudentSearch(e.target.value)}
+                />
+                {paymentStudentSearch.trim().length > 0 && (
+                  <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border bg-white shadow-sm text-sm">
+                    {students
+                      .filter((s) => {
+                        const term = paymentStudentSearch.toLowerCase();
+                        const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
+                        return displayName.includes(term);
+                      })
+                      .slice(0, 20)
+                      .map((s) => {
+                        const displayName = s.full_name ?? s.notes ?? s.level ?? s.id;
+                        return (
+                          <li
+                            key={s.id}
+                            className="cursor-pointer px-3 py-1.5 hover:bg-gray-100"
+                            onClick={() => {
+                              setPaymentStudentId(s.id);
+                              setPaymentStudentPlanId('');
+                              setPaymentStudentSearch(displayName || '');
+                            }}
+                          >
+                            {displayName}
+                          </li>
+                        );
+                      })}
+                    {students.filter((s) => {
+                      const term = paymentStudentSearch.toLowerCase();
+                      const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
+                      return displayName.includes(term);
+                    }).length === 0 && (
+                      <li className="px-3 py-1.5 text-gray-500">Sin resultados</li>
+                    )}
+                  </ul>
+                )}
+              </div>
             </div>
             <div>
               <label className="block text-sm mb-1">Plan del alumno</label>
