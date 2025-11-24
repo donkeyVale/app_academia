@@ -63,6 +63,9 @@ function DatePickerField({ value, onChange }: DatePickerFieldProps) {
             if (!date) return;
             onChange(formatYmd(date));
           }}
+          captionLayout="dropdown"
+          fromYear={1950}
+          toYear={new Date().getFullYear()}
           initialFocus
         />
       </PopoverContent>
@@ -409,7 +412,7 @@ export default function UsersPage() {
             <div>
               <label className="block text-sm mb-1">Nombre</label>
               <input
-                className="border rounded p-2 w-full"
+                className="border rounded px-3 w-full h-10 text-base md:text-sm"
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 required
@@ -418,7 +421,7 @@ export default function UsersPage() {
             <div>
               <label className="block text-sm mb-1">Apellido</label>
               <input
-                className="border rounded p-2 w-full"
+                className="border rounded px-3 w-full h-10 text-base md:text-sm"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 required
@@ -430,7 +433,7 @@ export default function UsersPage() {
             <div>
               <label className="block text-sm mb-1">N° de cédula</label>
               <input
-                className="border rounded p-2 w-full"
+                className="border rounded px-3 w-full h-10 text-base md:text-sm"
                 value={nationalId}
                 onChange={(e) => setNationalId(e.target.value)}
                 required
@@ -442,7 +445,7 @@ export default function UsersPage() {
             <div>
               <label className="block text-sm mb-1">Teléfono (+595...)</label>
               <input
-                className="border rounded p-2 w-full"
+                className="border rounded px-3 w-full h-10 text-base md:text-sm"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 required
@@ -455,7 +458,7 @@ export default function UsersPage() {
               <label className="block text-sm mb-1">Correo electrónico</label>
               <input
                 type="email"
-                className="border rounded p-2 w-full"
+                className="border rounded px-3 w-full h-10 text-base md:text-sm"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -551,6 +554,7 @@ export default function UsersPage() {
           </div>
         )}
       </div>
+
       {detailOpen && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-md rounded-lg shadow-lg flex flex-col max-h-[90vh]">
@@ -573,7 +577,7 @@ export default function UsersPage() {
                     <div>
                       <label className="block text-sm mb-1">Nombre</label>
                       <input
-                        className="border rounded p-2 w-full"
+                        className="border rounded px-3 w-full h-10 text-base md:text-sm"
                         value={detailFirstName}
                         onChange={(e) => setDetailFirstName(e.target.value)}
                         required
@@ -582,7 +586,7 @@ export default function UsersPage() {
                     <div>
                       <label className="block text-sm mb-1">Apellido</label>
                       <input
-                        className="border rounded p-2 w-full"
+                        className="border rounded px-3 w-full h-10 text-base md:text-sm"
                         value={detailLastName}
                         onChange={(e) => setDetailLastName(e.target.value)}
                         required
@@ -594,7 +598,7 @@ export default function UsersPage() {
                     <div>
                       <label className="block text-sm mb-1">N° de cédula</label>
                       <input
-                        className="border rounded p-2 w-full"
+                        className="border rounded px-3 w-full h-10 text-base md:text-sm"
                         value={detailNationalId}
                         onChange={(e) => setDetailNationalId(e.target.value)}
                         required
@@ -603,7 +607,7 @@ export default function UsersPage() {
                     <div>
                       <label className="block text-sm mb-1">Teléfono (+595...)</label>
                       <input
-                        className="border rounded p-2 w-full"
+                        className="border rounded px-3 w-full h-10 text-base md:text-sm"
                         value={detailPhone}
                         onChange={(e) => setDetailPhone(e.target.value)}
                         required
@@ -616,7 +620,7 @@ export default function UsersPage() {
                       <label className="block text-sm mb-1">Correo electrónico</label>
                       <input
                         type="email"
-                        className="border rounded p-2 w-full"
+                        className="border rounded px-3 w-full h-10 text-base md:text-sm"
                         value={detailEmail}
                         onChange={(e) => setDetailEmail(e.target.value)}
                         required
