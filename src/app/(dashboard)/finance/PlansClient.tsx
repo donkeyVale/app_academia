@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { Calendar as CalendarIcon } from 'lucide-react';
+import { Calendar as CalendarIcon, WalletCards, Receipt, Users, ClipboardList } from 'lucide-react';
 
 const iconColor = "#3cadaf";
 
@@ -699,7 +699,10 @@ export default function PlansClient() {
           className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
           onClick={() => setShowCreatePlan((v) => !v)}
         >
-          <span>Crear plan</span>
+          <span className="inline-flex items-center gap-2">
+            <WalletCards className="w-4 h-4 text-emerald-500" />
+            <span>Planes y precios</span>
+          </span>
           <span className="text-xs text-gray-500">{showCreatePlan ? '▼' : '▲'}</span>
         </button>
         {showCreatePlan && (
@@ -850,7 +853,10 @@ export default function PlansClient() {
         className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
         onClick={() => setShowPaymentsSection((v) => !v)}
       >
-        <span>Pagos</span>
+        <span className="inline-flex items-center gap-2">
+          <Receipt className="w-4 h-4 text-sky-500" />
+          <span>Pagos recientes y registro</span>
+        </span>
         <span className="text-xs text-gray-500">{showPaymentsSection ? '▼' : '▲'}</span>
       </button>
       {showPaymentsSection && (
@@ -908,7 +914,10 @@ export default function PlansClient() {
         className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
         onClick={() => setShowAssignPlan((v) => !v)}
       >
-        <span>Asignar plan y ver recientes</span>
+        <span className="inline-flex items-center gap-2">
+          <Users className="w-4 h-4 text-violet-500" />
+          <span>Planes asignados y saldos</span>
+        </span>
         <span className="text-xs text-gray-500">{showAssignPlan ? '▼' : '▲'}</span>
       </button>
       {showAssignPlan && (
@@ -1147,7 +1156,10 @@ export default function PlansClient() {
         className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
         onClick={() => setShowStudentSummary((v) => !v)}
       >
-        <span>Resumen por alumno</span>
+        <span className="inline-flex items-center gap-2">
+          <ClipboardList className="w-4 h-4 text-amber-500" />
+          <span>Resumen de uso por alumno</span>
+        </span>
         <span className="text-xs text-gray-500">{showStudentSummary ? '▼' : '▲'}</span>
       </button>
       {showStudentSummary && (
