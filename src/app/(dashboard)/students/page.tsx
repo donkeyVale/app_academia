@@ -341,7 +341,7 @@ export default function StudentsPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Nombre o nota del alumno"
-                className="h-9 text-sm"
+                className="h-10 text-base"
               />
             </div>
           )}
