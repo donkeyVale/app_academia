@@ -6,6 +6,7 @@ import { Users, UserPlus, ListChecks, Calendar as CalendarIcon } from 'lucide-re
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { toast } from 'sonner';
 
 const ROLES = ['admin', 'coach', 'student'] as const;
 
@@ -218,11 +219,14 @@ export default function UsersPage() {
 
       const json = await res.json();
       if (!res.ok) {
-        setError(json?.error ?? 'Error creando usuario.');
+        const message = json?.error ?? 'Error creando usuario.';
+        setError(message);
+        toast.error(message);
         return;
       }
 
       setSuccess('Usuario creado correctamente.');
+      toast.success('Usuario creado correctamente.');
       setFirstName('');
       setLastName('');
       setNationalId('');
@@ -244,7 +248,9 @@ export default function UsersPage() {
       setUsers((profilesRes.data ?? []) as UserRow[]);
       setUserRoles((rolesRes.data ?? []) as UserRolesRow[]);
     } catch (err: any) {
-      setError(err?.message ?? 'Error inesperado.');
+      const message = err?.message ?? 'Error inesperado.';
+      setError(message);
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -329,13 +335,18 @@ export default function UsersPage() {
       });
       const json = await res.json();
       if (!res.ok) {
-        setDetailError(json?.error ?? 'No se pudo actualizar el usuario.');
+        const message = json?.error ?? 'No se pudo actualizar el usuario.';
+        setDetailError(message);
+        toast.error(message);
         return;
       }
       await reloadUsersList();
       setDetailOpen(false);
+      toast.success('Usuario actualizado correctamente.');
     } catch (e: any) {
-      setDetailError(e?.message ?? 'Error inesperado actualizando el usuario.');
+      const message = e?.message ?? 'Error inesperado actualizando el usuario.';
+      setDetailError(message);
+      toast.error(message);
     } finally {
       setDetailSubmitting(false);
     }
@@ -355,13 +366,18 @@ export default function UsersPage() {
       });
       const json = await res.json();
       if (!res.ok) {
-        setDetailError(json?.error ?? 'No se pudo eliminar el usuario.');
+        const message = json?.error ?? 'No se pudo eliminar el usuario.';
+        setDetailError(message);
+        toast.error(message);
         return;
       }
       await reloadUsersList();
       setDetailOpen(false);
+      toast.success('Usuario eliminado correctamente.');
     } catch (e: any) {
-      setDetailError(e?.message ?? 'Error inesperado eliminando el usuario.');
+      const message = e?.message ?? 'Error inesperado eliminando el usuario.';
+      setDetailError(message);
+      toast.error(message);
     } finally {
       setDetailDeleting(false);
     }
