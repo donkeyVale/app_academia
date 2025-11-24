@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
 import { logAudit } from '@/lib/audit';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -326,7 +327,9 @@ export default function SchedulePage() {
     setError(null);
     try {
       if (!courtId || !coachId || !day || !time) {
-        setError('Completa cancha, fecha y hora, y profesor');
+        const msg = 'Completa cancha, fecha y hora, y profesor';
+        setError(msg);
+        toast.error(msg);
         setSaving(false);
         return;
       }
@@ -353,12 +356,16 @@ export default function SchedulePage() {
       }
 
       if (selectedStudents.length < 1) {
-        setError('Selecciona al menos 1 alumno (máximo 4).');
+        const msg = 'Selecciona al menos 1 alumno (máximo 4).';
+        setError(msg);
+        toast.error(msg);
         setSaving(false);
         return;
       }
       if (selectedStudents.length > 4) {
-        setError('Máximo 4 alumnos por clase.');
+        const msg = 'Máximo 4 alumnos por clase.';
+        setError(msg);
+        toast.error(msg);
         setSaving(false);
         return;
       }
@@ -411,8 +418,11 @@ export default function SchedulePage() {
       setCoachId('');
       setSelectedStudents([]);
       setNotes('');
+      toast.success('Clase creada correctamente');
     } catch (err: any) {
-      setError(err.message || 'Error creando la clase');
+      const msg = err.message || 'Error creando la clase';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -1038,7 +1048,7 @@ export default function SchedulePage() {
                                 const checked = selectedStudents.includes(id);
                                 const toggle = () => {
                                   if (!checked && selectedStudents.length >= 4) {
-                                    alert('Máximo 4 alumnos por clase');
+                                    toast.error('Máximo 4 alumnos por clase');
                                     return;
                                   }
                                   setSelectedStudents((prev) =>
@@ -1532,7 +1542,7 @@ export default function SchedulePage() {
                           if (!confirm('¿Cancelar y eliminar esta clase? Se eliminarán reservas y asistencias asociadas.')) return;
                           const { error: delErr } = await supabase.from('class_sessions').delete().eq('id', cls.id);
                           if (delErr) {
-                            alert('Error al cancelar: ' + delErr.message);
+                            toast.error('Error al cancelar: ' + delErr.message);
                             return;
                           }
                           await logAudit('delete', 'class_session', cls.id, {
@@ -1549,6 +1559,7 @@ export default function SchedulePage() {
                             delete n[cls.id];
                             return n;
                           });
+                          toast.success('Clase cancelada correctamente');
                         }}
                       >Cancelar</button>
                       <button

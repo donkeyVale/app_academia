@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { History, Users } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { createClientBrowser } from '@/lib/supabase';
 
 const iconColor = '#3cadaf';
@@ -46,6 +47,7 @@ export default function StudentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [students, setStudents] = useState<StudentRow[]>([]);
+  const [search, setSearch] = useState('');
   const [plansByStudent, setPlansByStudent] = useState<Record<string, StudentPlanRow | undefined>>({});
   const [planNamesById, setPlanNamesById] = useState<Record<string, string>>({});
   const [profilesByUser, setProfilesByUser] = useState<Record<string, ProfileRow | undefined>>({});
@@ -330,7 +332,19 @@ export default function StudentsPage() {
             {loading ? 'Cargando...' : `${students.length} alumno${students.length === 1 ? '' : 's'}`}
           </span>
         </div>
-        <div className="px-4 py-3">
+        <div className="px-4 py-3 space-y-3">
+          {!loading && students.length > 0 && (
+            <div className="max-w-xs">
+              <label className="block text-xs mb-1 text-gray-600">Buscar alumno</label>
+              <Input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Nombre o nota del alumno"
+                className="h-9 text-sm"
+              />
+            </div>
+          )}
           {loading ? (
             <p className="text-sm text-gray-600">Cargando alumnos...</p>
           ) : students.length === 0 ? (
@@ -346,7 +360,18 @@ export default function StudentsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {students.map((s) => {
+                  {students
+                    .filter((s) => {
+                      const term = search.trim().toLowerCase();
+                      if (!term) return true;
+                      const profile = s.user_id ? profilesByUser[s.user_id] : undefined;
+                      const name = profile?.full_name || '';
+                      const notes = s.notes || '';
+                      const level = s.level || '';
+                      const combined = `${name} ${notes} ${level}`.toLowerCase();
+                      return combined.includes(term);
+                    })
+                    .map((s) => {
                     const planInfo = plansByStudent[s.id];
                     const planId = planInfo?.plan_id ?? null;
                     const planName = planId ? planNamesById[planId] ?? '-' : '-';
