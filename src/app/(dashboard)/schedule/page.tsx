@@ -1002,8 +1002,8 @@ export default function SchedulePage() {
                         className="h-11 text-base"
                       />
                       <div className="max-h-52 overflow-auto border rounded-md divide-y">
-                        {students
-                          .filter((s) => {
+                        {(() => {
+                          const filtered = students.filter((s) => {
                             const t = (studentQuery || '').toLowerCase();
                             if (!t) return true;
                             const label =
@@ -1015,45 +1015,63 @@ export default function SchedulePage() {
                               ' ' +
                               s.id;
                             return label.toLowerCase().includes(t);
-                          })
-                          .map((s) => {
-                            const id = s.id;
-                            const checked = selectedStudents.includes(id);
-                            const toggle = () => {
-                              if (!checked && selectedStudents.length >= 4) {
-                                alert('Máximo 4 alumnos por clase');
-                                return;
-                              }
-                              setSelectedStudents((prev) =>
-                                checked
-                                  ? prev.filter((x) => x !== id)
-                                  : [...prev, id]
-                              );
-                            };
+                          });
+                          const limited = filtered.slice(0, 50);
+                          if (students.length === 0) {
                             return (
-                              <button
-                                key={id}
-                                type="button"
-                                onClick={toggle}
-                                className="w-full flex items-center justify-between px-2 py-1.5 text-sm hover:bg-slate-50"
-                              >
-                                <span className="truncate mr-2">
-                                  {s.full_name ?? s.notes ?? s.level ?? s.id}
-                                </span>
-                                <input
-                                  type="checkbox"
-                                  readOnly
-                                  checked={checked}
-                                  className="h-3.5 w-3.5 rounded border-gray-300"
-                                />
-                              </button>
+                              <div className="px-2 py-1.5 text-xs text-gray-500">
+                                No hay alumnos cargados.
+                              </div>
                             );
-                          })}
-                        {students.length === 0 && (
-                          <div className="px-2 py-1.5 text-xs text-gray-500">
-                            No hay alumnos cargados.
-                          </div>
-                        )}
+                          }
+                          if (filtered.length === 0) {
+                            return (
+                              <div className="px-2 py-1.5 text-xs text-gray-500">
+                                No se encontraron alumnos con ese criterio de búsqueda.
+                              </div>
+                            );
+                          }
+                          return (
+                            <>
+                              {limited.map((s) => {
+                                const id = s.id;
+                                const checked = selectedStudents.includes(id);
+                                const toggle = () => {
+                                  if (!checked && selectedStudents.length >= 4) {
+                                    alert('Máximo 4 alumnos por clase');
+                                    return;
+                                  }
+                                  setSelectedStudents((prev) =>
+                                    checked ? prev.filter((x) => x !== id) : [...prev, id]
+                                  );
+                                };
+                                return (
+                                  <button
+                                    key={id}
+                                    type="button"
+                                    onClick={toggle}
+                                    className="w-full flex items-center justify-between px-2 py-1.5 text-sm hover:bg-slate-50"
+                                  >
+                                    <span className="truncate mr-2">
+                                      {s.full_name ?? s.notes ?? s.level ?? s.id}
+                                    </span>
+                                    <input
+                                      type="checkbox"
+                                      readOnly
+                                      checked={checked}
+                                      className="h-3.5 w-3.5 rounded border-gray-300"
+                                    />
+                                  </button>
+                                );
+                              })}
+                              {filtered.length > limited.length && (
+                                <div className="px-2 py-1.5 text-[11px] text-gray-500 bg-slate-50">
+                                  Mostrando los primeros {limited.length} alumnos. Refiná la búsqueda para ver otros.
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                       <p className="text-[11px] text-gray-500">
                         Podés seleccionar entre 1 y 4 alumnos. Se crearán reservas para los alumnos
@@ -1443,7 +1461,9 @@ export default function SchedulePage() {
         {loading ? (
           <p className="text-sm text-gray-600">Cargando clases...</p>
         ) : filteredClasses.length === 0 ? (
-          <p className="text-sm text-gray-600">No hay clases programadas.</p>
+          <p className="text-sm text-gray-600">
+            No hay clases programadas para los filtros seleccionados. Probá quitar o cambiar los filtros.
+          </p>
         ) : (
           <>
           <ul className="space-y-3 max-w-full">
