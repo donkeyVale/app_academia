@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { History } from 'lucide-react';
 import { createClientBrowser } from '@/lib/supabase';
 
 const iconColor = '#3cadaf';
@@ -396,7 +397,10 @@ export default function StudentsPage() {
           <div className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-lg bg-white shadow-xl border border-slate-200">
             <div className="flex items-center justify-between border-b px-4 pt-4 pb-3">
               <div className="space-y-0.5">
-                <h2 className="text-base font-semibold text-[#31435d]">Historial de clases</h2>
+                <div className="flex items-center gap-2">
+                  <History className="h-4 w-4 text-[#3cadaf]" />
+                  <h2 className="text-base font-semibold text-[#31435d]">Historial de clases</h2>
+                </div>
                 <p className="text-xs text-gray-500">{historyStudent.name}</p>
               </div>
               <button
