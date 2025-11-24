@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
+import { Users } from 'lucide-react';
 
 const ROLES = ['admin', 'coach', 'student'] as const;
 const iconColor = "#3cadaf";
@@ -181,7 +182,10 @@ export default function UsersPage() {
   if (forbidden) {
     return (
       <section className="w-full max-w-5xl mx-auto px-4 py-6 space-y-4">
-        <h1 className="text-2xl font-semibold text-[#31435d]">Usuarios</h1>
+        <div className="flex items-center gap-2">
+          <Users className="h-5 w-5 text-[#3cadaf]" />
+          <h1 className="text-2xl font-semibold text-[#31435d]">Usuarios</h1>
+        </div>
         <p className="text-sm text-red-600">Solo administradores pueden acceder a este módulo.</p>
       </section>
     );
@@ -191,7 +195,7 @@ export default function UsersPage() {
     <section className="w-full max-w-5xl mx-auto px-4 py-6 space-y-6">
       <div>
         <div className="flex items-center gap-2 mb-1">
-          <IconUsers />
+          <Users className="h-5 w-5 text-[#3cadaf]" />
           <h1 className="text-2xl font-semibold text-[#31435d]">Usuarios</h1>
         </div>
         <p className="text-sm text-gray-600">
