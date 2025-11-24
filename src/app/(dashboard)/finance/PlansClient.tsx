@@ -110,6 +110,7 @@ export default function PlansClient() {
   const [recentPlansSearch, setRecentPlansSearch] = useState('');
   const [reportStudentSearch, setReportStudentSearch] = useState('');
   const [assignStudentQuery, setAssignStudentQuery] = useState('');
+  const [assignStudentOpen, setAssignStudentOpen] = useState(false);
 
   // Edición de plan existente
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
@@ -127,6 +128,8 @@ export default function PlansClient() {
   const [paymentNotes, setPaymentNotes] = useState('');
   const [paymentStatus, setPaymentStatus] = useState<'pagado' | 'pendiente'>('pagado');
   const [paymentStudentSearch, setPaymentStudentSearch] = useState('');
+  const [reportStudentOpen, setReportStudentOpen] = useState(false);
+  const [paymentStudentOpen, setPaymentStudentOpen] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -859,9 +862,15 @@ export default function PlansClient() {
                   className="border rounded px-3 w-full h-10 text-base md:text-sm"
                   placeholder="Escribe para buscar alumno"
                   value={assignStudentQuery}
-                  onChange={(e) => setAssignStudentQuery(e.target.value)}
+                  onChange={(e) => {
+                    setAssignStudentQuery(e.target.value);
+                    setAssignStudentOpen(true);
+                  }}
+                  onFocus={() => {
+                    if (assignStudentQuery.trim().length > 0) setAssignStudentOpen(true);
+                  }}
                 />
-                {assignStudentQuery.trim().length > 0 && (
+                {assignStudentOpen && assignStudentQuery.trim().length > 0 && (
                   <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border bg-white shadow-sm text-sm">
                     {students
                       .filter((s) => {
@@ -879,6 +888,7 @@ export default function PlansClient() {
                             onClick={() => {
                               setSelectedStudentId(s.id);
                               setAssignStudentQuery(displayName || '');
+                              setAssignStudentOpen(false);
                             }}
                           >
                             {displayName}
@@ -1091,9 +1101,15 @@ export default function PlansClient() {
                   className="border rounded px-3 w-full h-10 text-base md:text-sm"
                   placeholder="Escribe para buscar alumno"
                   value={reportStudentSearch}
-                  onChange={(e) => setReportStudentSearch(e.target.value)}
+                  onChange={(e) => {
+                    setReportStudentSearch(e.target.value);
+                    setReportStudentOpen(true);
+                  }}
+                  onFocus={() => {
+                    if (reportStudentSearch.trim().length > 0) setReportStudentOpen(true);
+                  }}
                 />
-                {reportStudentSearch.trim().length > 0 && (
+                {reportStudentOpen && reportStudentSearch.trim().length > 0 && (
                   <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border bg-white shadow-sm text-sm">
                     {students
                       .filter((s) => {
@@ -1111,6 +1127,7 @@ export default function PlansClient() {
                             onClick={() => {
                               setReportStudentId(s.id);
                               setReportStudentSearch(displayName || '');
+                              setReportStudentOpen(false);
                             }}
                           >
                             {displayName}
@@ -1197,9 +1214,15 @@ export default function PlansClient() {
                   className="border rounded px-3 w-full h-10 text-base md:text-sm"
                   placeholder="Escribe para buscar alumno"
                   value={paymentStudentSearch}
-                  onChange={(e) => setPaymentStudentSearch(e.target.value)}
+                  onChange={(e) => {
+                    setPaymentStudentSearch(e.target.value);
+                    setPaymentStudentOpen(true);
+                  }}
+                  onFocus={() => {
+                    if (paymentStudentSearch.trim().length > 0) setPaymentStudentOpen(true);
+                  }}
                 />
-                {paymentStudentSearch.trim().length > 0 && (
+                {paymentStudentOpen && paymentStudentSearch.trim().length > 0 && (
                   <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border bg-white shadow-sm text-sm">
                     {students
                       .filter((s) => {
@@ -1218,6 +1241,7 @@ export default function PlansClient() {
                               setPaymentStudentId(s.id);
                               setPaymentStudentPlanId('');
                               setPaymentStudentSearch(displayName || '');
+                              setPaymentStudentOpen(false);
                             }}
                           >
                             {displayName}
