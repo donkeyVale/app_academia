@@ -1594,7 +1594,7 @@ export default function SchedulePage() {
             className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
             onClick={() => setShowRecentSection((v) => !v)}
           >
-            <span className="inline-flex items-center gap-2 font-semibold text-[#31435d]">
+            <span className="inline-flex items-center gap-2 text-[#31435d]">
               <CalendarDays className="h-4 w-4 text-[#3cadaf]" />
               Clases recientes (últimas 6 horas)
             </span>
@@ -1608,12 +1608,12 @@ export default function SchedulePage() {
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.18, ease: 'easeOut' }}
-                className="p-4 space-y-3 origin-top max-w-full"
+                className="p-4 space-y-4 origin-top"
               >
                 <p className="text-xs text-gray-500">
                   Usá esta lista para marcar asistencia en clases que ya terminaron pero aún son recientes (últimas 6 horas).
                 </p>
-                <ul className="space-y-3 max-w-full">
+                <ul className="space-y-3">
                 {(showAllRecent ? recentClasses : recentClasses.slice(0, 5)).map((cls) => {
                   const d = new Date(cls.date);
                   const yyyy = d.getFullYear();
