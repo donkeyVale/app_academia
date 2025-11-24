@@ -108,6 +108,8 @@ export default function PlansClient() {
   const [showStudentSummary, setShowStudentSummary] = useState(false);
   const [showPaymentsSection, setShowPaymentsSection] = useState(false);
   const [recentPlansSearch, setRecentPlansSearch] = useState('');
+  const [assignStudentSearch, setAssignStudentSearch] = useState('');
+  const [reportStudentSearch, setReportStudentSearch] = useState('');
 
   // Edición de plan existente
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
@@ -124,6 +126,7 @@ export default function PlansClient() {
   const [paymentMethod, setPaymentMethod] = useState('efectivo');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [paymentStatus, setPaymentStatus] = useState<'pagado' | 'pendiente'>('pagado');
+  const [paymentStudentSearch, setPaymentStudentSearch] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -849,14 +852,29 @@ export default function PlansClient() {
           <h2 className="text-lg font-semibold mb-2">Asignar plan a alumno</h2>
           <form onSubmit={onAssignPlan} className="grid gap-3 max-w-xl">
             <div>
+              <label className="block text-xs mb-1 text-gray-600">Buscar jugador</label>
+              <input
+                type="text"
+                className="mb-2 border rounded px-3 w-full h-10 text-base md:text-sm"
+                placeholder="Ej.: Juan Pérez, nivel, notas"
+                value={assignStudentSearch}
+                onChange={(e) => setAssignStudentSearch(e.target.value)}
+              />
               <label className="block text-sm mb-1">Alumno</label>
               <select
-                className="border rounded p-2 w-full"
+                className="border rounded px-3 w-full h-10 text-base md:text-sm"
                 value={selectedStudentId}
                 onChange={(e) => setSelectedStudentId(e.target.value)}
               >
                 <option value="">Selecciona un alumno</option>
-                {students.map((s) => (
+                {students
+                  .filter((s) => {
+                    if (!assignStudentSearch.trim()) return true;
+                    const term = assignStudentSearch.toLowerCase();
+                    const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
+                    return displayName.includes(term);
+                  })
+                  .map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.full_name ?? s.notes ?? s.level ?? s.id}
                   </option>
@@ -966,7 +984,7 @@ export default function PlansClient() {
                   <label className="block text-xs mb-1 text-gray-600">Buscar por alumno o plan</label>
                   <input
                     type="text"
-                    className="border rounded p-2 w-full text-base md:text-sm"
+                    className="border rounded px-3 w-full h-10 text-base md:text-sm"
                     placeholder="Ej.: Juan Pérez o Plan Adultos"
                     value={recentPlansSearch}
                     onChange={(e) => setRecentPlansSearch(e.target.value)}
@@ -1051,14 +1069,29 @@ export default function PlansClient() {
           <h2 className="text-lg font-semibold mb-2">Resumen por alumno</h2>
           <form onSubmit={onLoadReport} className="grid gap-3 max-w-xl mb-4">
             <div>
+              <label className="block text-xs mb-1 text-gray-600">Buscar jugador</label>
+              <input
+                type="text"
+                className="mb-2 border rounded px-3 w-full h-10 text-base md:text-sm"
+                placeholder="Ej.: Juan Pérez, nivel, notas"
+                value={reportStudentSearch}
+                onChange={(e) => setReportStudentSearch(e.target.value)}
+              />
               <label className="block text-sm mb-1">Alumno</label>
               <select
-                className="border rounded p-2 w-full"
+                className="border rounded px-3 w-full h-10 text-base md:text-sm"
                 value={reportStudentId}
                 onChange={(e) => setReportStudentId(e.target.value)}
               >
                 <option value="">Selecciona un alumno</option>
-                {students.map((s) => (
+                {students
+                  .filter((s) => {
+                    if (!reportStudentSearch.trim()) return true;
+                    const term = reportStudentSearch.toLowerCase();
+                    const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
+                    return displayName.includes(term);
+                  })
+                  .map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.full_name ?? s.notes ?? s.level ?? s.id}
                   </option>
@@ -1070,7 +1103,7 @@ export default function PlansClient() {
                 <label className="block text-sm mb-1">Desde</label>
                 <input
                   type="date"
-                  className="border rounded p-2 w-full"
+                  className="border rounded px-3 w-full h-10 text-base md:text-sm"
                   value={reportFrom}
                   onChange={(e) => setReportFrom(e.target.value)}
                 />
@@ -1079,7 +1112,7 @@ export default function PlansClient() {
                 <label className="block text-sm mb-1">Hasta</label>
                 <input
                   type="date"
-                  className="border rounded p-2 w-full"
+                  className="border rounded px-3 w-full h-10 text-base md:text-sm"
                   value={reportTo}
                   onChange={(e) => setReportTo(e.target.value)}
                 />
@@ -1127,6 +1160,14 @@ export default function PlansClient() {
           </div>
           <form onSubmit={onCreatePayment} className="px-4 py-3 overflow-y-auto text-sm space-y-3">
             <div>
+              <label className="block text-xs mb-1 text-gray-600">Buscar jugador</label>
+              <input
+                type="text"
+                className="mb-2 border rounded px-3 w-full h-10 text-base md:text-sm"
+                placeholder="Ej.: Juan Pérez, nivel, notas"
+                value={paymentStudentSearch}
+                onChange={(e) => setPaymentStudentSearch(e.target.value)}
+              />
               <label className="block text-sm mb-1">Alumno</label>
               <select
                 className="border rounded p-2 w-full text-base md:text-sm"
@@ -1138,7 +1179,14 @@ export default function PlansClient() {
                 }}
               >
                 <option value="">Selecciona un alumno</option>
-                {students.map((s) => (
+                {students
+                  .filter((s) => {
+                    if (!paymentStudentSearch.trim()) return true;
+                    const term = paymentStudentSearch.toLowerCase();
+                    const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
+                    return displayName.includes(term);
+                  })
+                  .map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.full_name ?? s.notes ?? s.level ?? s.id}
                   </option>
@@ -1200,7 +1248,7 @@ export default function PlansClient() {
                 <label className="block text-sm mb-1">Fecha de pago</label>
                 <input
                   type="date"
-                  className="border rounded p-2 w-full text-base md:text-sm"
+                  className="border rounded px-3 w-full h-10 text-base md:text-sm"
                   value={paymentDate}
                   onChange={(e) => setPaymentDate(e.target.value)}
                 />
