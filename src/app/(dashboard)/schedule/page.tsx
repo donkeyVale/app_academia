@@ -836,19 +836,19 @@ export default function SchedulePage() {
   };
 
   return (
-    <section className="space-y-6 py-4 overflow-x-hidden">
+    <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4 overflow-x-hidden">
       <div className="flex items-center gap-2">
         <IconCalendar />
         <h1 className="text-2xl font-semibold text-[#31435d]">Agenda</h1>
       </div>
 
-      <div className="border rounded-lg bg-white shadow-sm border-t-4 border-[#3cadaf]">
+      <div className="border rounded-lg bg-white shadow-sm">
         <button
           type="button"
           className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
           onClick={() => setShowCreateSection((v) => !v)}
         >
-          <span className="inline-flex items-center gap-2 font-semibold text-[#31435d]">
+          <span className="inline-flex items-center gap-2 text-[#31435d]">
             <Clock className="w-4 h-4 text-[#3cadaf]" />
             Crear clase
           </span>
@@ -1090,13 +1090,13 @@ export default function SchedulePage() {
         </AnimatePresence>
       </div>
 
-      <div className="border rounded-lg bg-white shadow-sm overflow-x-hidden">
+      <div className="border rounded-lg bg-white shadow-sm overflow-hidden">
         <button
           type="button"
           className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
           onClick={() => setShowUpcomingSection((v) => !v)}
         >
-          <span className="inline-flex items-center gap-2 font-semibold text-[#31435d]">
+          <span className="inline-flex items-center gap-2 text-[#31435d]">
             <CalendarDays className="w-4 h-4 text-[#3cadaf]" />
             Próximas clases
           </span>
