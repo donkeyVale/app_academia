@@ -691,13 +691,9 @@ export default function PlansClient() {
   };
 
   return (
-    <section className="mt-4 space-y-6">
-      <div className="flex items-center gap-2">
-        <IconMoney />
-        <h1 className="text-2xl font-semibold text-[#31435d]">Finanzas / Planes</h1>
-      </div>
+    <div className="space-y-6">
 
-      <div className="border rounded-lg bg-white shadow-sm border-t-4 border-[#3cadaf]">
+      <div className="border rounded-lg bg-white shadow-sm">
         <button
           type="button"
           className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
@@ -1428,6 +1424,6 @@ export default function PlansClient() {
         </div>
       </div>
     )}
-    </section>
+    </div>
   );
 }

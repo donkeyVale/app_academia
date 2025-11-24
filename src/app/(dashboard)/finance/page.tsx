@@ -13,11 +13,6 @@ export default function FinancePage() {
           <p className="text-sm text-gray-600">Gestión de planes, saldos y pagos.</p>
         </div>
       </div>
-      <ul className="list-disc pl-6 text-sm text-gray-700">
-        <li>Registro manual de pagos (pendiente)</li>
-        <li>Planes/bonos y saldo</li>
-        <li>Reportes simples (CSV) (pendiente)</li>
-      </ul>
       <PlansClient />
     </section>
   );
