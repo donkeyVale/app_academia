@@ -3,6 +3,10 @@
 import { useEffect, useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Calendar as CalendarIcon } from 'lucide-react';
 
 const iconColor = "#3cadaf";
 
@@ -19,6 +23,67 @@ const IconMoney = (props: React.SVGProps<SVGSVGElement>) => (
     <path d="M16 15h2" stroke={iconColor} strokeWidth="1.6" />
   </svg>
 );
+
+type DatePickerFieldProps = {
+  value: string;
+  onChange: (value: string) => void;
+};
+
+function parseYmd(value: string): Date | undefined {
+  if (!value) return undefined;
+  const parts = value.split('-');
+  if (parts.length !== 3) return undefined;
+  const [y, m, d] = parts.map((p) => Number(p));
+  if (!y || !m || !d) return undefined;
+  const date = new Date(y, m - 1, d);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date;
+}
+
+function formatYmd(date: Date | undefined): string {
+  if (!date) return '';
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function formatDisplay(date: Date | undefined): string {
+  if (!date) return 'Seleccionar fecha';
+  return date.toLocaleDateString('es-PY');
+}
+
+function DatePickerField({ value, onChange }: DatePickerFieldProps) {
+  const selectedDate = parseYmd(value);
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full justify-start text-left text-sm font-normal flex items-center gap-2 h-10"
+        >
+          <CalendarIcon className="h-4 w-4 text-gray-500" />
+          <span className={selectedDate ? '' : 'text-gray-400'}>
+            {formatDisplay(selectedDate)}
+          </span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={selectedDate}
+          onSelect={(date) => {
+            if (!date) return;
+            onChange(formatYmd(date));
+          }}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 type Plan = {
   id: string;
@@ -1148,21 +1213,11 @@ export default function PlansClient() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm mb-1">Desde</label>
-                <input
-                  type="date"
-                  className="border rounded px-3 w-full h-10 text-base md:text-sm"
-                  value={reportFrom}
-                  onChange={(e) => setReportFrom(e.target.value)}
-                />
+                <DatePickerField value={reportFrom} onChange={setReportFrom} />
               </div>
               <div>
                 <label className="block text-sm mb-1">Hasta</label>
-                <input
-                  type="date"
-                  className="border rounded px-3 w-full h-10 text-base md:text-sm"
-                  value={reportTo}
-                  onChange={(e) => setReportTo(e.target.value)}
-                />
+                <DatePickerField value={reportTo} onChange={setReportTo} />
               </div>
             </div>
             <button
@@ -1312,12 +1367,7 @@ export default function PlansClient() {
               </div>
               <div>
                 <label className="block text-sm mb-1">Fecha de pago</label>
-                <input
-                  type="date"
-                  className="border rounded px-3 w-full h-10 text-base md:text-sm"
-                  value={paymentDate}
-                  onChange={(e) => setPaymentDate(e.target.value)}
-                />
+                <DatePickerField value={paymentDate} onChange={setPaymentDate} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
