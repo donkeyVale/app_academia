@@ -198,6 +198,15 @@ export default function UsersPage() {
     e.preventDefault();
     setError(null);
     setSuccess(null);
+
+    // Validaciones de campos obligatorios al crear usuario
+    if (!nationalId.trim() || !phone.trim() || !email.trim() || !birthDate.trim()) {
+      const message = 'Completá número de documento, teléfono, correo y fecha de nacimiento.';
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
     setSubmitting(true);
 
     try {
