@@ -107,6 +107,21 @@ export default function UsersPage() {
   const [showCreateUser, setShowCreateUser] = useState(true);
   const [showUsersList, setShowUsersList] = useState(false);
 
+  // Modal de detalle/edición de usuario
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [detailSubmitting, setDetailSubmitting] = useState(false);
+  const [detailDeleting, setDetailDeleting] = useState(false);
+  const [detailUserId, setDetailUserId] = useState<string | null>(null);
+  const [detailFirstName, setDetailFirstName] = useState('');
+  const [detailLastName, setDetailLastName] = useState('');
+  const [detailNationalId, setDetailNationalId] = useState('');
+  const [detailPhone, setDetailPhone] = useState('+595');
+  const [detailEmail, setDetailEmail] = useState('');
+  const [detailBirthDate, setDetailBirthDate] = useState('');
+  const [detailRoles, setDetailRoles] = useState<Role[]>([]);
+
   useEffect(() => {
     let active = true;
     (async () => {
@@ -157,6 +172,16 @@ export default function UsersPage() {
 
   const toggleRole = (role: Role) => {
     setSelectedRoles((prev) => {
+      if (prev.includes(role)) {
+        const next = prev.filter((r) => r !== role);
+        return next.length === 0 ? prev : next;
+      }
+      return [...prev, role];
+    });
+  };
+
+  const toggleDetailRole = (role: Role) => {
+    setDetailRoles((prev) => {
       if (prev.includes(role)) {
         const next = prev.filter((r) => r !== role);
         return next.length === 0 ? prev : next;
@@ -226,6 +251,117 @@ export default function UsersPage() {
     return userRoles
       .filter((r) => r.user_id === userId)
       .map((r) => r.role);
+  };
+
+  const reloadUsersList = async () => {
+    const [profilesRes, rolesRes] = await Promise.all([
+      supabase.from('profiles').select('id, full_name, role'),
+      supabase.from('user_roles').select('user_id, role'),
+    ]);
+
+    if (profilesRes.error || rolesRes.error) {
+      return;
+    }
+
+    setUsers((profilesRes.data ?? []) as UserRow[]);
+    setUserRoles((rolesRes.data ?? []) as UserRolesRow[]);
+  };
+
+  const openUserDetail = async (userId: string) => {
+    setDetailOpen(true);
+    setDetailLoading(true);
+    setDetailError(null);
+    setDetailSubmitting(false);
+    setDetailDeleting(false);
+    try {
+      const res = await fetch('/api/admin/get-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setDetailError(json?.error ?? 'No se pudo cargar el usuario.');
+        return;
+      }
+      const u = json.user as any;
+      setDetailUserId(u.id as string);
+      const fullName = (u.full_name as string | null) ?? '';
+      const [fn, ...rest] = fullName.split(' ');
+      setDetailFirstName((u.firstName as string | null) ?? fn ?? '');
+      setDetailLastName((u.lastName as string | null) ?? rest.join(' ') ?? '');
+      setDetailNationalId((u.nationalId as string | null) ?? '');
+      setDetailPhone(((u.metaPhone as string | null) ?? u.phone ?? '+595') || '+595');
+      setDetailEmail((u.email as string | null) ?? '');
+      setDetailBirthDate((u.birthDate as string | null) ?? '');
+      const roles: string[] = (u.roles as string[] | undefined) ?? [];
+      const validRoles = roles.filter((r) => (ROLES as readonly string[]).includes(r)) as Role[];
+      setDetailRoles(validRoles.length ? validRoles : ['student']);
+    } catch (e: any) {
+      setDetailError(e?.message ?? 'Error inesperado cargando el usuario.');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!detailUserId) return;
+    setDetailError(null);
+    setDetailSubmitting(true);
+    try {
+      const res = await fetch('/api/admin/update-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: detailUserId,
+          firstName: detailFirstName,
+          lastName: detailLastName,
+          nationalId: detailNationalId,
+          phone: detailPhone,
+          email: detailEmail,
+          birthDate: detailBirthDate,
+          roles: detailRoles,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setDetailError(json?.error ?? 'No se pudo actualizar el usuario.');
+        return;
+      }
+      await reloadUsersList();
+      setDetailOpen(false);
+    } catch (e: any) {
+      setDetailError(e?.message ?? 'Error inesperado actualizando el usuario.');
+    } finally {
+      setDetailSubmitting(false);
+    }
+  };
+
+  const handleDeleteUser = async () => {
+    if (!detailUserId) return;
+    const confirmDelete = window.confirm('¿Eliminar este usuario? Esta acción no se puede deshacer.');
+    if (!confirmDelete) return;
+    setDetailError(null);
+    setDetailDeleting(true);
+    try {
+      const res = await fetch('/api/admin/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: detailUserId }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        setDetailError(json?.error ?? 'No se pudo eliminar el usuario.');
+        return;
+      }
+      await reloadUsersList();
+      setDetailOpen(false);
+    } catch (e: any) {
+      setDetailError(e?.message ?? 'Error inesperado eliminando el usuario.');
+    } finally {
+      setDetailDeleting(false);
+    }
   };
 
   if (forbidden) {
@@ -397,7 +533,11 @@ export default function UsersPage() {
                     {users.map((u) => {
                       const allRoles = rolesForUser(u.id);
                       return (
-                        <tr key={u.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                        <tr
+                          key={u.id}
+                          className="border-b last:border-b-0 hover:bg-gray-50 cursor-pointer"
+                          onClick={() => openUserDetail(u.id)}
+                        >
                           <td className="py-2 px-3 whitespace-nowrap">{u.full_name ?? '(Sin nombre)'}</td>
                           <td className="py-2 px-3 whitespace-nowrap">{u.role}</td>
                           <td className="py-2 px-3 text-xs text-gray-700">{allRoles.join(', ') || '-'}</td>
@@ -411,6 +551,124 @@ export default function UsersPage() {
           </div>
         )}
       </div>
+      {detailOpen && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white w-full max-w-md rounded-lg shadow-lg flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b">
+              <h2 className="text-lg font-semibold text-[#31435d]">Detalle de usuario</h2>
+              <button
+                type="button"
+                className="text-xs text-gray-500 hover:text-gray-700"
+                onClick={() => setDetailOpen(false)}
+              >
+                Cerrar
+              </button>
+            </div>
+            <div className="px-4 py-3 overflow-y-auto text-sm space-y-3">
+              {detailLoading ? (
+                <p className="text-sm text-gray-600">Cargando usuario...</p>
+              ) : (
+                <form onSubmit={handleUpdateUser} className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm mb-1">Nombre</label>
+                      <input
+                        className="border rounded p-2 w-full"
+                        value={detailFirstName}
+                        onChange={(e) => setDetailFirstName(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm mb-1">Apellido</label>
+                      <input
+                        className="border rounded p-2 w-full"
+                        value={detailLastName}
+                        onChange={(e) => setDetailLastName(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm mb-1">N° de cédula</label>
+                      <input
+                        className="border rounded p-2 w-full"
+                        value={detailNationalId}
+                        onChange={(e) => setDetailNationalId(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm mb-1">Teléfono (+595...)</label>
+                      <input
+                        className="border rounded p-2 w-full"
+                        value={detailPhone}
+                        onChange={(e) => setDetailPhone(e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm mb-1">Correo electrónico</label>
+                      <input
+                        type="email"
+                        className="border rounded p-2 w-full"
+                        value={detailEmail}
+                        onChange={(e) => setDetailEmail(e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm mb-1">Fecha de nacimiento</label>
+                      <DatePickerField value={detailBirthDate} onChange={setDetailBirthDate} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm mb-1">Roles</label>
+                    <div className="flex flex-wrap gap-3 text-sm">
+                      {ROLES.map((role) => (
+                        <label key={role} className="inline-flex items-center gap-1">
+                          <input
+                            type="checkbox"
+                            checked={detailRoles.includes(role)}
+                            onChange={() => toggleDetailRole(role)}
+                          />
+                          <span>{role}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {detailError && <p className="text-sm text-red-600">{detailError}</p>}
+
+                  <div className="flex justify-between items-center gap-2 pt-2 border-t mt-2">
+                    <button
+                      type="button"
+                      className="px-3 py-2 border rounded text-xs text-red-600 border-red-200 hover:bg-red-50"
+                      onClick={handleDeleteUser}
+                      disabled={detailDeleting || detailSubmitting}
+                    >
+                      {detailDeleting ? 'Eliminando...' : 'Eliminar usuario'}
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-3 py-2 bg-[#3cadaf] hover:bg-[#31435d] text-white rounded text-xs disabled:opacity-50"
+                      disabled={detailSubmitting || detailDeleting}
+                    >
+                      {detailSubmitting ? 'Guardando cambios...' : 'Guardar cambios'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
