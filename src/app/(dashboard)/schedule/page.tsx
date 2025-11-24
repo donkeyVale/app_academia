@@ -1591,10 +1591,13 @@ export default function SchedulePage() {
         <div className="border rounded-lg bg-white shadow-sm overflow-x-hidden max-w-full">
           <button
             type="button"
-            className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+            className="flex w-full items-center justify-between rounded-t-lg bg-gray-50 px-4 py-2 text-left text-sm font-medium hover:bg-gray-100"
             onClick={() => setShowRecentSection((v) => !v)}
           >
-            <span className="font-semibold">Clases recientes (últimas 6 horas)</span>
+            <span className="inline-flex items-center gap-2 font-semibold text-[#31435d]">
+              <CalendarDays className="h-4 w-4 text-[#3cadaf]" />
+              Clases recientes (últimas 6 horas)
+            </span>
             <span className="text-xs text-gray-500">{showRecentSection ? '▼' : '▲'}</span>
           </button>
           {showRecentSection && (
@@ -1602,7 +1605,7 @@ export default function SchedulePage() {
               <p className="text-xs text-gray-500">
                 Usá esta lista para marcar asistencia en clases que ya terminaron pero aún son recientes (últimas 6 horas).
               </p>
-              <ul className="space-y-3">
+              <ul className="space-y-3 max-w-full">
                 {(showAllRecent ? recentClasses : recentClasses.slice(0, 5)).map((cls) => {
                   const d = new Date(cls.date);
                   const yyyy = d.getFullYear();
@@ -1612,27 +1615,30 @@ export default function SchedulePage() {
                   const min = String(d.getMinutes()).padStart(2, '0');
                   const court = cls.court_id ? courtsMap[cls.court_id] : undefined;
                   const studentIds = studentsByClass[cls.id] ?? [];
-                  const studentsCountLabel = studentIds.length === 0
-                    ? '-'
-                    : `${studentIds.length}`;
+                  const studentsCountLabel = studentIds.length === 0 ? '-' : `${studentIds.length}`;
                   return (
-                    <li key={cls.id} className="border rounded-lg p-3 bg-white shadow-sm text-xs sm:text-sm">
-                      <div className="flex flex-col sm:flex-row justify-between gap-2">
-                        <div className="space-y-0.5">
-                          <div className="font-semibold text-[#31435d]">
-                            <span className="font-bold">Fecha y hora:</span> {`${dd}/${mm}/${yyyy}`} • {`${hh}:${min}`}
-                          </div>
-                          <div className="text-gray-600">
-                            <span className="font-bold">Cancha:</span> {court?.name ?? '-'}
-                          </div>
-                          <div className="text-gray-600">
-                            <span className="font-bold">Alumnos:</span> {studentsCountLabel}
+                    <li
+                      key={cls.id}
+                      className="max-w-full overflow-hidden rounded-lg border bg-white p-3 text-xs shadow-sm transition hover:border-[#dbeafe] hover:shadow-md sm:text-sm"
+                    >
+                      <div className="flex max-w-full flex-col items-start justify-between gap-2 sm:flex-row">
+                        <div className="min-w-0 space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="inline-flex items-center rounded-full bg-[#e0f2fe] px-2 py-0.5 text-[11px] font-medium text-[#075985]">
+                              {dd}/{mm}/{yyyy} • {hh}:{min}
+                            </span>
+                            <span className="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200">
+                              Cancha: {court?.name ?? '-'}
+                            </span>
+                            <span className="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200">
+                              Alumnos: {studentsCountLabel}
+                            </span>
                           </div>
                         </div>
-                        <div className="sm:self-center">
+                        <div className="flex w-full items-center justify-start gap-2 sm:w-auto sm:justify-end">
                           <button
                             type="button"
-                            className="text-xs px-3 py-1 rounded bg-[#3cadaf] text-white hover:bg-[#31435d]"
+                            className="text-[11px] px-3 py-1 rounded bg-[#3cadaf] text-white hover:bg-[#31435d] sm:text-xs"
                             onClick={() => openAttendance(cls)}
                           >
                             Asistencia
@@ -1645,9 +1651,7 @@ export default function SchedulePage() {
               </ul>
               {recentClasses.length > 5 && (
                 <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
-                  {!showAllRecent && (
-                    <p>Mostrando las 5 clases recientes más cercanas.</p>
-                  )}
+                  {!showAllRecent && <p>Mostrando las 5 clases recientes más cercanas.</p>}
                   <button
                     type="button"
                     className="text-[#3cadaf] hover:underline"

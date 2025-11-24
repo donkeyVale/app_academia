@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Menu, X, CalendarDays, Users, CreditCard, UserCog, BarChart3, LogOut } from 'lucide-react';
 import LogoutButton from '@/components/LogoutButton';
 
 const iconColor = '#3cadaf';
@@ -82,68 +84,84 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-dvh grid grid-rows-[auto,1fr] bg-gray-50">
       <header className="border-b bg-white">
-        <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
-          <Link href="/" className="font-semibold">
+        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-4">
+          <Link href="/" className="font-semibold text-[#31435d]">
             Inicio
           </Link>
           <button
             type="button"
-            className="border rounded px-3 py-2 text-sm flex flex-col justify-center items-center gap-0.5"
+            className="flex items-center justify-center rounded-full border border-gray-300 bg-white px-2.5 py-2 text-xs shadow-sm transition-all hover:border-[#3cadaf]/70 hover:shadow-md"
             onClick={() => setMenuOpen((v) => !v)}
-            aria-label="Abrir menú"
+            aria-label={menuOpen ? 'Cerrar menú principal' : 'Abrir menú principal'}
           >
-            <span className="block w-5 h-0.5 bg-black" />
-            <span className="block w-5 h-0.5 bg-black" />
-            <span className="block w-5 h-0.5 bg-black" />
+            {menuOpen ? (
+              <X className="h-4 w-4 text-[#31435d]" />
+            ) : (
+              <Menu className="h-4 w-4 text-[#31435d]" />
+            )}
           </button>
         </div>
-        {menuOpen && (
-          <nav className="max-w-5xl mx-auto px-4 pb-3 flex flex-col gap-2 text-sm bg-white">
-            <Link
-              href="/schedule"
-              onClick={() => setMenuOpen(false)}
-              className="underline flex items-center gap-2"
+
+        <AnimatePresence initial={false}>
+          {menuOpen && (
+            <motion.nav
+              key="dashboard-main-menu"
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              className="mx-auto mt-1 flex w-full max-w-[220px] origin-top-right flex-col gap-1 rounded-xl border border-[#dbeafe] bg-[#f1f5f9] px-3 py-2 text-sm shadow-md"
             >
-              <IconCalendar />
-              <span>Agenda</span>
-            </Link>
-            <Link
-              href="/students"
-              onClick={() => setMenuOpen(false)}
-              className="underline flex items-center gap-2"
-            >
-              <IconStudents />
-              <span>Alumnos</span>
-            </Link>
-            <Link
-              href="/finance"
-              onClick={() => setMenuOpen(false)}
-              className="underline flex items-center gap-2"
-            >
-              <IconMoney />
-              <span>Finanzas</span>
-            </Link>
-            <Link
-              href="/users"
-              onClick={() => setMenuOpen(false)}
-              className="underline flex items-center gap-2"
-            >
-              <IconUsers />
-              <span>Usuarios</span>
-            </Link>
-            <Link
-              href="/reports"
-              onClick={() => setMenuOpen(false)}
-              className="underline flex items-center gap-2"
-            >
-              <IconReport />
-              <span>Reportes</span>
-            </Link>
-            <div className="mt-1">
-              <LogoutButton />
-            </div>
-          </nav>
-        )}
+              <p className="px-3 pb-1 text-[11px] uppercase tracking-wide text-gray-400">
+                Navegación rápida
+              </p>
+              <Link
+                className="flex items-center gap-2 rounded-lg px-3 py-2 transition-colors hover:bg-gray-50"
+                href="/schedule"
+                onClick={() => setMenuOpen(false)}
+              >
+                <CalendarDays className="h-4 w-4 text-[#3b82f6]" />
+                <span>Agenda</span>
+              </Link>
+              <Link
+                className="flex items-center gap-2 rounded-lg px-3 py-2 transition-colors hover:bg-gray-50"
+                href="/students"
+                onClick={() => setMenuOpen(false)}
+              >
+                <Users className="h-4 w-4 text-[#22c55e]" />
+                <span>Alumnos</span>
+              </Link>
+              <Link
+                className="flex items-center gap-2 rounded-lg px-3 py-2 transition-colors hover:bg-gray-50"
+                href="/finance"
+                onClick={() => setMenuOpen(false)}
+              >
+                <CreditCard className="h-4 w-4 text-[#3cadaf]" />
+                <span>Finanzas</span>
+              </Link>
+              <Link
+                className="flex items-center gap-2 rounded-lg px-3 py-2 transition-colors hover:bg-gray-50"
+                href="/users"
+                onClick={() => setMenuOpen(false)}
+              >
+                <UserCog className="h-4 w-4 text-[#f97316]" />
+                <span>Usuarios</span>
+              </Link>
+              <Link
+                className="flex items-center gap-2 rounded-lg px-3 py-2 transition-colors hover:bg-gray-50"
+                href="/reports"
+                onClick={() => setMenuOpen(false)}
+              >
+                <BarChart3 className="h-4 w-4 text-[#6366f1]" />
+                <span>Reportes</span>
+              </Link>
+              <div className="mt-1 flex items-center gap-2 rounded-lg px-3 py-2 text-xs text-red-600 hover:bg-red-50">
+                <LogOut className="h-4 w-4" />
+                <LogoutButton />
+              </div>
+            </motion.nav>
+          )}
+        </AnimatePresence>
       </header>
       <main className="w-full flex justify-center px-4 py-3">
         <div className="w-full max-w-5xl">{children}</div>
