@@ -109,10 +109,11 @@ export default function ProfilePage() {
         setNationalId((meta.national_id as string | null) ?? "");
         setPhone((meta.phone as string | null) ?? "+595");
         setBirthDate((meta.birth_date as string | null) ?? "");
+        setAvatarUrl((meta.avatar_url as string | null) ?? null);
 
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("full_name, avatar_url")
+          .select("full_name")
           .eq("id", u.id)
           .maybeSingle();
 
@@ -128,7 +129,6 @@ export default function ProfilePage() {
 
         if (!firstName) setFirstName(fn);
         if (!lastName) setLastName(ln);
-        setAvatarUrl((profile.avatar_url as string | null) ?? null);
       } catch (e: any) {
         toast.error(e?.message ?? "Error cargando el perfil.");
       } finally {
@@ -216,15 +216,6 @@ export default function ProfilePage() {
       }
 
       const url = json.url as string;
-
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({ avatar_url: url })
-        .eq("id", userId);
-
-      if (profileError) {
-        throw profileError;
-      }
 
       setAvatarUrl(url);
       toast.success('Foto de perfil actualizada.');

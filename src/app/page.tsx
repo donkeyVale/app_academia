@@ -152,16 +152,11 @@ export default function HomePage() {
       if (userId) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('full_name, role, avatar_url')
+          .select('full_name, role')
           .eq('id', userId)
           .maybeSingle();
         if (profile?.full_name) {
           displayName = profile.full_name as string;
-        }
-        if (profile?.avatar_url) {
-          setAvatarUrl(profile.avatar_url as string);
-        } else {
-          setAvatarUrl(null);
         }
         if (profile?.role === 'admin') {
           setIsAdmin(true);
@@ -175,8 +170,9 @@ export default function HomePage() {
         }
       }
 
+      const meta = (user?.user_metadata ?? {}) as any;
+
       if (!displayName) {
-        const meta = (user?.user_metadata ?? {}) as any;
         const fn = (meta.first_name as string | null) ?? '';
         const ln = (meta.last_name as string | null) ?? '';
         const fullFromMeta = `${fn} ${ln}`.trim();
@@ -188,6 +184,9 @@ export default function HomePage() {
       if (!displayName) {
         displayName = user?.email ?? null;
       }
+
+      const avatarMeta = (meta.avatar_url as string | null) ?? null;
+      setAvatarUrl(avatarMeta);
 
       setUserName(displayName);
 
