@@ -1,5 +1,7 @@
 "use client";
+
 import Link from 'next/link';
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClientBrowser } from '@/lib/supabase';
@@ -409,8 +411,19 @@ export default function HomePage() {
             Hola {userName ?? '...'}
           </h1>
           <p className="text-sm text-gray-600">
-            Gestioná tu agenda, alumnos, planes y finanzas desde un solo lugar.
+            Gestioná tu agenda desde un solo lugar.
           </p>
+        </div>
+        <div className="hidden sm:flex items-center justify-end flex-1">
+          <div className="h-14 w-28 relative">
+            <Image
+              src="/icons/LogoAgendo1024.png"
+              alt="Agendo"
+              fill
+              className="object-contain"
+              priority
+            />
+          </div>
         </div>
       </div>
 

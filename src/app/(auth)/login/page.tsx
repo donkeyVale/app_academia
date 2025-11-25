@@ -57,7 +57,7 @@ export default function LoginPage() {
           <div className="space-y-1">
             <label className="block text-xs font-medium text-gray-600">Correo electrónico</label>
             <input
-              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf] focus:border-[#3cadaf]"
+              className="w-full border border-gray-200 rounded-md px-3 h-10 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf] focus:border-[#3cadaf]"
               placeholder="nombre@tuacademia.com"
               type="email"
               value={email}
@@ -69,7 +69,7 @@ export default function LoginPage() {
           <div className="space-y-1">
             <label className="block text-xs font-medium text-gray-600">Contraseña</label>
             <input
-              className="w-full border border-gray-200 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf] focus:border-[#3cadaf]"
+              className="w-full border border-gray-200 rounded-md px-3 h-10 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf] focus:border-[#3cadaf]"
               placeholder="••••••••"
               type="password"
               value={password}
@@ -81,7 +81,7 @@ export default function LoginPage() {
           {error && <p className="text-red-600 text-xs">{error}</p>}
 
           <button
-            className="w-full bg-[#3cadaf] hover:bg-[#31435d] text-white py-2 rounded-md text-sm font-medium disabled:opacity-50 transition-colors"
+            className="w-full bg-[#3cadaf] hover:bg-[#31435d] text-white h-10 rounded-md text-base md:text-sm font-medium disabled:opacity-50 transition-colors"
             disabled={loading}
           >
             {loading ? 'Ingresando...' : 'Ingresar'}
