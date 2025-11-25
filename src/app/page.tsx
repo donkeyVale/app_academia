@@ -3,6 +3,9 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
+import { FooterAvatarButton } from '@/components/footer-avatar-button';
+import { FooterNav } from '@/components/footer-nav';
+import { AgendoLogo } from '@/components/agendo-logo';
 import { useRouter } from 'next/navigation';
 import { createClientBrowser } from '@/lib/supabase';
 import { motion } from 'framer-motion';
@@ -415,17 +418,7 @@ export default function HomePage() {
           </p>
         </div>
         <div className="flex items-center justify-end flex-1">
-          <Link href="/" className="flex items-center">
-            <div className="h-16 w-32 relative">
-              <Image
-                src="/icons/logoHome.png"
-                alt="Agendo"
-                fill
-                className="object-contain"
-                priority
-              />
-            </div>
-          </Link>
+          <AgendoLogo />
         </div>
       </div>
 
@@ -633,78 +626,17 @@ export default function HomePage() {
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <nav className="fixed bottom-0 inset-x-0 border-t bg-white/95 backdrop-blur-sm">
-        <div className="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
-          <div className="flex-1 flex items-center gap-3 text-xs sm:text-sm overflow-x-auto">
-            <Link
-              href="/schedule"
-              className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
-            >
-              <CalendarDays className="w-4 h-4 text-[#3b82f6]" />
-              <span>Agenda</span>
-            </Link>
-            <Link
-              href="/students"
-              className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
-            >
-              <Users className="w-4 h-4 text-[#22c55e]" />
-              <span>Alumnos</span>
-            </Link>
-            <Link
-              href="/finance"
-              className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
-            >
-              <CreditCard className="w-4 h-4 text-[#3cadaf]" />
-              <span>Finanzas</span>
-            </Link>
-            {isAdmin && (
-              <Link
-                href="/users"
-                className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
-              >
-                <UserCog className="w-4 h-4 text-[#f97316]" />
-                <span>Usuarios</span>
-              </Link>
-            )}
-            <Link
-              href="/reports"
-              className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
-            >
-              <BarChart3 className="w-4 h-4 text-[#6366f1]" />
-              <span>Reportes</span>
-            </Link>
-          </div>
-
-          <div className="relative flex items-center">
-            <button
-              type="button"
+      <FooterNav
+        isAdmin={isAdmin}
+        rightSlot={(
+          <>
+            <FooterAvatarButton
+              avatarUrl={avatarUrl}
+              initials={initials}
+              avatarOffsetX={avatarOffsetX}
+              avatarOffsetY={avatarOffsetY}
               onClick={() => setAvatarMenuOpen((v) => !v)}
-              className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-gray-200 flex items-center justify-center text-xs sm:text-sm font-medium text-gray-700 overflow-visible hover:ring-2 hover:ring-[#3cadaf]"
-              aria-label="Abrir menú de usuario"
-            >
-              {avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={avatarUrl}
-                  alt="Avatar"
-                  className="h-full w-full rounded-full object-cover"
-                  style={{ transform: `translate(${avatarOffsetX}%, ${avatarOffsetY - 22}%) scale(1.3)` }}
-                />
-              ) : initials ? (
-                <span
-                  className="text-base sm:text-lg inline-block"
-                  style={{ transform: `translate(${avatarOffsetX}%, ${avatarOffsetY - 22}%) scale(1.3)` }}
-                >
-                  {initials}
-                </span>
-              ) : (
-                <UserCircle2
-                  className="w-6 h-6 text-gray-500"
-                  style={{ transform: `translate(${avatarOffsetX}%, ${avatarOffsetY - 22}%) scale(1.3)` }}
-                />
-              )}
-            </button>
-
+            />
             {avatarMenuOpen && (
               <div className="absolute bottom-12 right-0 w-48 rounded-md border bg-white shadow-lg text-xs sm:text-sm py-1.5 z-50">
                 <button
@@ -731,9 +663,9 @@ export default function HomePage() {
                 </button>
               </div>
             )}
-          </div>
-        </div>
-      </nav>
+          </>
+        )}
+      />
 
       <Dialog open={showInstallPopup} onOpenChange={setShowInstallPopup}>
         <DialogContent
