@@ -107,10 +107,11 @@ export default function ProfilePage() {
         setFirstName((meta.first_name as string | null) ?? "");
         setLastName((meta.last_name as string | null) ?? "");
         setNationalId((meta.national_id as string | null) ?? "");
+        setBirthDate((meta.birth_date as string | null) ?? "");
 
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("full_name, phone, birth_date, avatar_url")
+          .select("full_name, phone, avatar_url")
           .eq("id", u.id)
           .maybeSingle();
 
@@ -127,7 +128,6 @@ export default function ProfilePage() {
         if (!firstName) setFirstName(fn);
         if (!lastName) setLastName(ln);
         setPhone((profile.phone as string | null) ?? "+595");
-        setBirthDate((profile.birth_date as string | null) ?? "");
         setAvatarUrl((profile.avatar_url as string | null) ?? null);
       } catch (e: any) {
         toast.error(e?.message ?? "Error cargando el perfil.");
@@ -167,7 +167,6 @@ export default function ProfilePage() {
         .update({
           full_name: fullName || null,
           phone,
-          birth_date: birthDate || null,
         })
         .eq("id", userId);
 
