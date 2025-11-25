@@ -655,16 +655,16 @@ export default function HomePage() {
             <button
               type="button"
               onClick={() => setAvatarMenuOpen((v) => !v)}
-              className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-gray-200 flex items-center justify-center text-[11px] font-medium text-gray-700 overflow-hidden hover:ring-2 hover:ring-[#3cadaf]"
+              className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-gray-200 flex items-center justify-center text-xs sm:text-sm font-medium text-gray-700 overflow-hidden hover:ring-2 hover:ring-[#3cadaf]"
               aria-label="Abrir menú de usuario"
             >
               {avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
               ) : initials ? (
-                <span>{initials}</span>
+                <span className="text-base sm:text-lg">{initials}</span>
               ) : (
-                <UserCircle2 className="w-4 h-4 text-gray-500" />
+                <UserCircle2 className="w-6 h-6 text-gray-500" />
               )}
             </button>
 
