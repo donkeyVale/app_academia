@@ -411,6 +411,21 @@ export default function SchedulePage() {
         if (bErr) throw bErr;
         setBookingsCount((prev) => ({ ...prev, [createdClass.id]: selectedStudents.length }));
       }
+
+      // Notificaciones push para coach y alumnos (no bloquea el flujo)
+      try {
+        await fetch('/api/push/class-created', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            coachId,
+            studentIds: selectedStudents,
+            dateIso: iso,
+          }),
+        });
+      } catch (pushErr) {
+        console.error('Error enviando notificación de clase creada', pushErr);
+      }
       // reset full form for next class
       setDay('');
       setTime('');
