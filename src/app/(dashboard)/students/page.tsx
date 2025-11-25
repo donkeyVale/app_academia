@@ -1,5 +1,7 @@
 "use client";
 
+import Link from 'next/link';
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { History, Users } from 'lucide-react';
@@ -300,11 +302,26 @@ export default function StudentsPage() {
   if (checking) {
     return (
       <section className="mt-4 space-y-4 max-w-5xl mx-auto px-4">
-        <div className="flex items-start gap-2">
-          <Users className="h-5 w-5 text-[#3cadaf] flex-shrink-0" />
-          <div className="space-y-0.5">
-            <h1 className="text-2xl font-semibold text-[#31435d]">Alumnos</h1>
-            <p className="text-sm text-gray-600">Cargando...</p>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start gap-2">
+            <Users className="h-5 w-5 text-[#3cadaf] flex-shrink-0" />
+            <div className="space-y-0.5">
+              <h1 className="text-2xl font-semibold text-[#31435d]">Alumnos</h1>
+              <p className="text-sm text-gray-600">Cargando...</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-end flex-1">
+            <Link href="/" className="flex items-center">
+              <div className="h-14 w-28 relative">
+                <Image
+                  src="/icons/logoHome.png"
+                  alt="Agendo"
+                  fill
+                  className="object-contain"
+                  priority
+                />
+              </div>
+            </Link>
           </div>
         </div>
       </section>
@@ -313,13 +330,28 @@ export default function StudentsPage() {
 
   return (
     <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4 overflow-x-hidden">
-      <div className="flex items-start gap-2">
-        <Users className="h-5 w-5 text-[#3cadaf] flex-shrink-0" />
-        <div className="space-y-0.5">
-          <h1 className="text-2xl font-semibold text-[#31435d]">Alumnos</h1>
-          <p className="text-sm text-gray-600">
-            Listado de alumnos con su plan activo y clases restantes (si corresponde).
-          </p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-2">
+          <Users className="h-5 w-5 text-[#3cadaf] flex-shrink-0" />
+          <div className="space-y-0.5">
+            <h1 className="text-2xl font-semibold text-[#31435d]">Alumnos</h1>
+            <p className="text-sm text-gray-600">
+              Listado de alumnos con su plan activo y clases restantes (si corresponde).
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center justify-end flex-1">
+          <Link href="/" className="flex items-center">
+            <div className="h-14 w-28 relative">
+              <Image
+                src="/icons/logoHome.png"
+                alt="Agendo"
+                fill
+                className="object-contain"
+                priority
+              />
+            </div>
+          </Link>
         </div>
       </div>
 

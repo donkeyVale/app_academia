@@ -1,5 +1,7 @@
 "use client";
 
+import Link from 'next/link';
+import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
 import { logAudit } from '@/lib/audit';
@@ -847,9 +849,24 @@ export default function SchedulePage() {
 
   return (
     <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4 overflow-x-hidden">
-      <div className="flex items-center gap-2">
-        <CalendarIcon className="h-5 w-5 text-[#3cadaf]" />
-        <h1 className="text-2xl font-semibold text-[#31435d]">Agenda</h1>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <CalendarIcon className="h-5 w-5 text-[#3cadaf]" />
+          <h1 className="text-2xl font-semibold text-[#31435d]">Agenda</h1>
+        </div>
+        <div className="flex items-center justify-end flex-1">
+          <Link href="/" className="flex items-center">
+            <div className="h-14 w-28 relative">
+              <Image
+                src="/icons/logoHome.png"
+                alt="Agendo"
+                fill
+                className="object-contain"
+                priority
+              />
+            </div>
+          </Link>
+        </div>
       </div>
 
       <div className="border rounded-lg bg-white shadow-sm">
