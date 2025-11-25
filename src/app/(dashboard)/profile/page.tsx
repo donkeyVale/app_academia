@@ -81,6 +81,7 @@ export default function ProfilePage() {
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [nationalId, setNationalId] = useState("");
   const [phone, setPhone] = useState("+595");
   const [birthDate, setBirthDate] = useState("");
   const [email, setEmail] = useState("");
@@ -102,6 +103,11 @@ export default function ProfilePage() {
         setUserId(u.id);
         setEmail(u.email ?? "");
 
+        const meta = (u.user_metadata ?? {}) as any;
+        setFirstName((meta.first_name as string | null) ?? "");
+        setLastName((meta.last_name as string | null) ?? "");
+        setNationalId((meta.national_id as string | null) ?? "");
+
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
           .select("full_name, phone, birth_date, avatar_url")
@@ -118,8 +124,8 @@ export default function ProfilePage() {
         const fn = parts[0] ?? "";
         const ln = parts.slice(1).join(" ") ?? "";
 
-        setFirstName(fn);
-        setLastName(ln);
+        if (!firstName) setFirstName(fn);
+        if (!lastName) setLastName(ln);
         setPhone((profile.phone as string | null) ?? "+595");
         setBirthDate((profile.birth_date as string | null) ?? "");
         setAvatarUrl((profile.avatar_url as string | null) ?? null);
@@ -171,10 +177,11 @@ export default function ProfilePage() {
 
       await supabase.auth.updateUser({
         data: {
-          firstName,
-          lastName,
+          first_name: firstName,
+          last_name: lastName,
+          national_id: nationalId,
           phone,
-          birthDate,
+          birth_date: birthDate,
         },
       });
 
