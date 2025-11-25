@@ -392,8 +392,25 @@ export default function HomePage() {
         setLoading(false);
       }
     })();
+
     return () => { active = false; };
   }, [supabase, role]);
+
+  const handleSendTestPush = async () => {
+    try {
+      const { data } = await supabase.auth.getUser();
+      const userId = data.user?.id as string | undefined;
+      if (!userId) return;
+
+      await fetch('/api/push/send-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+    } catch (err) {
+      console.error('Error enviando push de prueba', err);
+    }
+  };
 
   // Registro de service worker y suscripción Web Push
   useEffect(() => {
@@ -478,6 +495,18 @@ export default function HomePage() {
           <AgendoLogo />
         </div>
       </div>
+
+      {isAdmin && (
+        <div className="mt-2">
+          <button
+            type="button"
+            onClick={handleSendTestPush}
+            className="px-3 py-1.5 text-xs rounded-md border border-[#3cadaf] text-[#3cadaf] hover:bg-[#e6f5f6]"
+          >
+            Enviar push de prueba
+          </button>
+        </div>
+      )}
 
       {(!role || role === 'admin') && (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
