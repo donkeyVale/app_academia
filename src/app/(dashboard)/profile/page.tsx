@@ -216,6 +216,16 @@ export default function ProfilePage() {
       }
 
       const url = json.url as string;
+
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .update({ avatar_url: url })
+        .eq("id", userId);
+
+      if (profileError) {
+        throw profileError;
+      }
+
       setAvatarUrl(url);
       toast.success('Foto de perfil actualizada.');
     } catch (e: any) {

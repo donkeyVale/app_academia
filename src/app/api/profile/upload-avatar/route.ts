@@ -38,18 +38,6 @@ export async function POST(req: NextRequest) {
       data: { publicUrl },
     } = supabaseAdmin.storage.from('avatars').getPublicUrl(filePath);
 
-    const { error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .update({ avatar_url: publicUrl })
-      .eq('id', userId);
-
-    if (profileError) {
-      return NextResponse.json(
-        { error: 'Imagen subida, pero no se pudo actualizar el perfil.' },
-        { status: 500 }
-      );
-    }
-
     return NextResponse.json({ url: publicUrl });
   } catch (e: any) {
     return NextResponse.json(
