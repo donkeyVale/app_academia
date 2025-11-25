@@ -410,6 +410,12 @@ export default function SchedulePage() {
         const { error: bErr } = await supabase.from('bookings').insert(rows);
         if (bErr) throw bErr;
         setBookingsCount((prev) => ({ ...prev, [createdClass.id]: selectedStudents.length }));
+        // También actualizamos el mapa de alumnos por clase en memoria, para que la cancelación
+        // pueda enviar notificaciones a los alumnos incluso antes de recargar la página.
+        setStudentsByClass((prev) => ({
+          ...prev,
+          [createdClass.id]: [...(prev[createdClass.id] ?? []), ...selectedStudents],
+        }));
       }
 
       // Notificaciones push para coach y alumnos (no bloquea el flujo)
