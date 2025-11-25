@@ -371,15 +371,10 @@ export default function HomePage() {
               setStudentRemainingClasses(null);
             } else {
               const planRow = spData[0] as any;
-              const { data: usagesData, error: usagesErr } = await supabase
-                .from('plan_usages')
-                .select('id')
-                .eq('student_plan_id', planRow.id)
-                .eq('student_id', studentId);
-              if (usagesErr) throw usagesErr;
-              const used = (usagesData ?? []).length;
-              const total = planRow.remaining_classes as number;
-              const remaining = Math.max(0, total - used);
+              // En el esquema actual, remaining_classes ya representa las clases
+              // que quedan disponibles, por lo que no debemos volver a restar
+              // los usos desde plan_usages.
+              const remaining = planRow.remaining_classes as number;
               setStudentRemainingClasses(remaining);
             }
           }
