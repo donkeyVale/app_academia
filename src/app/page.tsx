@@ -670,20 +670,20 @@ export default function HomePage() {
                 <img
                   src={avatarUrl}
                   alt="Avatar"
-                  className="h-full w-full rounded-full object-cover scale-150 -translate-y-1"
-                  style={{ transform: `translate(${avatarOffsetX}%, ${avatarOffsetY - 10}%) scale(1.5)` }}
+                  className="h-full w-full rounded-full object-cover"
+                  style={{ transform: `translate(${avatarOffsetX}%, ${avatarOffsetY - 6}%) scale(1.3)` }}
                 />
               ) : initials ? (
                 <span
                   className="text-base sm:text-lg inline-block"
-                  style={{ transform: `translate(${avatarOffsetX}%, ${avatarOffsetY - 10}%) scale(1.5)` }}
+                  style={{ transform: `translate(${avatarOffsetX}%, ${avatarOffsetY - 6}%) scale(1.3)` }}
                 >
                   {initials}
                 </span>
               ) : (
                 <UserCircle2
                   className="w-6 h-6 text-gray-500"
-                  style={{ transform: `translate(${avatarOffsetX}%, ${avatarOffsetY - 10}%) scale(1.5)` }}
+                  style={{ transform: `translate(${avatarOffsetX}%, ${avatarOffsetY - 6}%) scale(1.3)` }}
                 />
               )}
             </button>
