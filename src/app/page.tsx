@@ -103,6 +103,19 @@ const IconUsers = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+
+  const rawData = typeof window !== 'undefined' ? window.atob(base64) : Buffer.from(base64, 'base64').toString('binary');
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
 export default function HomePage() {
   const supabase = createClientBrowser();
   const router = useRouter();
@@ -381,6 +394,50 @@ export default function HomePage() {
     })();
     return () => { active = false; };
   }, [supabase, role]);
+
+  // Registro de service worker y suscripción Web Push
+  useEffect(() => {
+    async function setupPush() {
+      if (typeof window === 'undefined') return;
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!vapidPublicKey) {
+        console.warn('NEXT_PUBLIC_VAPID_PUBLIC_KEY no está configurada. Push deshabilitado.');
+        return;
+      }
+
+      try {
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') return;
+
+        const registration = await navigator.serviceWorker.register('/sw.js');
+
+        let subscription = await registration.pushManager.getSubscription();
+        if (!subscription) {
+          const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: convertedVapidKey as unknown as ArrayBuffer,
+          });
+        }
+
+        const { data } = await supabase.auth.getUser();
+        const userId = data.user?.id as string | undefined;
+        if (!userId) return;
+
+        await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...subscription.toJSON(), userId, platform: 'web' }),
+        });
+      } catch (err) {
+        console.error('Error configurando notificaciones push', err);
+      }
+    }
+
+    setupPush();
+  }, [supabase]);
 
   // Popup de recordatorio para leer cómo instalar la app en el celular
   useEffect(() => {
