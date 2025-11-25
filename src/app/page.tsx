@@ -414,7 +414,7 @@ export default function HomePage() {
             Gestioná tu agenda desde un solo lugar.
           </p>
         </div>
-        <div className="hidden sm:flex items-center justify-end flex-1">
+        <div className="flex items-center justify-end flex-1">
           <div className="h-14 w-28 relative">
             <Image
               src="/icons/LogoAgendo1024.png"
