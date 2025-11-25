@@ -147,7 +147,7 @@ export default function HomePage() {
       // 1) profiles.full_name
       // 2) user_metadata.first_name / last_name
       // 3) email
-      let displayName: string | null = user?.email ?? null;
+      let displayName: string | null = null;
 
       if (userId) {
         const { data: profile } = await supabase
@@ -183,6 +183,10 @@ export default function HomePage() {
         if (fullFromMeta) {
           displayName = fullFromMeta;
         }
+      }
+
+      if (!displayName) {
+        displayName = user?.email ?? null;
       }
 
       setUserName(displayName);
