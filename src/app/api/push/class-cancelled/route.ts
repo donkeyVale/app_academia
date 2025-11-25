@@ -6,7 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase-service';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { classId, coachId, dateIso } = body || {};
+    const { classId, coachId, studentIds, dateIso } = body || {};
 
     if (!classId) {
       return NextResponse.json({ error: 'Falta classId.' }, { status: 400 });
@@ -38,26 +38,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Students reservados en esta clase -> student_id -> user_id
-    const { data: bookings, error: bErr } = await supabaseAdmin
-      .from('bookings')
-      .select('student_id')
-      .eq('class_id', classId);
-    if (bErr) {
-      console.error('Error obteniendo bookings para clase cancelada', bErr.message);
-    } else if (bookings && bookings.length > 0) {
-      const studentIds = Array.from(new Set((bookings as any[]).map((b) => b.student_id as string)));
-      if (studentIds.length) {
-        const { data: studentsRows, error: studErr } = await supabaseAdmin
-          .from('students')
-          .select('id, user_id')
-          .in('id', studentIds);
-        if (studErr) {
-          console.error('Error obteniendo students.user_id para clase cancelada', studErr.message);
-        } else {
-          for (const row of studentsRows ?? []) {
-            if (row.user_id) userIds.add(row.user_id as string);
-          }
+    // Students reservados -> student_id -> user_id (recibidos desde el frontend)
+    if (studentIds && Array.isArray(studentIds) && studentIds.length > 0) {
+      const uniqueStudentIds = Array.from(new Set(studentIds as string[]));
+      const { data: studentsRows, error: studErr } = await supabaseAdmin
+        .from('students')
+        .select('id, user_id')
+        .in('id', uniqueStudentIds);
+      if (studErr) {
+        console.error('Error obteniendo students.user_id para clase cancelada', studErr.message);
+      } else {
+        for (const row of studentsRows ?? []) {
+          if (row.user_id) userIds.add(row.user_id as string);
         }
       }
     }

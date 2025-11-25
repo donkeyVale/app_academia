@@ -1598,6 +1598,7 @@ export default function SchedulePage() {
                               body: JSON.stringify({
                                 classId: cls.id,
                                 coachId: cls.coach_id,
+                                studentIds: studentsByClass[cls.id] ?? [],
                                 dateIso: cls.date,
                               }),
                             });
