@@ -579,13 +579,14 @@ export default function HomePage() {
           </span>
           <span className="text-xs text-gray-500">{showInstallHelpOpen ? '▼' : '▲'}</span>
         </button>
-        <div
-          id="install-app-help"
-          className={`p-4 text-sm space-y-3 bg-[#f0f9fb] border-t border-[#3cadaf]/20 origin-top ${showInstallHelpOpen ? 'h-auto' : 'h-0'} overflow-hidden`}
-        >
-          <p className="text-gray-600">
-            Seguí estos pasos para tener acceso rápido desde la pantalla de inicio de tu celular.
-          </p>
+        {showInstallHelpOpen && (
+          <div
+            id="install-app-help"
+            className="p-4 text-sm space-y-3 bg-[#f0f9fb] border-t border-[#3cadaf]/20 origin-top"
+          >
+            <p className="text-gray-600">
+              Seguí estos pasos para tener acceso rápido desde la pantalla de inicio de tu celular.
+            </p>
 
           <div>
             <h3 className="font-semibold text-[#31435d]">iPhone (Safari)</h3>
@@ -608,10 +609,11 @@ export default function HomePage() {
             </ol>
           </div>
 
-          <p className="text-gray-600">
-            Una vez instalado, vas a ver el icono de la academia en tu pantalla de inicio y podés entrar directo como si fuera una app.
-          </p>
-        </div>
+            <p className="text-gray-600">
+              Una vez instalado, vas a ver el icono de la academia en tu pantalla de inicio y podés entrar directo como si fuera una app.
+            </p>
+          </div>
+        )}
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
