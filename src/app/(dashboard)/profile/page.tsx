@@ -88,8 +88,13 @@ export default function ProfilePage() {
   const [birthDate, setBirthDate] = useState("");
   const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [avatarOffsetX, setAvatarOffsetX] = useState(0); // porcentaje -50 a 50
-  const [avatarOffsetY, setAvatarOffsetY] = useState(0); // porcentaje -50 a 50
+
+  // Editor de recorte (pan/zoom) en cliente
+  const [cropSrc, setCropSrc] = useState<string | null>(null);
+  const [cropZoom, setCropZoom] = useState(1); // 1x-3x
+  const [cropOffsetX, setCropOffsetX] = useState(0); // porcentaje -50 a 50
+  const [cropOffsetY, setCropOffsetY] = useState(0); // porcentaje -50 a 50
+  const [cropping, setCropping] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -114,11 +119,6 @@ export default function ProfilePage() {
         setPhone((meta.phone as string | null) ?? "+595");
         setBirthDate((meta.birth_date as string | null) ?? "");
         setAvatarUrl((meta.avatar_url as string | null) ?? null);
-
-        const offX = Number(meta.avatar_offset_x ?? 0);
-        const offY = Number(meta.avatar_offset_y ?? 0);
-        setAvatarOffsetX(Number.isFinite(offX) ? offX : 0);
-        setAvatarOffsetY(Number.isFinite(offY) ? offY : 0);
 
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
@@ -189,8 +189,6 @@ export default function ProfilePage() {
           national_id: nationalId,
           phone,
           birth_date: birthDate,
-          avatar_offset_x: avatarOffsetX,
-          avatar_offset_y: avatarOffsetY,
         },
       });
 
@@ -207,14 +205,74 @@ export default function ProfilePage() {
   };
 
   const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!userId) return;
     const file = event.target.files?.[0];
     if (!file) return;
 
     try {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result === 'string') {
+          setCropSrc(result);
+          setCropZoom(1.4);
+          setCropOffsetX(0);
+          setCropOffsetY(0);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (e: any) {
+      toast.error(e?.message ?? 'No se pudo cargar la imagen para recorte.');
+    } finally {
+      if (event.target) {
+        event.target.value = '';
+      }
+    }
+  };
+
+  const handleApplyCroppedAvatar = async () => {
+    if (!userId || !cropSrc) return;
+
+    try {
+      setCropping(true);
+
+      const image = new window.Image();
+      image.src = cropSrc;
+
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error('No se pudo cargar la imagen para recorte.'));
+      });
+
+      const size = 512;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('No se pudo inicializar el canvas.');
+
+      const imgW = image.width;
+      const imgH = image.height;
+      const baseScale = Math.max(size / imgW, size / imgH);
+      const scale = baseScale * cropZoom;
+
+      const offsetXPx = (cropOffsetX / 100) * size;
+      const offsetYPx = (cropOffsetY / 100) * size;
+
+      const drawX = size / 2 - (imgW * scale) / 2 + offsetXPx;
+      const drawY = size / 2 - (imgH * scale) / 2 + offsetYPx;
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, size, size);
+      ctx.drawImage(image, drawX, drawY, imgW * scale, imgH * scale);
+
+      const blob: Blob | null = await new Promise((resolve) =>
+        canvas.toBlob((b) => resolve(b), 'image/jpeg', 0.92),
+      );
+      if (!blob) throw new Error('No se pudo generar la imagen recortada.');
+
       const formData = new FormData();
       formData.append('userId', userId);
-      formData.append('file', file);
+      formData.append('file', blob, 'avatar.jpg');
 
       const res = await fetch('/api/profile/upload-avatar', {
         method: 'POST',
@@ -227,15 +285,13 @@ export default function ProfilePage() {
       }
 
       const url = json.url as string;
-
       setAvatarUrl(url);
+      setCropSrc(null);
       toast.success('Foto de perfil actualizada.');
     } catch (e: any) {
       toast.error(e?.message ?? 'No se pudo actualizar la foto de perfil.');
     } finally {
-      if (event.target) {
-        event.target.value = '';
-      }
+      setCropping(false);
     }
   };
 
@@ -304,9 +360,6 @@ export default function ProfilePage() {
                     src={avatarUrl}
                     alt="Foto de perfil"
                     className="h-full w-full rounded-full object-cover"
-                    style={{
-                      transform: `translate(${avatarOffsetX}%, ${avatarOffsetY}%)`,
-                    }}
                   />
                 ) : (
                   <span className="text-xl">{initials || "?"}</span>
@@ -318,30 +371,84 @@ export default function ProfilePage() {
                 <p className="text-xs text-gray-500">
                   Recomendado: imagen cuadrada, mínimo 256x256 px.
                 </p>
-                <div className="mt-2 space-y-2">
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Ajustar horizontal</label>
-                    <input
-                      type="range"
-                      min={-50}
-                      max={50}
-                      value={avatarOffsetX}
-                      onChange={(e) => setAvatarOffsetX(Number(e.target.value))}
-                      className="w-full"
-                    />
+                {cropSrc && (
+                  <div className="mt-3 space-y-3 border-t pt-3">
+                    <p className="text-xs text-gray-600 font-medium">Ajustar recorte</p>
+                    <div className="flex items-center gap-4">
+                      <div className="h-20 w-20 rounded-full border border-gray-300 overflow-hidden bg-gray-100 flex items-center justify-center">
+                        {/* Vista previa circular del recorte */}
+                        <div className="relative h-24 w-24">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={cropSrc}
+                            alt="Vista previa"
+                            className="absolute inset-0 w-full h-full object-cover"
+                            style={{
+                              transform: `scale(${cropZoom}) translate(${cropOffsetX}%, ${cropOffsetY}%)`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex-1 space-y-2 text-xs">
+                        <div>
+                          <label className="block text-[11px] text-gray-600 mb-1">Zoom</label>
+                          <input
+                            type="range"
+                            min={1}
+                            max={3}
+                            step={0.1}
+                            value={cropZoom}
+                            onChange={(e) => setCropZoom(Number(e.target.value))}
+                            className="w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-gray-600 mb-1">Mover horizontal</label>
+                          <input
+                            type="range"
+                            min={-50}
+                            max={50}
+                            value={cropOffsetX}
+                            onChange={(e) => setCropOffsetX(Number(e.target.value))}
+                            className="w-full"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] text-gray-600 mb-1">Mover vertical</label>
+                          <input
+                            type="range"
+                            min={-50}
+                            max={50}
+                            value={cropOffsetY}
+                            onChange={(e) => setCropOffsetY(Number(e.target.value))}
+                            className="w-full"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="bg-[#3cadaf] hover:bg-[#31435d] text-white px-3 py-1.5 disabled:opacity-50"
+                        onClick={handleApplyCroppedAvatar}
+                        disabled={cropping}
+                      >
+                        {cropping ? "Guardando recorte..." : "Aplicar recorte y guardar"}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="px-3 py-1.5"
+                        onClick={() => setCropSrc(null)}
+                        disabled={cropping}
+                      >
+                        Cancelar recorte
+                      </Button>
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">Ajustar vertical</label>
-                    <input
-                      type="range"
-                      min={-50}
-                      max={50}
-                      value={avatarOffsetY}
-                      onChange={(e) => setAvatarOffsetY(Number(e.target.value))}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
+                )}
                 <div className="flex flex-wrap gap-2 mt-1">
                   <Button type="button" variant="outline" size="sm" onClick={handleUploadAvatarClick}>
                     <Upload className="w-3 h-3 mr-1" /> Subir foto
