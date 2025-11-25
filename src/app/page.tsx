@@ -660,36 +660,36 @@ export default function HomePage() {
             >
               {avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={avatarUrl} alt="Avatar" className="h-full w-full rounded-full object-cover scale-125 -translate-y-0.5" />
+                <img src={avatarUrl} alt="Avatar" className="h-full w-full rounded-full object-cover scale-150 -translate-y-1" />
               ) : initials ? (
-                <span className="text-base sm:text-lg scale-125 -translate-y-0.5 inline-block">{initials}</span>
+                <span className="text-base sm:text-lg scale-150 -translate-y-1 inline-block">{initials}</span>
               ) : (
-                <UserCircle2 className="w-6 h-6 text-gray-500 scale-125 -translate-y-0.5" />
+                <UserCircle2 className="w-6 h-6 text-gray-500 scale-150 -translate-y-1" />
               )}
             </button>
 
             {avatarMenuOpen && (
-              <div className="absolute bottom-12 right-0 w-40 rounded-md border bg-white shadow-lg text-xs sm:text-sm py-1 z-50">
+              <div className="absolute bottom-12 right-0 w-48 rounded-md border bg-white shadow-lg text-xs sm:text-sm py-1.5 z-50">
                 <button
                   type="button"
-                  className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 text-left"
+                  className="w-full flex items-center gap-2 px-3.5 py-2 hover:bg-gray-50 text-left"
                   onClick={() => {
                     setAvatarMenuOpen(false);
                     router.push('/profile');
                   }}
                 >
-                  <UserCircle2 className="w-3 h-3" />
+                  <UserCircle2 className="w-3.5 h-3.5" />
                   <span>Mi perfil</span>
                 </button>
                 <button
                   type="button"
-                  className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-red-50 text-left text-red-600"
+                  className="w-full flex items-center gap-2 px-3.5 py-2 hover:bg-red-50 text-left text-red-600"
                   onClick={() => {
                     setAvatarMenuOpen(false);
                     handleLogout();
                   }}
                 >
-                  <LogOut className="w-3 h-3" />
+                  <LogOut className="w-3.5 h-3.5" />
                   <span>Cerrar sesión</span>
                 </button>
               </div>
