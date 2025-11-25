@@ -25,6 +25,7 @@ import {
   CreditCard,
   BarChart3,
   LogOut,
+  UserCircle2,
 } from 'lucide-react';
 
 const iconColor = "#3cadaf";
@@ -107,6 +108,7 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [role, setRole] = useState<'admin' | 'coach' | 'student' | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   const [activePlansCount, setActivePlansCount] = useState(0);
   const [studentsWithPlanCount, setStudentsWithPlanCount] = useState(0);
@@ -144,11 +146,16 @@ export default function HomePage() {
       if (userId) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('full_name, role')
+          .select('full_name, role, avatar_url')
           .eq('id', userId)
           .maybeSingle();
         if (profile?.full_name) {
           displayName = profile.full_name as string;
+        }
+        if (profile?.avatar_url) {
+          setAvatarUrl(profile.avatar_url as string);
+        } else {
+          setAvatarUrl(null);
         }
         if (profile?.role === 'admin') {
           setIsAdmin(true);
@@ -360,6 +367,15 @@ export default function HomePage() {
     }
   }, []);
 
+  const initials = (() => {
+    const name = (userName ?? '').trim();
+    if (!name) return '';
+    const parts = name.split(' ');
+    const first = parts[0]?.[0];
+    const second = parts[1]?.[0];
+    return `${first ?? ''}${second ?? ''}`.toUpperCase();
+  })();
+
   return (
     <section className="space-y-6 max-w-5xl mx-auto px-4 py-6">
       <div className="flex items-center justify-between gap-4">
@@ -371,18 +387,35 @@ export default function HomePage() {
             Gestioná tu agenda, alumnos, planes y finanzas desde un solo lugar.
           </p>
         </div>
-        <button
-          type="button"
-          className="border border-gray-300 bg-white rounded-full px-2.5 py-2 text-xs flex items-center justify-center shadow-sm hover:shadow-md hover:border-[#3cadaf]/70 transition-all"
-          onClick={() => setMenuOpen((v) => !v)}
-          aria-label={menuOpen ? 'Cerrar menú principal' : 'Abrir menú principal'}
-        >
-          {menuOpen ? (
-            <X className="w-4 h-4 text-[#31435d]" />
-          ) : (
-            <Menu className="w-4 h-4 text-[#31435d]" />
-          )}
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => router.push('/profile')}
+            className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-[11px] font-medium text-gray-700 overflow-hidden hover:ring-2 hover:ring-[#3cadaf]"
+            aria-label="Ir a mi perfil"
+          >
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
+            ) : initials ? (
+              <span>{initials}</span>
+            ) : (
+              <UserCircle2 className="w-4 h-4 text-gray-500" />
+            )}
+          </button>
+          <button
+            type="button"
+            className="border border-gray-300 bg-white rounded-full px-2.5 py-2 text-xs flex items-center justify-center shadow-sm hover:shadow-md hover:border-[#3cadaf]/70 transition-all"
+            onClick={() => setMenuOpen((v) => !v)}
+            aria-label={menuOpen ? 'Cerrar menú principal' : 'Abrir menú principal'}
+          >
+            {menuOpen ? (
+              <X className="w-4 h-4 text-[#31435d]" />
+            ) : (
+              <Menu className="w-4 h-4 text-[#31435d]" />
+            )}
+          </button>
+        </div>
       </div>
 
       <AnimatePresence initial={false}>
@@ -439,6 +472,14 @@ export default function HomePage() {
             >
               <BarChart3 className="w-4 h-4 text-[#6366f1]" />
               <span>Reportes</span>
+            </Link>
+            <Link
+              className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+              href="/profile"
+              onClick={() => setMenuOpen(false)}
+            >
+              <UserCircle2 className="w-4 h-4 text-[#0ea5e9]" />
+              <span>Mi perfil</span>
             </Link>
             <button
               type="button"
