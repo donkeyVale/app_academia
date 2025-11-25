@@ -1591,6 +1591,19 @@ export default function SchedulePage() {
                             delete n[cls.id];
                             return n;
                           });
+                          try {
+                            await fetch('/api/push/class-cancelled', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                classId: cls.id,
+                                coachId: cls.coach_id,
+                                dateIso: cls.date,
+                              }),
+                            });
+                          } catch (pushErr) {
+                            console.error('Error enviando notificación de clase cancelada', pushErr);
+                          }
                           toast.success('Clase cancelada correctamente');
                         }}
                       >Cancelar</button>
