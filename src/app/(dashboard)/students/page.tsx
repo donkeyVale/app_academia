@@ -181,17 +181,17 @@ export default function StudentsPage() {
     setHistoryError(null);
     setHistoryItems([]);
     try {
-      // Buscar clases del alumno a través de bookings
-      const { data: bookingsData, error: bookingsErr } = await supabase
-        .from('bookings')
+      // Buscar clases efectivamente usadas (presentes) a través de plan_usages
+      const { data: usagesData, error: usagesErr } = await supabase
+        .from('plan_usages')
         .select('class_id, class_sessions!inner(id,date,court_id,coach_id)')
         .eq('student_id', studentId)
         .limit(50);
 
-      if (bookingsErr) throw bookingsErr;
+      if (usagesErr) throw usagesErr;
 
-      const classSessionsRaw = (bookingsData ?? [])
-        .map((b: any) => b.class_sessions as any)
+      const classSessionsRaw = (usagesData ?? [])
+        .map((u: any) => u.class_sessions as any)
         .filter((c) => !!c);
 
       // Quitar duplicados por id
