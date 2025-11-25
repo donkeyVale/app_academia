@@ -660,7 +660,7 @@ export default function HomePage() {
             >
               {avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover scale-125 -translate-y-0.5" />
+                <img src={avatarUrl} alt="Avatar" className="h-full w-full rounded-full object-cover scale-125 -translate-y-0.5" />
               ) : initials ? (
                 <span className="text-base sm:text-lg scale-125 -translate-y-0.5 inline-block">{initials}</span>
               ) : (
