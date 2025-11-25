@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClientBrowser } from '@/lib/supabase';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   Dialog,
   DialogContent,
@@ -20,8 +20,6 @@ import {
   UserCog,
   CalendarClock,
   TicketPercent,
-  Menu,
-  X,
   CreditCard,
   BarChart3,
   LogOut,
@@ -115,10 +113,10 @@ export default function HomePage() {
   const [todayClassesCount, setTodayClassesCount] = useState(0);
   const [coachesCount, setCoachesCount] = useState(0);
   const [studentsCount, setStudentsCount] = useState(0);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [showInstallHelpOpen, setShowInstallHelpOpen] = useState(false);
   const [showInstallPopup, setShowInstallPopup] = useState(false);
   const [popupDontShowAgain, setPopupDontShowAgain] = useState(false);
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
 
   // métricas específicas para coach
   const [coachTodayClasses, setCoachTodayClasses] = useState(0);
@@ -397,7 +395,7 @@ export default function HomePage() {
   })();
 
   return (
-    <section className="space-y-6 max-w-5xl mx-auto px-4 py-6">
+    <section className="space-y-6 max-w-5xl mx-auto px-4 pt-6 pb-20">
       <div className="flex items-center justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold text-[#31435d]">
@@ -407,111 +405,7 @@ export default function HomePage() {
             Gestioná tu agenda, alumnos, planes y finanzas desde un solo lugar.
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => router.push('/profile')}
-            className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-gray-200 flex items-center justify-center text-[11px] font-medium text-gray-700 overflow-hidden hover:ring-2 hover:ring-[#3cadaf]"
-            aria-label="Ir a mi perfil"
-          >
-            {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
-            ) : initials ? (
-              <span>{initials}</span>
-            ) : (
-              <UserCircle2 className="w-4 h-4 text-gray-500" />
-            )}
-          </button>
-          <button
-            type="button"
-            className="border border-gray-300 bg-white rounded-full px-2.5 py-2 text-xs flex items-center justify-center shadow-sm hover:shadow-md hover:border-[#3cadaf]/70 transition-all"
-            onClick={() => setMenuOpen((v) => !v)}
-            aria-label={menuOpen ? 'Cerrar menú principal' : 'Abrir menú principal'}
-          >
-            {menuOpen ? (
-              <X className="w-4 h-4 text-[#31435d]" />
-            ) : (
-              <Menu className="w-4 h-4 text-[#31435d]" />
-            )}
-          </button>
-        </div>
       </div>
-
-      <AnimatePresence initial={false}>
-        {menuOpen && (
-          <motion.nav
-            key="dashboard-main-menu"
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
-            className="border border-[#dbeafe] rounded-xl px-3 py-2 bg-[#f1f5f9] flex flex-col gap-1 text-sm shadow-md w-full max-w-[220px] ml-auto mt-1 origin-top-right"
-          >
-            <p className="px-3 pb-1 text-[11px] uppercase tracking-wide text-gray-400">
-              Navegación rápida
-            </p>
-            <Link
-              className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-              href="/schedule"
-              onClick={() => setMenuOpen(false)}
-            >
-              <CalendarDays className="w-4 h-4 text-[#3b82f6]" />
-              <span>Agenda</span>
-            </Link>
-            <Link
-              className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-              href="/students"
-              onClick={() => setMenuOpen(false)}
-            >
-              <Users className="w-4 h-4 text-[#22c55e]" />
-              <span>Alumnos</span>
-            </Link>
-            <Link
-              className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-              href="/finance"
-              onClick={() => setMenuOpen(false)}
-            >
-              <CreditCard className="w-4 h-4 text-[#3cadaf]" />
-              <span>Finanzas</span>
-            </Link>
-            {isAdmin && (
-              <Link
-                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-                href="/users"
-                onClick={() => setMenuOpen(false)}
-              >
-                <UserCog className="w-4 h-4 text-[#f97316]" />
-                <span>Usuarios</span>
-              </Link>
-            )}
-            <Link
-              className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-              href="/reports"
-              onClick={() => setMenuOpen(false)}
-            >
-              <BarChart3 className="w-4 h-4 text-[#6366f1]" />
-              <span>Reportes</span>
-            </Link>
-            <Link
-              className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-              href="/profile"
-              onClick={() => setMenuOpen(false)}
-            >
-              <UserCircle2 className="w-4 h-4 text-[#0ea5e9]" />
-              <span>Mi perfil</span>
-            </Link>
-            <button
-              type="button"
-              className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg text-xs text-red-600 hover:bg-red-50 transition-colors"
-              onClick={handleLogout}
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Cerrar sesión</span>
-            </button>
-          </motion.nav>
-        )}
-      </AnimatePresence>
 
       {(!role || role === 'admin') && (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
@@ -678,54 +572,133 @@ export default function HomePage() {
           </span>
           <span className="text-xs text-gray-500">{showInstallHelpOpen ? '▼' : '▲'}</span>
         </button>
-        <AnimatePresence initial={false}>
-          {showInstallHelpOpen && (
-            <motion.div
-              key="install-help-content"
-              id="install-app-help"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
-              className="p-4 text-sm space-y-3 bg-[#f0f9fb] border-t border-[#3cadaf]/20 origin-top"
-            >
-              <p className="text-gray-600">
-                Seguí estos pasos para tener acceso rápido desde la pantalla de inicio de tu celular.
-              </p>
+        <div
+          id="install-app-help"
+          className={`p-4 text-sm space-y-3 bg-[#f0f9fb] border-t border-[#3cadaf]/20 origin-top ${showInstallHelpOpen ? 'h-auto' : 'h-0'} overflow-hidden`}
+        >
+          <p className="text-gray-600">
+            Seguí estos pasos para tener acceso rápido desde la pantalla de inicio de tu celular.
+          </p>
 
-              <div>
-                <h3 className="font-semibold text-[#31435d]">iPhone (Safari)</h3>
-                <ol className="list-decimal list-inside text-gray-700 space-y-1 mt-1">
-                  <li>Abrí este enlace en Safari.</li>
-                  <li>Tocá el botón <strong>Compartir</strong> (icono de cuadrado con flecha hacia arriba).</li>
-                  <li>En el menú que se abre, tocá los <strong>tres puntitos</strong> (Más opciones).</li>
-                  <li>Elegí <strong>"Agregar a inicio"</strong> o <strong>"Agregar a pantalla de inicio"</strong>.</li>
-                  <li>Confirmá con <strong>Agregar</strong>.</li>
-                </ol>
-              </div>
+          <div>
+            <h3 className="font-semibold text-[#31435d]">iPhone (Safari)</h3>
+            <ol className="list-decimal list-inside text-gray-700 space-y-1 mt-1">
+              <li>Abrí este enlace en Safari.</li>
+              <li>Tocá el botón <strong>Compartir</strong> (icono de cuadrado con flecha hacia arriba).</li>
+              <li>En el menú que se abre, tocá los <strong>tres puntitos</strong> (Más opciones).</li>
+              <li>Elegí <strong>"Agregar a inicio"</strong> o <strong>"Agregar a pantalla de inicio"</strong>.</li>
+              <li>Confirmá con <strong>Agregar</strong>.</li>
+            </ol>
+          </div>
 
-              <div>
-                <h3 className="font-semibold text-[#31435d]">Android (Chrome)</h3>
-                <ol className="list-decimal list-inside text-gray-700 space-y-1 mt-1">
-                  <li>Abrí este enlace en Chrome.</li>
-                  <li>Tocá el botón de <strong>tres puntos</strong> arriba a la derecha.</li>
-                  <li>Elegí <strong>"Agregar a pantalla principal"</strong> o <strong>"Instalar app"</strong>.</li>
-                  <li>Confirmá cuando aparezca el mensaje.</li>
-                </ol>
-              </div>
+          <div>
+            <h3 className="font-semibold text-[#31435d]">Android (Chrome)</h3>
+            <ol className="list-decimal list-inside text-gray-700 space-y-1 mt-1">
+              <li>Abrí este enlace en Chrome.</li>
+              <li>Tocá el botón de <strong>tres puntos</strong> arriba a la derecha.</li>
+              <li>Elegí <strong>"Agregar a pantalla principal"</strong> o <strong>"Instalar app"</strong>.</li>
+              <li>Confirmá cuando aparezca el mensaje.</li>
+            </ol>
+          </div>
 
-              <p className="text-gray-600">
-                Una vez instalado, vas a ver el icono de la academia en tu pantalla de inicio y podés entrar directo como si fuera una app.
-              </p>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          <p className="text-gray-600">
+            Una vez instalado, vas a ver el icono de la academia en tu pantalla de inicio y podés entrar directo como si fuera una app.
+          </p>
+        </div>
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <Dialog open={showInstallPopup} onOpenChange={setShowInstallPopup}
-      >
+      <nav className="fixed bottom-0 inset-x-0 border-t bg-white/95 backdrop-blur-sm">
+        <div className="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 text-xs sm:text-sm">
+            <Link
+              href="/schedule"
+              className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
+            >
+              <CalendarDays className="w-4 h-4 text-[#3b82f6]" />
+              <span>Agenda</span>
+            </Link>
+            <Link
+              href="/students"
+              className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
+            >
+              <Users className="w-4 h-4 text-[#22c55e]" />
+              <span>Alumnos</span>
+            </Link>
+            <Link
+              href="/finance"
+              className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
+            >
+              <CreditCard className="w-4 h-4 text-[#3cadaf]" />
+              <span>Finanzas</span>
+            </Link>
+            {isAdmin && (
+              <Link
+                href="/users"
+                className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
+              >
+                <UserCog className="w-4 h-4 text-[#f97316]" />
+                <span>Usuarios</span>
+              </Link>
+            )}
+            <Link
+              href="/reports"
+              className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
+            >
+              <BarChart3 className="w-4 h-4 text-[#6366f1]" />
+              <span>Reportes</span>
+            </Link>
+          </div>
+
+          <div className="relative flex items-center">
+            <button
+              type="button"
+              onClick={() => setAvatarMenuOpen((v) => !v)}
+              className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-gray-200 flex items-center justify-center text-[11px] font-medium text-gray-700 overflow-hidden hover:ring-2 hover:ring-[#3cadaf]"
+              aria-label="Abrir menú de usuario"
+            >
+              {avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
+              ) : initials ? (
+                <span>{initials}</span>
+              ) : (
+                <UserCircle2 className="w-4 h-4 text-gray-500" />
+              )}
+            </button>
+
+            {avatarMenuOpen && (
+              <div className="absolute bottom-12 right-0 w-40 rounded-md border bg-white shadow-lg text-xs sm:text-sm py-1 z-50">
+                <button
+                  type="button"
+                  className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-gray-50 text-left"
+                  onClick={() => {
+                    setAvatarMenuOpen(false);
+                    router.push('/profile');
+                  }}
+                >
+                  <UserCircle2 className="w-3 h-3" />
+                  <span>Mi perfil</span>
+                </button>
+                <button
+                  type="button"
+                  className="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-red-50 text-left text-red-600"
+                  onClick={() => {
+                    setAvatarMenuOpen(false);
+                    handleLogout();
+                  }}
+                >
+                  <LogOut className="w-3 h-3" />
+                  <span>Cerrar sesión</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </nav>
+
+      <Dialog open={showInstallPopup} onOpenChange={setShowInstallPopup}>
         <DialogContent
           className="w-full max-w-md sm:max-w-lg max-h-[90vh] p-0 flex flex-col rounded-xl border border-gray-200 shadow-xl bg-slate-50/95 backdrop-blur data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
         >
