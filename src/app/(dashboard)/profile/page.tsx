@@ -86,6 +86,8 @@ export default function ProfilePage() {
   const [birthDate, setBirthDate] = useState("");
   const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarOffsetX, setAvatarOffsetX] = useState(0); // porcentaje -50 a 50
+  const [avatarOffsetY, setAvatarOffsetY] = useState(0); // porcentaje -50 a 50
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -110,6 +112,11 @@ export default function ProfilePage() {
         setPhone((meta.phone as string | null) ?? "+595");
         setBirthDate((meta.birth_date as string | null) ?? "");
         setAvatarUrl((meta.avatar_url as string | null) ?? null);
+
+        const offX = Number(meta.avatar_offset_x ?? 0);
+        const offY = Number(meta.avatar_offset_y ?? 0);
+        setAvatarOffsetX(Number.isFinite(offX) ? offX : 0);
+        setAvatarOffsetY(Number.isFinite(offY) ? offY : 0);
 
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
@@ -180,6 +187,8 @@ export default function ProfilePage() {
           national_id: nationalId,
           phone,
           birth_date: birthDate,
+          avatar_offset_x: avatarOffsetX,
+          avatar_offset_y: avatarOffsetY,
         },
       });
 
@@ -270,13 +279,20 @@ export default function ProfilePage() {
               <button
                 type="button"
                 onClick={handleUploadAvatarClick}
-                className="h-16 w-16 rounded-full bg-gray-200 flex items-center justify-center text-sm font-medium text-gray-700 overflow-hidden hover:ring-2 hover:ring-[#3cadaf]"
+                className="h-24 w-24 rounded-full bg-gray-200 flex items-center justify-center text-base font-medium text-gray-700 overflow-hidden hover:ring-2 hover:ring-[#3cadaf]"
               >
                 {avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={avatarUrl} alt="Foto de perfil" className="h-full w-full object-cover" />
+                  <img
+                    src={avatarUrl}
+                    alt="Foto de perfil"
+                    className="h-full w-full rounded-full object-cover"
+                    style={{
+                      transform: `translate(${avatarOffsetX}%, ${avatarOffsetY}%)`,
+                    }}
+                  />
                 ) : (
-                  <span>{initials || "?"}</span>
+                  <span className="text-xl">{initials || "?"}</span>
                 )}
               </button>
 
@@ -285,6 +301,30 @@ export default function ProfilePage() {
                 <p className="text-xs text-gray-500">
                   Recomendado: imagen cuadrada, mínimo 256x256 px.
                 </p>
+                <div className="mt-2 space-y-2">
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Ajustar horizontal</label>
+                    <input
+                      type="range"
+                      min={-50}
+                      max={50}
+                      value={avatarOffsetX}
+                      onChange={(e) => setAvatarOffsetX(Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-600 mb-1">Ajustar vertical</label>
+                    <input
+                      type="range"
+                      min={-50}
+                      max={50}
+                      value={avatarOffsetY}
+                      onChange={(e) => setAvatarOffsetY(Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
                 <div className="flex flex-wrap gap-2 mt-1">
                   <Button type="button" variant="outline" size="sm" onClick={handleUploadAvatarClick}>
                     <Upload className="w-3 h-3 mr-1" /> Subir foto

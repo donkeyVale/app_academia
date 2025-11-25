@@ -107,6 +107,8 @@ export default function HomePage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [role, setRole] = useState<'admin' | 'coach' | 'student' | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarOffsetX, setAvatarOffsetX] = useState(0);
+  const [avatarOffsetY, setAvatarOffsetY] = useState(0);
 
   const [activePlansCount, setActivePlansCount] = useState(0);
   const [studentsWithPlanCount, setStudentsWithPlanCount] = useState(0);
@@ -185,6 +187,11 @@ export default function HomePage() {
 
       const avatarMeta = (meta.avatar_url as string | null) ?? null;
       setAvatarUrl(avatarMeta);
+
+      const offX = Number(meta.avatar_offset_x ?? 0);
+      const offY = Number(meta.avatar_offset_y ?? 0);
+      setAvatarOffsetX(Number.isFinite(offX) ? offX : 0);
+      setAvatarOffsetY(Number.isFinite(offY) ? offY : 0);
 
       setUserName(displayName);
 
@@ -660,11 +667,24 @@ export default function HomePage() {
             >
               {avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={avatarUrl} alt="Avatar" className="h-full w-full rounded-full object-cover scale-150 -translate-y-1" />
+                <img
+                  src={avatarUrl}
+                  alt="Avatar"
+                  className="h-full w-full rounded-full object-cover scale-150 -translate-y-1"
+                  style={{ transform: `translate(${avatarOffsetX}%, ${avatarOffsetY - 10}%) scale(1.5)` }}
+                />
               ) : initials ? (
-                <span className="text-base sm:text-lg scale-150 -translate-y-1 inline-block">{initials}</span>
+                <span
+                  className="text-base sm:text-lg inline-block"
+                  style={{ transform: `translate(${avatarOffsetX}%, ${avatarOffsetY - 10}%) scale(1.5)` }}
+                >
+                  {initials}
+                </span>
               ) : (
-                <UserCircle2 className="w-6 h-6 text-gray-500 scale-150 -translate-y-1" />
+                <UserCircle2
+                  className="w-6 h-6 text-gray-500"
+                  style={{ transform: `translate(${avatarOffsetX}%, ${avatarOffsetY - 10}%) scale(1.5)` }}
+                />
               )}
             </button>
 
