@@ -18,7 +18,7 @@ export default function FinancePage() {
         </div>
         <div className="flex items-center justify-end flex-1">
           <Link href="/" className="flex items-center">
-            <div className="h-14 w-28 relative">
+            <div className="h-16 w-32 relative">
               <Image
                 src="/icons/logoHome.png"
                 alt="Agendo"
