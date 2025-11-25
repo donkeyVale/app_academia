@@ -201,35 +201,28 @@ export default function ProfilePage() {
     if (!file) return;
 
     try {
-      const filePath = `avatars/${userId}-${Date.now()}`;
-      const { error: uploadError } = await supabase.storage.from("avatars").upload(filePath, file, {
-        upsert: true,
+      const formData = new FormData();
+      formData.append('userId', userId);
+      formData.append('file', file);
+
+      const res = await fetch('/api/profile/upload-avatar', {
+        method: 'POST',
+        body: formData,
       });
 
-      if (uploadError) {
-        throw uploadError;
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json?.error ?? 'No se pudo actualizar la foto de perfil.');
       }
 
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("avatars").getPublicUrl(filePath);
-
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({ avatar_url: publicUrl })
-        .eq("id", userId);
-
-      if (profileError) {
-        throw profileError;
-      }
-
-      setAvatarUrl(publicUrl);
-      toast.success("Foto de perfil actualizada.");
+      const url = json.url as string;
+      setAvatarUrl(url);
+      toast.success('Foto de perfil actualizada.');
     } catch (e: any) {
-      toast.error(e?.message ?? "No se pudo actualizar la foto de perfil.");
+      toast.error(e?.message ?? 'No se pudo actualizar la foto de perfil.');
     } finally {
       if (event.target) {
-        event.target.value = "";
+        event.target.value = '';
       }
     }
   };
