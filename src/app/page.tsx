@@ -415,15 +415,17 @@ export default function HomePage() {
           </p>
         </div>
         <div className="flex items-center justify-end flex-1">
-          <div className="h-14 w-28 relative">
-            <Image
-              src="/icons/LogoAgendo1024.png"
-              alt="Agendo"
-              fill
-              className="object-contain"
-              priority
-            />
-          </div>
+          <Link href="/" className="flex items-center">
+            <div className="h-14 w-28 relative">
+              <Image
+                src="/icons/LogoAgendo1024.png"
+                alt="Agendo"
+                fill
+                className="object-contain"
+                priority
+              />
+            </div>
+          </Link>
         </div>
       </div>
 

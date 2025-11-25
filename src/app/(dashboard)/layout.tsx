@@ -1,6 +1,7 @@
 "use client";
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CalendarDays, Users, CreditCard, UserCog, BarChart3, LogOut, UserCircle2, Smartphone } from 'lucide-react';
@@ -166,8 +167,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="min-h-dvh bg-gray-50 pb-16">
       <header className="border-b bg-white">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-4">
-          <Link href="/" className="font-semibold text-[#31435d]">
-            Inicio
+          <Link href="/" className="flex items-center">
+            <div className="h-10 w-24 relative">
+              <Image
+                src="/icons/LogoAgendo1024.png"
+                alt="Agendo"
+                fill
+                className="object-contain"
+                priority
+              />
+            </div>
           </Link>
         </div>
       </header>
