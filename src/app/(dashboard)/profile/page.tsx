@@ -343,6 +343,14 @@ export default function ProfilePage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
+                  <label className="block text-sm mb-1">N° de documento</label>
+                  <input
+                    className="border rounded px-3 w-full h-10 text-base md:text-sm"
+                    value={nationalId}
+                    onChange={(e) => setNationalId(e.target.value)}
+                  />
+                </div>
+                <div>
                   <label className="block text-sm mb-1">Teléfono (+595...)</label>
                   <input
                     className="border rounded px-3 w-full h-10 text-base md:text-sm"
@@ -350,13 +358,13 @@ export default function ProfilePage() {
                     onChange={(e) => setPhone(e.target.value)}
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm mb-1">Fecha de nacimiento</label>
                   <DatePickerField value={birthDate} onChange={setBirthDate} />
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm mb-1">Correo electrónico</label>
                   <input
