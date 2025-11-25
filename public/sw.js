@@ -45,8 +45,10 @@ self.addEventListener('push', (event) => {
   const title = payload.title || 'Notificación';
   const options = {
     body: payload.body || '',
-    icon: '/icons/logoHome.png',
-    badge: '/icons/logoHome.png',
+    // Usamos el icono de la PWA declarado en el manifest. En Android este icono
+    // suele respetarse mejor que un logo rectangular arbitrario.
+    icon: '/icons/icon-192.png',
+    badge: '/icons/icon-192.png',
     data: payload.data || {},
   };
 
