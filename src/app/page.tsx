@@ -411,7 +411,7 @@ export default function HomePage() {
           <button
             type="button"
             onClick={() => router.push('/profile')}
-            className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center text-[11px] font-medium text-gray-700 overflow-hidden hover:ring-2 hover:ring-[#3cadaf]"
+            className="h-9 w-9 sm:h-10 sm:w-10 rounded-full bg-gray-200 flex items-center justify-center text-[11px] font-medium text-gray-700 overflow-hidden hover:ring-2 hover:ring-[#3cadaf]"
             aria-label="Ir a mi perfil"
           >
             {avatarUrl ? (
