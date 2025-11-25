@@ -18,7 +18,7 @@ export function FooterAvatarButton({
   avatarOffsetY,
   onClick,
 }: FooterAvatarButtonProps) {
-  const transform = `translate(${avatarOffsetX}%, ${avatarOffsetY - 22}%) scale(1.3)`;
+  const transform = `translate(${avatarOffsetX}%, ${avatarOffsetY - 24}%) scale(1.3)`;
 
   return (
     <button
