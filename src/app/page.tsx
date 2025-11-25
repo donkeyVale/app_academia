@@ -140,9 +140,15 @@ export default function HomePage() {
       const { data } = await supabase.auth.getUser();
       if (!active) return;
 
-      // nombre del usuario desde profiles (fallback al email)
-      let displayName: string | null = data.user?.email ?? null;
-      const userId = data.user?.id;
+      const user = data.user;
+      const userId = user?.id;
+
+      // nombre del usuario: intentamos en este orden
+      // 1) profiles.full_name
+      // 2) user_metadata.first_name / last_name
+      // 3) email
+      let displayName: string | null = user?.email ?? null;
+
       if (userId) {
         const { data: profile } = await supabase
           .from('profiles')
@@ -168,6 +174,17 @@ export default function HomePage() {
           setRole(null);
         }
       }
+
+      if (!displayName) {
+        const meta = (user?.user_metadata ?? {}) as any;
+        const fn = (meta.first_name as string | null) ?? '';
+        const ln = (meta.last_name as string | null) ?? '';
+        const fullFromMeta = `${fn} ${ln}`.trim();
+        if (fullFromMeta) {
+          displayName = fullFromMeta;
+        }
+      }
+
       setUserName(displayName);
 
       // métricas de dashboard
