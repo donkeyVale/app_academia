@@ -554,6 +554,10 @@ export default function SchedulePage() {
       const endTs = startTs + 60 * 60 * 1000;
       if (endTs < now.getTime()) return false;
 
+      // ocultar clases sin alumnos (por ejemplo, cuando el único alumno canceló)
+      const countForClass = bookingsCount[cls.id] ?? 0;
+      if (countForClass <= 0) return false;
+
       // Si es alumno, solo ve clases donde tiene reserva
       if (role === 'student' && studentId) {
         const studentsForClass = studentsByClass[cls.id] ?? [];
@@ -584,6 +588,7 @@ export default function SchedulePage() {
     classes,
     courtsMap,
     studentsByClass,
+    bookingsCount,
     role,
     studentId,
     filterLocationId,
@@ -1684,41 +1689,11 @@ export default function SchedulePage() {
                             if (!canStudentCancel) return;
                             if (!confirm('¿Cancelar tu reserva para esta clase?')) return;
 
-                            // Verificamos si esta clase tenía solo a este alumno reservado
+                            // Verificamos si esta clase tenía solo a este alumno reservado (para actualizar el estado local)
                             const currentStudents = studentsByClass[cls.id] ?? [];
                             const wasSingleStudent = currentStudents.length <= 1;
 
-                            const { error: delBookingErr } = await supabase
-                              .from('bookings')
-                              .delete()
-                              .eq('class_id', cls.id)
-                              .eq('student_id', studentId);
-                            if (delBookingErr) {
-                              toast.error('Error al cancelar la reserva: ' + delBookingErr.message);
-                              return;
-                            }
-
-                            const { error: delUsageErr } = await supabase
-                              .from('plan_usages')
-                              .delete()
-                              .eq('class_id', cls.id)
-                              .eq('student_id', studentId);
-                            if (delUsageErr) {
-                              toast.error('Error al devolver la clase al plan: ' + delUsageErr.message);
-                              return;
-                            }
-
                             if (wasSingleStudent) {
-                              // Si era el único alumno, eliminamos también la clase para que no quede vacía
-                              const { error: delClassErr } = await supabase
-                                .from('class_sessions')
-                                .delete()
-                                .eq('id', cls.id);
-                              if (delClassErr) {
-                                toast.error('Error al eliminar la clase vacía: ' + delClassErr.message);
-                                return;
-                              }
-
                               setClasses((prev) => prev.filter((c) => c.id !== cls.id));
                               setBookingsCount((prev) => {
                                 const n = { ...prev };
@@ -1731,7 +1706,6 @@ export default function SchedulePage() {
                                 return n;
                               });
                             } else {
-                              // Si había más alumnos, mantenemos la clase y solo actualizamos los contadores
                               setBookingsCount((prev) => {
                                 const current = prev[cls.id] ?? 0;
                                 return { ...prev, [cls.id]: Math.max(0, current - 1) };
@@ -1741,6 +1715,23 @@ export default function SchedulePage() {
                                 const nextArr = arr.filter((sid) => sid !== studentId);
                                 return { ...prev, [cls.id]: nextArr };
                               });
+                            }
+
+                            // Delegamos el borrado real (booking, plan_usage y posible clase vacía) al backend con supabaseAdmin
+                            try {
+                              const res = await fetch('/api/classes/cancel-single-student', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ classId: cls.id, studentId }),
+                              });
+                              if (!res.ok) {
+                                const data = await res.json().catch(() => ({}));
+                                const msg = data?.error || 'No se pudo cancelar la reserva en el servidor.';
+                                toast.error(msg);
+                              }
+                            } catch (apiErr) {
+                              console.error('Error llamando a /api/classes/cancel-single-student', apiErr);
+                              toast.error('No se pudo cancelar la reserva en el servidor.');
                             }
 
                             try {
