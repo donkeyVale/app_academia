@@ -130,6 +130,8 @@ export default function SchedulePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [role, setRole] = useState<'admin' | 'coach' | 'student' | null>(null);
+  const [studentId, setStudentId] = useState<string | null>(null);
 
   // Form state
   const [day, setDay] = useState<string>(''); // yyyy-mm-dd
@@ -157,6 +159,54 @@ export default function SchedulePage() {
   const [courtFilterSearch, setCourtFilterSearch] = useState('');
   const [coachFilterSearch, setCoachFilterSearch] = useState('');
   const [studentFilterSearch, setStudentFilterSearch] = useState('');
+
+  // Cargar rol del usuario actual y, si es alumno, su studentId
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.auth.getUser();
+        const userId = data.user?.id as string | undefined;
+        if (!userId) {
+          setRole(null);
+          setStudentId(null);
+          return;
+        }
+
+        const { data: profile, error: profErr } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', userId)
+          .maybeSingle();
+        if (profErr) {
+          console.error('Error cargando perfil en Agenda', profErr);
+          setRole(null);
+        } else {
+          const r = (profile?.role as 'admin' | 'coach' | 'student' | null) ?? null;
+          setRole(r === 'admin' || r === 'coach' || r === 'student' ? r : null);
+        }
+
+        if (profile?.role === 'student') {
+          const { data: studentRow, error: studErr } = await supabase
+            .from('students')
+            .select('id')
+            .eq('user_id', userId)
+            .maybeSingle();
+          if (studErr) {
+            console.error('Error obteniendo studentId en Agenda', studErr);
+            setStudentId(null);
+          } else {
+            setStudentId((studentRow?.id as string | undefined) ?? null);
+          }
+        } else {
+          setStudentId(null);
+        }
+      } catch (e) {
+        console.error('Error inicializando rol en Agenda', e);
+        setRole(null);
+        setStudentId(null);
+      }
+    })();
+  }, [supabase]);
 
   useEffect(() => {
     (async () => {
@@ -462,6 +512,13 @@ export default function SchedulePage() {
       const startTs = new Date(cls.date).getTime();
       const endTs = startTs + 60 * 60 * 1000;
       if (endTs < now.getTime()) return false;
+
+      // Si es alumno, solo ve clases donde tiene reserva
+      if (role === 'student' && studentId) {
+        const studentsForClass = studentsByClass[cls.id] ?? [];
+        if (!studentsForClass.includes(studentId)) return false;
+      }
+
       if (filterLocationId) {
         const court = courtsMap[cls.court_id || ''];
         if (!court || court.location_id !== filterLocationId) return false;
@@ -486,6 +543,8 @@ export default function SchedulePage() {
     classes,
     courtsMap,
     studentsByClass,
+    role,
+    studentId,
     filterLocationId,
     filterCourtId,
     filterCoachId,
@@ -890,20 +949,21 @@ export default function SchedulePage() {
         </div>
       </div>
 
-      <div className="border rounded-lg bg-white shadow-sm">
-        <button
-          type="button"
-          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
-          onClick={() => setShowCreateSection((v) => !v)}
-        >
-          <span className="inline-flex items-center gap-2 text-[#31435d]">
-            <Clock className="w-4 h-4 text-emerald-500" />
-            Crear nueva clase
-          </span>
-          <span className="text-xs text-gray-500">{showCreateSection ? '▼' : '▲'}</span>
-        </button>
-        <AnimatePresence initial={false}>
-          {showCreateSection && (
+      {role !== 'student' && (
+        <div className="border rounded-lg bg-white shadow-sm">
+          <button
+            type="button"
+            className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+            onClick={() => setShowCreateSection((v) => !v)}
+          >
+            <span className="inline-flex items-center gap-2 text-[#31435d]">
+              <Clock className="w-4 h-4 text-emerald-500" />
+              Crear nueva clase
+            </span>
+            <span className="text-xs text-gray-500">{showCreateSection ? '▼' : '▲'}</span>
+          </button>
+          <AnimatePresence initial={false}>
+            {showCreateSection && (
             <motion.form
               key="create-class-section"
               initial={{ opacity: 0, height: 0 }}
@@ -1129,14 +1189,15 @@ export default function SchedulePage() {
                   </PopoverContent>
                 </Popover>
               </div>
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        <button className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50" disabled={saving}>
-          {saving ? 'Creando...' : 'Crear clase'}
-        </button>
+              {error && <p className="text-sm text-red-600">{error}</p>}
+              <button className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50" disabled={saving}>
+                {saving ? 'Creando...' : 'Crear clase'}
+              </button>
             </motion.form>
           )}
         </AnimatePresence>
-      </div>
+        </div>
+      )}
 
       <div className="border rounded-lg bg-white shadow-sm overflow-hidden">
         <button
@@ -1532,6 +1593,11 @@ export default function SchedulePage() {
               const hh = String(d.getHours()).padStart(2, '0');
               const min = String(d.getMinutes()).padStart(2, '0');
 
+              const now = new Date();
+              const startTs = d.getTime();
+              const hoursUntilClass = (startTs - now.getTime()) / (1000 * 60 * 60);
+              const canStudentCancel = !!studentId && hoursUntilClass > 12;
+
               const tipoLabel = cls.type === 'individual' ? 'Individual' : 'Grupal';
 
               return (
@@ -1574,58 +1640,148 @@ export default function SchedulePage() {
                       </div>
                     </div>
                     <div className="shrink-0 flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full sm:w-auto">
-                      <button
-                        className="text-[11px] sm:text-xs px-3 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50"
-                        onClick={async () => {
-                          if (!confirm('¿Cancelar y eliminar esta clase? Se eliminarán reservas y asistencias asociadas.')) return;
-                          const { error: delErr } = await supabase.from('class_sessions').delete().eq('id', cls.id);
-                          if (delErr) {
-                            toast.error('Error al cancelar: ' + delErr.message);
-                            return;
-                          }
-                          await logAudit('delete', 'class_session', cls.id, {
-                            date: cls.date,
-                            court_id: cls.court_id,
-                            coach_id: cls.coach_id,
-                            capacity: cls.capacity,
-                            price_cents: cls.price_cents,
-                            currency: cls.currency,
-                          });
-                          setClasses((prev) => prev.filter((c) => c.id !== cls.id));
-                          setBookingsCount((prev) => {
-                            const n = { ...prev };
-                            delete n[cls.id];
-                            return n;
-                          });
-                          try {
-                            await fetch('/api/push/class-cancelled', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({
-                                classId: cls.id,
-                                coachId: cls.coach_id,
-                                studentIds: studentsByClass[cls.id] ?? [],
-                                dateIso: cls.date,
-                              }),
+                      {role === 'student' ? (
+                        <button
+                          className="text-[11px] sm:text-xs px-3 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={!canStudentCancel}
+                          onClick={async () => {
+                            if (!studentId) return;
+                            if (!canStudentCancel) return;
+                            if (!confirm('¿Cancelar tu reserva para esta clase?')) return;
+
+                            const { error: delBookingErr } = await supabase
+                              .from('bookings')
+                              .delete()
+                              .eq('class_id', cls.id)
+                              .eq('student_id', studentId);
+                            if (delBookingErr) {
+                              toast.error('Error al cancelar la reserva: ' + delBookingErr.message);
+                              return;
+                            }
+
+                            const { error: delUsageErr } = await supabase
+                              .from('plan_usages')
+                              .delete()
+                              .eq('class_id', cls.id)
+                              .eq('student_id', studentId);
+                            if (delUsageErr) {
+                              toast.error('Error al devolver la clase al plan: ' + delUsageErr.message);
+                              return;
+                            }
+
+                            setBookingsCount((prev) => {
+                              const current = prev[cls.id] ?? 0;
+                              return { ...prev, [cls.id]: Math.max(0, current - 1) };
                             });
-                          } catch (pushErr) {
-                            console.error('Error enviando notificación de clase cancelada', pushErr);
-                          }
-                          toast.success('Clase cancelada correctamente');
-                        }}
-                      >Cancelar</button>
-                      <button
-                        className="text-[11px] sm:text-xs px-3 py-1 rounded border border-[#3cadaf] text-[#3cadaf] hover:bg-[#e6f5f6]"
-                        onClick={() => openAttendance(cls)}
-                      >
-                        Asistencia
-                      </button>
-                      <button
-                        className="text-[11px] sm:text-xs px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
-                        onClick={() => openEdit(cls)}
-                      >
-                        Editar
-                      </button>
+                            setStudentsByClass((prev) => {
+                              const arr = prev[cls.id] ?? [];
+                              const nextArr = arr.filter((sid) => sid !== studentId);
+                              return { ...prev, [cls.id]: nextArr };
+                            });
+
+                            try {
+                              await fetch('/api/push/class-cancelled', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  classId: cls.id,
+                                  coachId: cls.coach_id,
+                                  studentIds: [studentId],
+                                  dateIso: cls.date,
+                                }),
+                              });
+                            } catch (pushErr) {
+                              console.error('Error enviando notificación de cancelación de reserva', pushErr);
+                            }
+
+                            toast.success('Reserva cancelada correctamente. Se devolvió 1 clase a tu plan.');
+                          }}
+                        >
+                          {canStudentCancel ? 'Cancelar reserva' : 'No se puede cancelar (menos de 12h)'}
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            className="text-[11px] sm:text-xs px-3 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50"
+                            onClick={async () => {
+                              const nowInner = new Date();
+                              if (startTs <= nowInner.getTime()) {
+                                toast.error('No se puede cancelar una clase que ya comenzó.');
+                                return;
+                              }
+
+                              if (!confirm('¿Cancelar y eliminar esta clase? Se eliminarán reservas, asistencias y usos de plan asociados.')) return;
+
+                              const { error: delUsageErr } = await supabase
+                                .from('plan_usages')
+                                .delete()
+                                .eq('class_id', cls.id);
+                              if (delUsageErr) {
+                                toast.error('Error al devolver clases de los planes: ' + delUsageErr.message);
+                                return;
+                              }
+
+                              const { error: delErr } = await supabase
+                                .from('class_sessions')
+                                .delete()
+                                .eq('id', cls.id);
+                              if (delErr) {
+                                toast.error('Error al cancelar: ' + delErr.message);
+                                return;
+                              }
+
+                              await logAudit('delete', 'class_session', cls.id, {
+                                date: cls.date,
+                                court_id: cls.court_id,
+                                coach_id: cls.coach_id,
+                                capacity: cls.capacity,
+                                price_cents: cls.price_cents,
+                                currency: cls.currency,
+                              });
+                              setClasses((prev) => prev.filter((c) => c.id !== cls.id));
+                              setBookingsCount((prev) => {
+                                const n = { ...prev };
+                                delete n[cls.id];
+                                return n;
+                              });
+                              setStudentsByClass((prev) => {
+                                const n = { ...prev };
+                                delete n[cls.id];
+                                return n;
+                              });
+                              try {
+                                await fetch('/api/push/class-cancelled', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    classId: cls.id,
+                                    coachId: cls.coach_id,
+                                    studentIds: studentsByClass[cls.id] ?? [],
+                                    dateIso: cls.date,
+                                  }),
+                                });
+                              } catch (pushErr) {
+                                console.error('Error enviando notificación de clase cancelada', pushErr);
+                              }
+                              toast.success('Clase cancelada correctamente y clases devueltas a los planes.');
+                            }}
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            className="text-[11px] sm:text-xs px-3 py-1 rounded border border-[#3cadaf] text-[#3cadaf] hover:bg-[#e6f5f6]"
+                            onClick={() => openAttendance(cls)}
+                          >
+                            Asistencia
+                          </button>
+                          <button
+                            className="text-[11px] sm:text-xs px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+                            onClick={() => openEdit(cls)}
+                          >
+                            Editar
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </li>
@@ -1652,7 +1808,7 @@ export default function SchedulePage() {
         )}
       </div>
 
-      {recentClasses.length > 0 && (
+      {role !== 'student' && recentClasses.length > 0 && (
         <div className="border rounded-lg bg-white shadow-sm overflow-hidden">
           <button
             type="button"
