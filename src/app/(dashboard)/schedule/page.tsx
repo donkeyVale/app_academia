@@ -1684,6 +1684,10 @@ export default function SchedulePage() {
                             if (!canStudentCancel) return;
                             if (!confirm('¿Cancelar tu reserva para esta clase?')) return;
 
+                            // Verificamos si esta clase tenía solo a este alumno reservado
+                            const currentStudents = studentsByClass[cls.id] ?? [];
+                            const wasSingleStudent = currentStudents.length <= 1;
+
                             const { error: delBookingErr } = await supabase
                               .from('bookings')
                               .delete()
@@ -1704,15 +1708,40 @@ export default function SchedulePage() {
                               return;
                             }
 
-                            setBookingsCount((prev) => {
-                              const current = prev[cls.id] ?? 0;
-                              return { ...prev, [cls.id]: Math.max(0, current - 1) };
-                            });
-                            setStudentsByClass((prev) => {
-                              const arr = prev[cls.id] ?? [];
-                              const nextArr = arr.filter((sid) => sid !== studentId);
-                              return { ...prev, [cls.id]: nextArr };
-                            });
+                            if (wasSingleStudent) {
+                              // Si era el único alumno, eliminamos también la clase para que no quede vacía
+                              const { error: delClassErr } = await supabase
+                                .from('class_sessions')
+                                .delete()
+                                .eq('id', cls.id);
+                              if (delClassErr) {
+                                toast.error('Error al eliminar la clase vacía: ' + delClassErr.message);
+                                return;
+                              }
+
+                              setClasses((prev) => prev.filter((c) => c.id !== cls.id));
+                              setBookingsCount((prev) => {
+                                const n = { ...prev };
+                                delete n[cls.id];
+                                return n;
+                              });
+                              setStudentsByClass((prev) => {
+                                const n = { ...prev };
+                                delete n[cls.id];
+                                return n;
+                              });
+                            } else {
+                              // Si había más alumnos, mantenemos la clase y solo actualizamos los contadores
+                              setBookingsCount((prev) => {
+                                const current = prev[cls.id] ?? 0;
+                                return { ...prev, [cls.id]: Math.max(0, current - 1) };
+                              });
+                              setStudentsByClass((prev) => {
+                                const arr = prev[cls.id] ?? [];
+                                const nextArr = arr.filter((sid) => sid !== studentId);
+                                return { ...prev, [cls.id]: nextArr };
+                              });
+                            }
 
                             try {
                               await fetch('/api/push/class-cancelled', {
