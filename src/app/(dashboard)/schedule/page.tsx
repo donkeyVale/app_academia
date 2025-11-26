@@ -614,6 +614,9 @@ export default function SchedulePage() {
     });
   }, [classes]);
 
+  // Modal simple para ver los alumnos de una clase
+  const [studentsModalClass, setStudentsModalClass] = useState<ClassSession | null>(null);
+
   // Edit modal state
   const [editing, setEditing] = useState<ClassSession | null>(null);
   const [editCourtId, setEditCourtId] = useState<string>('');
@@ -1673,9 +1676,13 @@ export default function SchedulePage() {
                           >
                             {tipoLabel}
                           </span>
-                          <span className="inline-flex items-center rounded-full bg-slate-50 text-slate-700 border border-slate-200 px-2 py-0.5 text-[11px] font-medium">
+                          <button
+                            type="button"
+                            className="inline-flex items-center rounded-full bg-slate-50 text-slate-700 border border-slate-200 px-2 py-0.5 text-[11px] font-medium hover:bg-slate-100"
+                            onClick={() => setStudentsModalClass(cls)}
+                          >
                             {alumnos}/{cls.capacity} alumnos
-                          </span>
+                          </button>
                         </div>
                       </div>
                     </div>
