@@ -2245,6 +2245,57 @@ export default function SchedulePage() {
           </div>
         </div>
       )}
+
+      {studentsModalClass && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3 py-4">
+          <div className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-lg bg-white shadow-xl border border-slate-200">
+            <div className="flex items-center justify-between border-b px-4 pt-4 pb-3">
+              <div className="space-y-0.5">
+                <h3 className="text-base font-semibold text-[#31435d]">Alumnos de la clase</h3>
+                <p className="text-xs text-gray-500">
+                  Clase del {new Date(studentsModalClass.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  {" "}a las{" "}
+                  {new Date(studentsModalClass.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="text-xs text-gray-500 hover:text-gray-700 underline-offset-2 hover:underline"
+                onClick={() => setStudentsModalClass(null)}
+              >
+                Cerrar
+              </button>
+            </div>
+            <div className="px-4 py-3 text-sm overflow-y-auto">
+              {(() => {
+                const ids = studentsByClass[studentsModalClass.id] ?? [];
+                if (!ids.length) {
+                  return <p className="text-xs text-gray-600">No hay alumnos reservados para esta clase.</p>;
+                }
+                const uniqueIds = Array.from(new Set(ids));
+                const items = uniqueIds.map((sid) => {
+                  const s = studentsMap[sid];
+                  const label = s?.full_name ?? s?.notes ?? s?.level ?? sid;
+                  return { id: sid, label };
+                });
+                return (
+                  <ul className="space-y-1">
+                    {items.map((item) => (
+                      <li
+                        key={item.id}
+                        className="flex items-center justify-between rounded border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs"
+                      >
+                        <span className="truncate mr-2">{item.label}</span>
+                      </li>
+                    ))}
+                  </ul>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
     </section>
   );
 }
