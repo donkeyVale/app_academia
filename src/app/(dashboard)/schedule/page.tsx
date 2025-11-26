@@ -454,11 +454,52 @@ export default function SchedulePage() {
         students: selectedStudents,
       });
 
-      // Create bookings for selected students
+      // Create bookings for selected students y registrar consumo en plan_usages
       if (selectedStudents.length) {
         const rows = selectedStudents.map((sid) => ({ class_id: createdClass.id, student_id: sid, status: 'reserved' }));
         const { error: bErr } = await supabase.from('bookings').insert(rows);
         if (bErr) throw bErr;
+
+        // Para cada alumno, registrar uso de plan si tiene clases disponibles
+        for (const sid of selectedStudents) {
+          try {
+            const { data: plans, error: planErr } = await supabase
+              .from('student_plans')
+              .select('id, remaining_classes, purchased_at')
+              .eq('student_id', sid)
+              .order('purchased_at', { ascending: true });
+            if (planErr) continue;
+            if (!plans || plans.length === 0) continue;
+
+            let chosenPlan: any = null;
+            for (const p of plans as any[]) {
+              const { data: usageData, error: usageCountErr } = await supabase
+                .from('plan_usages')
+                .select('id', { count: 'exact', head: true })
+                .eq('student_plan_id', p.id);
+              if (usageCountErr) continue;
+              const used = (usageData as any)?.length ?? 0;
+              if (used < (p.remaining_classes as number)) {
+                chosenPlan = p;
+                break;
+              }
+            }
+
+            if (!chosenPlan) continue;
+
+            await supabase.from('plan_usages').upsert(
+              {
+                student_plan_id: chosenPlan.id,
+                class_id: createdClass.id,
+                student_id: sid,
+              },
+              { onConflict: 'student_id,class_id' }
+            );
+          } catch {
+            // si falla algo con el plan, no bloqueamos la creación de la clase
+          }
+        }
+
         setBookingsCount((prev) => ({ ...prev, [createdClass.id]: selectedStudents.length }));
         // También actualizamos el mapa de alumnos por clase en memoria, para que la cancelación
         // pueda enviar notificaciones a los alumnos incluso antes de recargar la página.
@@ -718,37 +759,6 @@ export default function SchedulePage() {
     setAttendanceSaving(true);
     setError(null);
     try {
-      // Validar que cada alumno presente tenga un plan con saldo disponible
-      const presentRows = attendanceList.filter((r) => r.present);
-      const planByStudent: Record<string, string> = {};
-      for (const row of presentRows) {
-        const { data: plans, error: planErr } = await supabase
-          .from('student_plans')
-          .select('id, remaining_classes, purchased_at')
-          .eq('student_id', row.student_id)
-          .gt('remaining_classes', 0)
-          .order('purchased_at', { ascending: true })
-          .limit(1);
-        if (planErr) throw planErr;
-        if (!plans || plans.length === 0) {
-          throw new Error(`El alumno no tiene clases disponibles en sus planes. (${row.label})`);
-        }
-        const plan = plans[0];
-
-        // Verificar cuántas clases ya usó de ese plan
-        const { data: usageData, error: usageCountErr } = await supabase
-          .from('plan_usages')
-          .select('id', { count: 'exact', head: true })
-          .eq('student_plan_id', plan.id);
-        if (usageCountErr) throw usageCountErr;
-        const used = (usageData as any)?.length ?? 0;
-        if (used >= (plan.remaining_classes as number)) {
-          throw new Error(`El alumno ya utilizó todas las clases de su plan. (${row.label})`);
-        }
-
-        planByStudent[row.student_id] = plan.id as string;
-      }
-
       // Simple approach: remove previous attendance for this class and insert fresh snapshot
       const { error: delErr } = await supabase
         .from('attendance')
@@ -764,29 +774,6 @@ export default function SchedulePage() {
         }));
         const { error: insErr } = await supabase.from('attendance').insert(rows);
         if (insErr) throw insErr;
-
-        // Sincronizar plan_usages: upsert para presentes y eliminar para ausentes
-        if (presentRows.length) {
-          const usageRows = presentRows.map((row) => ({
-            student_plan_id: planByStudent[row.student_id],
-            class_id: attendanceClass.id,
-            student_id: row.student_id,
-          }));
-          const { error: usageErr } = await supabase
-            .from('plan_usages')
-            .upsert(usageRows, { onConflict: 'student_id,class_id' });
-          if (usageErr) throw usageErr;
-        }
-        const absentRows = attendanceList.filter((r) => !r.present);
-        if (absentRows.length) {
-          const absentIds = absentRows.map((r) => r.student_id);
-          const { error: delUsageErr } = await supabase
-            .from('plan_usages')
-            .delete()
-            .eq('class_id', attendanceClass.id)
-            .in('student_id', absentIds);
-          if (delUsageErr) throw delUsageErr;
-        }
 
         await logAudit('attendance_update', 'class_session', attendanceClass.id, {
           attendance: rows,
@@ -904,6 +891,46 @@ export default function SchedulePage() {
         const rows = toAdd.map((sid) => ({ class_id: editing.id, student_id: sid, status: 'reserved' }));
         const { error: addErr } = await supabase.from('bookings').insert(rows);
         if (addErr) throw addErr;
+
+        // crear usos de plan para nuevos alumnos si tienen saldo disponible
+        for (const sid of toAdd) {
+          try {
+            const { data: plans, error: planErr } = await supabase
+              .from('student_plans')
+              .select('id, remaining_classes, purchased_at')
+              .eq('student_id', sid)
+              .order('purchased_at', { ascending: true });
+            if (planErr) continue;
+            if (!plans || plans.length === 0) continue;
+
+            let chosenPlan: any = null;
+            for (const p of plans as any[]) {
+              const { data: usageData, error: usageCountErr } = await supabase
+                .from('plan_usages')
+                .select('id', { count: 'exact', head: true })
+                .eq('student_plan_id', p.id);
+              if (usageCountErr) continue;
+              const used = (usageData as any)?.length ?? 0;
+              if (used < (p.remaining_classes as number)) {
+                chosenPlan = p;
+                break;
+              }
+            }
+
+            if (!chosenPlan) continue;
+
+            await supabase.from('plan_usages').upsert(
+              {
+                student_plan_id: chosenPlan.id,
+                class_id: editing.id,
+                student_id: sid,
+              },
+              { onConflict: 'student_id,class_id' }
+            );
+          } catch {
+            // no bloquear la edición por errores de plan
+          }
+        }
       }
       if (toRemove.length) {
         const { error: delErr } = await supabase
@@ -912,6 +939,14 @@ export default function SchedulePage() {
           .eq('class_id', editing.id)
           .in('student_id', toRemove);
         if (delErr) throw delErr;
+
+        // devolver clases al plan eliminando usos para los alumnos quitados
+        const { error: delUsageErr } = await supabase
+          .from('plan_usages')
+          .delete()
+          .eq('class_id', editing.id)
+          .in('student_id', toRemove);
+        if (delUsageErr) throw delUsageErr;
       }
 
       await logAudit('update', 'class_session', editing.id, { ...updates, add_students: toAdd, remove_students: toRemove });
