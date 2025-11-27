@@ -169,7 +169,7 @@ export default function PlansClient() {
 
   // UI: secciones plegables para reducir scroll
   const [showCreatePlan, setShowCreatePlan] = useState(false);
-  const [showAssignPlan, setShowAssignPlan] = useState(true);
+  const [showAssignPlan, setShowAssignPlan] = useState(false);
   const [showStudentSummary, setShowStudentSummary] = useState(false);
   const [showPaymentsSection, setShowPaymentsSection] = useState(false);
   const [recentPlansSearch, setRecentPlansSearch] = useState('');

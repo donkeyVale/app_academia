@@ -1015,7 +1015,7 @@ export default function SchedulePage() {
   }[]>([]);
 
   // UI: secciones plegables para reducir scroll
-  const [showCreateSection, setShowCreateSection] = useState(true);
+  const [showCreateSection, setShowCreateSection] = useState(false);
   const [showUpcomingSection, setShowUpcomingSection] = useState(false);
   const [showRecentSection, setShowRecentSection] = useState(false);
   const [showAllUpcoming, setShowAllUpcoming] = useState(false);

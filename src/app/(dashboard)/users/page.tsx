@@ -110,7 +110,7 @@ export default function UsersPage() {
   const [forbidden, setForbidden] = useState(false);
 
   // UI: secciones plegables
-  const [showCreateUser, setShowCreateUser] = useState(true);
+  const [showCreateUser, setShowCreateUser] = useState(false);
   const [showUsersList, setShowUsersList] = useState(false);
 
   // Modal de detalle/edición de usuario
