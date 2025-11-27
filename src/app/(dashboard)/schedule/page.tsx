@@ -380,7 +380,6 @@ export default function SchedulePage() {
     try {
       if (!courtId || !coachId || !day || !time) {
         const msg = 'Completa cancha, fecha y hora, y profesor';
-        setError(msg);
         toast.error(msg);
         setSaving(false);
         return;
@@ -421,14 +420,12 @@ export default function SchedulePage() {
 
       if (selectedStudents.length < 1) {
         const msg = 'Selecciona al menos 1 alumno (máximo 4).';
-        setError(msg);
         toast.error(msg);
         setSaving(false);
         return;
       }
       if (selectedStudents.length > 4) {
         const msg = 'Máximo 4 alumnos por clase.';
-        setError(msg);
         toast.error(msg);
         setSaving(false);
         return;
@@ -963,15 +960,15 @@ export default function SchedulePage() {
   const onSaveEdit = async () => {
     if (!editing) return;
     if (!editCourtId || !editCoachId || !editDay || !editTime) {
-      setError('Completa cancha, fecha, hora y profesor');
+      toast.error('Completa cancha, fecha, hora y profesor');
       return;
     }
     if (editSelectedStudents.length < 1) {
-      setError('Selecciona al menos 1 alumno (máximo 4).');
+      toast.error('Selecciona al menos 1 alumno (máximo 4).');
       return;
     }
     if (editSelectedStudents.length > 4) {
-      setError('Máximo 4 alumnos por clase.');
+      toast.error('Máximo 4 alumnos por clase.');
       return;
     }
     setSaving(true);
@@ -987,7 +984,7 @@ export default function SchedulePage() {
         .limit(1);
       if (clashErr) throw clashErr;
       if ((clash ?? []).length > 0) {
-        setError('Ese horario ya fue ocupado recientemente. Elegí otra hora.');
+        toast.error('Ese horario ya fue ocupado recientemente. Elegí otra hora.');
         setSaving(false);
         return;
       }
@@ -1010,7 +1007,7 @@ export default function SchedulePage() {
         const now = new Date();
         const classStart = new Date(iso);
         if (classStart.getTime() <= now.getTime()) {
-          setError('No podés mover una clase a una fecha y hora que ya pasaron.');
+          toast.error('No podés mover una clase a una fecha y hora que ya pasaron.');
           setSaving(false);
           return;
         }
@@ -1032,13 +1029,13 @@ export default function SchedulePage() {
             .order('purchased_at', { ascending: true });
 
           if (planErr) {
-            setError('No se pudo verificar el plan del alumno. Intenta nuevamente.');
+            toast.error('No se pudo verificar el plan del alumno. Intenta nuevamente.');
             setSaving(false);
             return;
           }
 
           if (!plans || plans.length === 0) {
-            setError('Uno de los alumnos seleccionados no tiene un plan con clases disponibles.');
+            toast.error('Uno de los alumnos seleccionados no tiene un plan con clases disponibles.');
             setSaving(false);
             return;
           }
@@ -1051,7 +1048,7 @@ export default function SchedulePage() {
               .eq('student_plan_id', p.id)
               .eq('student_id', sid);
             if (usageCountErr) {
-              setError('No se pudo verificar el uso de clases del plan.');
+              toast.error('No se pudo verificar el uso de clases del plan.');
               setSaving(false);
               return;
             }
@@ -1063,7 +1060,7 @@ export default function SchedulePage() {
           }
 
           if (!chosenPlan) {
-            setError('Uno de los alumnos seleccionados ya no tiene clases disponibles en su plan.');
+            toast.error('Uno de los alumnos seleccionados ya no tiene clases disponibles en su plan.');
             setSaving(false);
             return;
           }
@@ -1079,7 +1076,7 @@ export default function SchedulePage() {
               .gt('class_sessions.date', nowIso);
 
             if (futureErr) {
-              setError('No se pudo verificar las clases futuras del alumno. Intenta nuevamente.');
+              toast.error('No se pudo verificar las clases futuras del alumno. Intenta nuevamente.');
               setSaving(false);
               return;
             }
@@ -1088,7 +1085,7 @@ export default function SchedulePage() {
             if (futureCount >= totalFromPlan) {
               const s = studentsMap[sid];
               const label = s?.full_name ?? s?.notes ?? s?.level ?? sid;
-              setError(
+              toast.error(
                 `El alumno ${label} ya tiene ${futureCount} clases futuras reservadas, que es el máximo permitido por su plan.`
               );
               setSaving(false);
@@ -1110,13 +1107,13 @@ export default function SchedulePage() {
           .neq('id', editing.id)
           .limit(1);
         if (coachClashErr) {
-          setError('No se pudo verificar la disponibilidad del profesor. Intenta nuevamente.');
+          toast.error('No se pudo verificar la disponibilidad del profesor. Intenta nuevamente.');
           setSaving(false);
           return;
         }
         if ((coachClash ?? []).length > 0) {
           const coachName = coachesMap[editCoachId]?.full_name ?? 'el profesor seleccionado';
-          setError(`${coachName} ya tiene una clase en ese horario.`);
+          toast.error(`${coachName} ya tiene una clase en ese horario.`);
           setSaving(false);
           return;
         }
@@ -1132,7 +1129,7 @@ export default function SchedulePage() {
           .neq('class_sessions.id', editing.id);
 
         if (conflictsErr) {
-          setError('No se pudo verificar la disponibilidad de los alumnos. Intenta nuevamente.');
+          toast.error('No se pudo verificar la disponibilidad de los alumnos. Intenta nuevamente.');
           setSaving(false);
           return;
         }
@@ -1149,7 +1146,7 @@ export default function SchedulePage() {
             conflictIds.length === 1
               ? `El alumno ${labels[0]} ya tiene una clase en ese horario.`
               : `Los siguientes alumnos ya tienen una clase en ese horario: ${labels.join(', ')}.`;
-          setError(msg);
+          toast.error(msg);
           setSaving(false);
           return;
         }
