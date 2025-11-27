@@ -413,7 +413,6 @@ export default function SchedulePage() {
         const classStart = new Date(iso);
         if (classStart.getTime() <= now.getTime()) {
           const msg = 'No podés crear una clase en una fecha y hora que ya pasaron.';
-          setError(msg);
           toast.error(msg);
           setSaving(false);
           return;
@@ -448,7 +447,6 @@ export default function SchedulePage() {
           .limit(1);
         if (coachClashErr) {
           const msg = 'No se pudo verificar la disponibilidad del profesor. Intenta nuevamente.';
-          setError(msg);
           toast.error(msg);
           setSaving(false);
           return;
@@ -456,7 +454,6 @@ export default function SchedulePage() {
         if ((coachClash ?? []).length > 0) {
           const coachName = coachesMap[coachId]?.full_name ?? 'el profesor seleccionado';
           const msg = `${coachName} ya tiene una clase en ese horario.`;
-          setError(msg);
           toast.error(msg);
           setSaving(false);
           return;
@@ -474,7 +471,6 @@ export default function SchedulePage() {
 
         if (planErr) {
           const msg = 'No se pudo verificar el plan del alumno. Intenta nuevamente.';
-          setError(msg);
           toast.error(msg);
           setSaving(false);
           return;
@@ -482,7 +478,6 @@ export default function SchedulePage() {
 
         if (!plans || plans.length === 0) {
           const msg = 'El alumno seleccionado no tiene un plan con clases disponibles.';
-          setError(msg);
           toast.error(msg);
           setSaving(false);
           return;
@@ -497,7 +492,6 @@ export default function SchedulePage() {
             .eq('student_id', sid);
           if (usageCountErr) {
             const msg = 'No se pudo verificar el uso de clases del plan.';
-            setError(msg);
             toast.error(msg);
             setSaving(false);
             return;
@@ -511,7 +505,6 @@ export default function SchedulePage() {
 
         if (!chosenPlan) {
           const msg = 'El alumno seleccionado ya no tiene clases disponibles en su plan.';
-          setError(msg);
           toast.error(msg);
           setSaving(false);
           return;
@@ -529,7 +522,6 @@ export default function SchedulePage() {
 
           if (futureErr) {
             const msg = 'No se pudo verificar las clases futuras del alumno. Intenta nuevamente.';
-            setError(msg);
             toast.error(msg);
             setSaving(false);
             return;
@@ -540,7 +532,6 @@ export default function SchedulePage() {
             const s = studentsMap[sid];
             const label = s?.full_name ?? s?.notes ?? s?.level ?? sid;
             const msg = `El alumno ${label} ya tiene ${futureCount} clases futuras reservadas, que es el máximo permitido por su plan.`;
-            setError(msg);
             toast.error(msg);
             setSaving(false);
             return;
@@ -560,7 +551,6 @@ export default function SchedulePage() {
 
         if (conflictsErr) {
           const msg = 'No se pudo verificar la disponibilidad de los alumnos. Intenta nuevamente.';
-          setError(msg);
           toast.error(msg);
           setSaving(false);
           return;
@@ -578,7 +568,6 @@ export default function SchedulePage() {
             conflictIds.length === 1
               ? `El alumno ${labels[0]} ya tiene una clase en ese horario.`
               : `Los siguientes alumnos ya tienen una clase en ese horario: ${labels.join(', ')}.`;
-          setError(msg);
           toast.error(msg);
           setSaving(false);
           return;
