@@ -407,6 +407,19 @@ export default function SchedulePage() {
         }
       }
 
+      // V1: no permitir crear clases en el pasado
+      {
+        const now = new Date();
+        const classStart = new Date(iso);
+        if (classStart.getTime() <= now.getTime()) {
+          const msg = 'No podés crear una clase en una fecha y hora que ya pasaron.';
+          setError(msg);
+          toast.error(msg);
+          setSaving(false);
+          return;
+        }
+      }
+
       if (selectedStudents.length < 1) {
         const msg = 'Selecciona al menos 1 alumno (máximo 4).';
         setError(msg);
@@ -424,6 +437,153 @@ export default function SchedulePage() {
 
       const derivedCapacity = selectedStudents.length;
       const derivedType: 'individual' | 'grupal' = derivedCapacity === 1 ? 'individual' : 'grupal';
+
+      // V4: Validar que el profesor no tenga otra clase en el mismo horario (en cualquier sede/cancha)
+      {
+        const { data: coachClash, error: coachClashErr } = await supabase
+          .from('class_sessions')
+          .select('id')
+          .eq('coach_id', coachId)
+          .eq('date', iso)
+          .limit(1);
+        if (coachClashErr) {
+          const msg = 'No se pudo verificar la disponibilidad del profesor. Intenta nuevamente.';
+          setError(msg);
+          toast.error(msg);
+          setSaving(false);
+          return;
+        }
+        if ((coachClash ?? []).length > 0) {
+          const coachName = coachesMap[coachId]?.full_name ?? 'el profesor seleccionado';
+          const msg = `${coachName} ya tiene una clase en ese horario.`;
+          setError(msg);
+          toast.error(msg);
+          setSaving(false);
+          return;
+        }
+      }
+
+      // Validar que cada alumno tenga saldo disponible en su plan antes de crear la clase
+      const planForStudent: Record<string, string> = {};
+      for (const sid of selectedStudents) {
+        const { data: plans, error: planErr } = await supabase
+          .from('student_plans')
+          .select('id, remaining_classes, purchased_at')
+          .eq('student_id', sid)
+          .order('purchased_at', { ascending: true });
+
+        if (planErr) {
+          const msg = 'No se pudo verificar el plan del alumno. Intenta nuevamente.';
+          setError(msg);
+          toast.error(msg);
+          setSaving(false);
+          return;
+        }
+
+        if (!plans || plans.length === 0) {
+          const msg = 'El alumno seleccionado no tiene un plan con clases disponibles.';
+          setError(msg);
+          toast.error(msg);
+          setSaving(false);
+          return;
+        }
+
+        let chosenPlan: any = null;
+        for (const p of plans as any[]) {
+          const { count: usedCount, error: usageCountErr } = await supabase
+            .from('plan_usages')
+            .select('id', { count: 'exact', head: true })
+            .eq('student_plan_id', p.id)
+            .eq('student_id', sid);
+          if (usageCountErr) {
+            const msg = 'No se pudo verificar el uso de clases del plan.';
+            setError(msg);
+            toast.error(msg);
+            setSaving(false);
+            return;
+          }
+          const used = usedCount ?? 0;
+          if (used < (p.remaining_classes as number)) {
+            chosenPlan = p;
+            break;
+          }
+        }
+
+        if (!chosenPlan) {
+          const msg = 'El alumno seleccionado ya no tiene clases disponibles en su plan.';
+          setError(msg);
+          toast.error(msg);
+          setSaving(false);
+          return;
+        }
+
+        // V3: limitar cantidad de clases futuras reservadas al total de clases del plan
+        const totalFromPlan = (chosenPlan.remaining_classes as number) ?? 0;
+        if (totalFromPlan > 0) {
+          const nowIso = new Date().toISOString();
+          const { data: futureBookings, error: futureErr } = await supabase
+            .from('bookings')
+            .select('id, class_sessions!inner(id,date)')
+            .eq('student_id', sid)
+            .gt('class_sessions.date', nowIso);
+
+          if (futureErr) {
+            const msg = 'No se pudo verificar las clases futuras del alumno. Intenta nuevamente.';
+            setError(msg);
+            toast.error(msg);
+            setSaving(false);
+            return;
+          }
+
+          const futureCount = (futureBookings ?? []).length;
+          if (futureCount >= totalFromPlan) {
+            const s = studentsMap[sid];
+            const label = s?.full_name ?? s?.notes ?? s?.level ?? sid;
+            const msg = `El alumno ${label} ya tiene ${futureCount} clases futuras reservadas, que es el máximo permitido por su plan.`;
+            setError(msg);
+            toast.error(msg);
+            setSaving(false);
+            return;
+          }
+        }
+
+        planForStudent[sid] = chosenPlan.id as string;
+      }
+
+      // V4: Validar que ningún alumno tenga otra clase en el mismo horario (en cualquier sede/cancha)
+      {
+        const { data: conflicts, error: conflictsErr } = await supabase
+          .from('bookings')
+          .select('student_id, class_sessions!inner(id,date)')
+          .in('student_id', selectedStudents)
+          .eq('class_sessions.date', iso);
+
+        if (conflictsErr) {
+          const msg = 'No se pudo verificar la disponibilidad de los alumnos. Intenta nuevamente.';
+          setError(msg);
+          toast.error(msg);
+          setSaving(false);
+          return;
+        }
+
+        if ((conflicts ?? []).length > 0) {
+          const conflictIds = Array.from(
+            new Set((conflicts ?? []).map((c: any) => c.student_id as string))
+          );
+          const labels = conflictIds.map((sid) => {
+            const s = studentsMap[sid];
+            return s?.full_name ?? s?.notes ?? s?.level ?? sid;
+          });
+          const msg =
+            conflictIds.length === 1
+              ? `El alumno ${labels[0]} ya tiene una clase en ese horario.`
+              : `Los siguientes alumnos ya tienen una clase en ese horario: ${labels.join(', ')}.`;
+          setError(msg);
+          toast.error(msg);
+          setSaving(false);
+          return;
+        }
+      }
 
       const { error: insError, data } = await supabase
         .from('class_sessions')
@@ -460,43 +620,21 @@ export default function SchedulePage() {
         const { error: bErr } = await supabase.from('bookings').insert(rows);
         if (bErr) throw bErr;
 
-        // Para cada alumno, registrar uso de plan si tiene clases disponibles
+        // Para cada alumno, registrar uso de plan usando el plan previamente validado
         for (const sid of selectedStudents) {
+          const planId = planForStudent[sid];
+          if (!planId) continue;
           try {
-            const { data: plans, error: planErr } = await supabase
-              .from('student_plans')
-              .select('id, remaining_classes, purchased_at')
-              .eq('student_id', sid)
-              .order('purchased_at', { ascending: true });
-            if (planErr) continue;
-            if (!plans || plans.length === 0) continue;
-
-            let chosenPlan: any = null;
-            for (const p of plans as any[]) {
-              const { data: usageData, error: usageCountErr } = await supabase
-                .from('plan_usages')
-                .select('id', { count: 'exact', head: true })
-                .eq('student_plan_id', p.id);
-              if (usageCountErr) continue;
-              const used = (usageData as any)?.length ?? 0;
-              if (used < (p.remaining_classes as number)) {
-                chosenPlan = p;
-                break;
-              }
-            }
-
-            if (!chosenPlan) continue;
-
             await supabase.from('plan_usages').upsert(
               {
-                student_plan_id: chosenPlan.id,
+                student_plan_id: planId,
                 class_id: createdClass.id,
                 student_id: sid,
               },
               { onConflict: 'student_id,class_id' }
             );
           } catch {
-            // si falla algo con el plan, no bloqueamos la creación de la clase
+            // si falla algo con el plan, no bloqueamos la creación de la clase (ya validamos saldo antes)
           }
         }
 
@@ -878,6 +1016,156 @@ export default function SchedulePage() {
       // @ts-ignore
       updates.notes = editNotes;
 
+      // V1: no permitir mover una clase a una fecha/hora en el pasado
+      {
+        const now = new Date();
+        const classStart = new Date(iso);
+        if (classStart.getTime() <= now.getTime()) {
+          setError('No podés mover una clase a una fecha y hora que ya pasaron.');
+          setSaving(false);
+          return;
+        }
+      }
+
+      // Validar saldo de plan solo para los alumnos nuevos que se agregan a la clase
+      const planForStudentEdit: Record<string, string> = {};
+      const before = new Set(editExistingStudents);
+      const after = new Set(editSelectedStudents);
+      const toAdd = Array.from(after).filter((id) => !before.has(id));
+      const toRemove = Array.from(before).filter((id) => !after.has(id));
+
+      if (toAdd.length) {
+        for (const sid of toAdd) {
+          const { data: plans, error: planErr } = await supabase
+            .from('student_plans')
+            .select('id, remaining_classes, purchased_at')
+            .eq('student_id', sid)
+            .order('purchased_at', { ascending: true });
+
+          if (planErr) {
+            setError('No se pudo verificar el plan del alumno. Intenta nuevamente.');
+            setSaving(false);
+            return;
+          }
+
+          if (!plans || plans.length === 0) {
+            setError('Uno de los alumnos seleccionados no tiene un plan con clases disponibles.');
+            setSaving(false);
+            return;
+          }
+
+          let chosenPlan: any = null;
+          for (const p of plans as any[]) {
+            const { count: usedCount, error: usageCountErr } = await supabase
+              .from('plan_usages')
+              .select('id', { count: 'exact', head: true })
+              .eq('student_plan_id', p.id)
+              .eq('student_id', sid);
+            if (usageCountErr) {
+              setError('No se pudo verificar el uso de clases del plan.');
+              setSaving(false);
+              return;
+            }
+            const used = usedCount ?? 0;
+            if (used < (p.remaining_classes as number)) {
+              chosenPlan = p;
+              break;
+            }
+          }
+
+          if (!chosenPlan) {
+            setError('Uno de los alumnos seleccionados ya no tiene clases disponibles en su plan.');
+            setSaving(false);
+            return;
+          }
+
+          // V3: limitar cantidad de clases futuras reservadas al total de clases del plan
+          const totalFromPlan = (chosenPlan.remaining_classes as number) ?? 0;
+          if (totalFromPlan > 0) {
+            const nowIso = new Date().toISOString();
+            const { data: futureBookings, error: futureErr } = await supabase
+              .from('bookings')
+              .select('id, class_sessions!inner(id,date)')
+              .eq('student_id', sid)
+              .gt('class_sessions.date', nowIso);
+
+            if (futureErr) {
+              setError('No se pudo verificar las clases futuras del alumno. Intenta nuevamente.');
+              setSaving(false);
+              return;
+            }
+
+            const futureCount = (futureBookings ?? []).length;
+            if (futureCount >= totalFromPlan) {
+              const s = studentsMap[sid];
+              const label = s?.full_name ?? s?.notes ?? s?.level ?? sid;
+              setError(
+                `El alumno ${label} ya tiene ${futureCount} clases futuras reservadas, que es el máximo permitido por su plan.`
+              );
+              setSaving(false);
+              return;
+            }
+          }
+
+          planForStudentEdit[sid] = chosenPlan.id as string;
+        }
+      }
+
+      // V4: Validar que el profesor no tenga otra clase en el mismo horario (en cualquier sede/cancha), excluyendo esta clase
+      {
+        const { data: coachClash, error: coachClashErr } = await supabase
+          .from('class_sessions')
+          .select('id')
+          .eq('coach_id', editCoachId)
+          .eq('date', iso)
+          .neq('id', editing.id)
+          .limit(1);
+        if (coachClashErr) {
+          setError('No se pudo verificar la disponibilidad del profesor. Intenta nuevamente.');
+          setSaving(false);
+          return;
+        }
+        if ((coachClash ?? []).length > 0) {
+          const coachName = coachesMap[editCoachId]?.full_name ?? 'el profesor seleccionado';
+          setError(`${coachName} ya tiene una clase en ese horario.`);
+          setSaving(false);
+          return;
+        }
+      }
+
+      // V4: Validar que los alumnos nuevos no tengan otra clase en el mismo horario, excluyendo esta clase
+      if (toAdd.length) {
+        const { data: conflicts, error: conflictsErr } = await supabase
+          .from('bookings')
+          .select('student_id, class_sessions!inner(id,date)')
+          .in('student_id', toAdd)
+          .eq('class_sessions.date', iso)
+          .neq('class_sessions.id', editing.id);
+
+        if (conflictsErr) {
+          setError('No se pudo verificar la disponibilidad de los alumnos. Intenta nuevamente.');
+          setSaving(false);
+          return;
+        }
+
+        if ((conflicts ?? []).length > 0) {
+          const conflictIds = Array.from(
+            new Set((conflicts ?? []).map((c: any) => c.student_id as string))
+          );
+          const labels = conflictIds.map((sid) => {
+            const s = studentsMap[sid];
+            return s?.full_name ?? s?.notes ?? s?.level ?? sid;
+          });
+          const msg =
+            conflictIds.length === 1
+              ? `El alumno ${labels[0]} ya tiene una clase en ese horario.`
+              : `Los siguientes alumnos ya tienen una clase en ese horario: ${labels.join(', ')}.`;
+          setError(msg);
+          setSaving(false);
+          return;
+        }
+      }
+
       const { data: upd, error: updErr } = await supabase
         .from('class_sessions')
         .update(updates)
@@ -888,55 +1176,26 @@ export default function SchedulePage() {
       if (!upd) {
         throw new Error('No se pudo actualizar la clase (verifica permisos RLS para UPDATE)');
       }
-
-      // Compute bookings diff
-      const before = new Set(editExistingStudents);
-      const after = new Set(editSelectedStudents);
-      const toAdd = Array.from(after).filter((id) => !before.has(id));
-      const toRemove = Array.from(before).filter((id) => !after.has(id));
-
       if (toAdd.length) {
         const rows = toAdd.map((sid) => ({ class_id: editing.id, student_id: sid, status: 'reserved' }));
         const { error: addErr } = await supabase.from('bookings').insert(rows);
         if (addErr) throw addErr;
 
-        // crear usos de plan para nuevos alumnos si tienen saldo disponible
+        // crear usos de plan para nuevos alumnos usando el plan previamente validado
         for (const sid of toAdd) {
+          const planId = planForStudentEdit[sid];
+          if (!planId) continue;
           try {
-            const { data: plans, error: planErr } = await supabase
-              .from('student_plans')
-              .select('id, remaining_classes, purchased_at')
-              .eq('student_id', sid)
-              .order('purchased_at', { ascending: true });
-            if (planErr) continue;
-            if (!plans || plans.length === 0) continue;
-
-            let chosenPlan: any = null;
-            for (const p of plans as any[]) {
-              const { data: usageData, error: usageCountErr } = await supabase
-                .from('plan_usages')
-                .select('id', { count: 'exact', head: true })
-                .eq('student_plan_id', p.id);
-              if (usageCountErr) continue;
-              const used = (usageData as any)?.length ?? 0;
-              if (used < (p.remaining_classes as number)) {
-                chosenPlan = p;
-                break;
-              }
-            }
-
-            if (!chosenPlan) continue;
-
             await supabase.from('plan_usages').upsert(
               {
-                student_plan_id: chosenPlan.id,
+                student_plan_id: planId,
                 class_id: editing.id,
                 student_id: sid,
               },
               { onConflict: 'student_id,class_id' }
             );
           } catch {
-            // no bloquear la edición por errores de plan
+            // no bloquear la edición por errores de plan (el saldo ya fue validado)
           }
         }
       }
