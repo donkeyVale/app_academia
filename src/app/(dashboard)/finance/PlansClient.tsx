@@ -523,9 +523,6 @@ export default function PlansClient() {
       const msg = err.message || 'Error cargando resumen';
       setError(msg);
       toast.error(msg);
-      setReportSummary(null);
-      setReportHistory([]);
-    } finally {
       setReportLoading(false);
     }
   };
@@ -550,6 +547,41 @@ export default function PlansClient() {
         toast.error(msg);
         setSaving(false);
         return;
+      }
+      const { data: existingPlans, error: existingErr } = await supabase
+        .from('student_plans')
+        .select('id, remaining_classes')
+        .eq('student_id', selectedStudentId);
+      if (existingErr) {
+        const msg = 'No se pudo verificar los planes vigentes del alumno. Intenta nuevamente.';
+        setError(msg);
+        toast.error(msg);
+        setSaving(false);
+        return;
+      }
+      if (existingPlans && existingPlans.length > 0) {
+        for (const sp of existingPlans as any[]) {
+          const { count: usedCount, error: usageErr } = await supabase
+            .from('plan_usages')
+            .select('id', { count: 'exact', head: true })
+            .eq('student_plan_id', sp.id)
+            .eq('student_id', selectedStudentId);
+          if (usageErr) {
+            const msg = 'No se pudo verificar el uso de planes del alumno. Intenta nuevamente.';
+            setError(msg);
+            toast.error(msg);
+            setSaving(false);
+            return;
+          }
+          const used = usedCount ?? 0;
+          if (used < (sp.remaining_classes as number)) {
+            const msg = 'Este alumno ya tiene un plan vigente con clases disponibles. Primero debe agotar ese plan antes de asignar uno nuevo.';
+            setError(msg);
+            toast.error(msg);
+            setSaving(false);
+            return;
+          }
+        }
       }
       const basePrice = plan?.price_cents ?? 0;
       let finalPrice = basePrice;
