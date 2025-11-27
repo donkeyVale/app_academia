@@ -929,12 +929,12 @@ export default function SchedulePage() {
       const endTs = startTs + 60 * 60 * 1000;
       if (endTs < now.getTime()) return false;
 
-      // ocultar clases sin alumnos (por ejemplo, cuando el único alumno canceló)
       const countForClass = bookingsCount[cls.id] ?? 0;
-      if (countForClass <= 0) return false;
 
-      // Si es alumno, solo ve clases donde tiene reserva
+      // Si es alumno, ocultar clases sin alumnos (por ejemplo, cuando el único alumno canceló)
+      // y además solo mostrar clases donde tiene reserva.
       if (role === 'student' && studentId) {
+        if (countForClass <= 0) return false;
         const studentsForClass = studentsByClass[cls.id] ?? [];
         if (!studentsForClass.includes(studentId)) return false;
       }
