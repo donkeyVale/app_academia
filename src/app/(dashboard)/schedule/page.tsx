@@ -145,6 +145,9 @@ export default function SchedulePage() {
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [studentQuery, setStudentQuery] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
+  const [recurringEnabled, setRecurringEnabled] = useState(false);
+  const [recurringWeekdays, setRecurringWeekdays] = useState<number[]>([]);
+  const [recurringMaxCount, setRecurringMaxCount] = useState<string>('');
 
   // Filters for list
   const [filterLocationId, setFilterLocationId] = useState<string>('');
