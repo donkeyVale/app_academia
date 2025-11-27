@@ -1480,6 +1480,80 @@ export default function SchedulePage() {
                   </PopoverContent>
                 </Popover>
               </div>
+              {/* Recurrencia de clases (Fase 3) */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    id="recurring-enabled"
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={recurringEnabled}
+                    onChange={(e) => {
+                      const enabled = e.target.checked;
+                      setRecurringEnabled(enabled);
+                      if (enabled) {
+                        if (day) {
+                          const baseDate = new Date(`${day}T00:00:00`);
+                          const wd = baseDate.getDay();
+                          setRecurringWeekdays((prev) => (prev.includes(wd) ? prev : [wd]));
+                        }
+                      } else {
+                        setRecurringWeekdays([]);
+                        setRecurringMaxCount('');
+                      }
+                    }}
+                  />
+                  <label htmlFor="recurring-enabled" className="text-sm font-medium">
+                    Clases recurrentes (hasta agotar el plan)
+                  </label>
+                </div>
+                {recurringEnabled && (
+                  <div className="space-y-2 border rounded-md p-2 bg-slate-50">
+                    <div className="flex flex-wrap gap-2 items-center">
+                      <span className="text-xs text-gray-600 mr-1">Días de la semana:</span>
+                      {['D', 'L', 'M', 'X', 'J', 'V', 'S'].map((label, idx) => {
+                        const wd = idx; // 0=Domingo
+                        const active = recurringWeekdays.includes(wd);
+                        return (
+                          <button
+                            key={wd}
+                            type="button"
+                            onClick={() => {
+                              setRecurringWeekdays((prev) =>
+                                prev.includes(wd) ? prev.filter((x) => x !== wd) : [...prev, wd]
+                              );
+                            }}
+                            className={`px-2 py-1 rounded text-xs border transition-colors ${
+                              active
+                                ? 'bg-[#3cadaf] text-white border-[#3cadaf]'
+                                : 'bg-white text-gray-700 border-gray-300 hover:bg-slate-100'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div>
+                      <label className="block text-xs mb-1 text-gray-700">
+                        Máximo de clases a generar (opcional)
+                      </label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={recurringMaxCount}
+                        onChange={(e) => setRecurringMaxCount(e.target.value)}
+                        className="h-9 text-sm max-w-[160px]"
+                        placeholder="Ej.: 8"
+                      />
+                    </div>
+                    <p className="text-[11px] text-gray-500">
+                      Se creará primero la clase seleccionada y luego se intentarán crear más clases en los días
+                      marcados, respetando el saldo de los planes y evitando superposiciones de horario.
+                    </p>
+                  </div>
+                )}
+              </div>
               {error && <p className="text-sm text-red-600">{error}</p>}
               <button className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50" disabled={saving}>
                 {saving ? 'Creando...' : 'Crear clase'}
