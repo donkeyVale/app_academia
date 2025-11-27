@@ -524,6 +524,8 @@ export default function PlansClient() {
       setError(msg);
       toast.error(msg);
       setReportLoading(false);
+    } finally {
+      setReportLoading(false);
     }
   };
 
@@ -534,7 +536,6 @@ export default function PlansClient() {
     try {
       if (!selectedStudentId || !selectedPlanId) {
         const msg = 'Selecciona alumno y plan';
-        setError(msg);
         toast.error(msg);
         setSaving(false);
         return;
@@ -543,7 +544,6 @@ export default function PlansClient() {
       const remaining = Number(remainingClassesInput || (plan?.classes_included ?? 0));
       if (!remaining || remaining <= 0) {
         const msg = 'Las clases restantes deben ser mayores a 0';
-        setError(msg);
         toast.error(msg);
         setSaving(false);
         return;
@@ -554,7 +554,6 @@ export default function PlansClient() {
         .eq('student_id', selectedStudentId);
       if (existingErr) {
         const msg = 'No se pudo verificar los planes vigentes del alumno. Intenta nuevamente.';
-        setError(msg);
         toast.error(msg);
         setSaving(false);
         return;
@@ -568,7 +567,6 @@ export default function PlansClient() {
             .eq('student_id', selectedStudentId);
           if (usageErr) {
             const msg = 'No se pudo verificar el uso de planes del alumno. Intenta nuevamente.';
-            setError(msg);
             toast.error(msg);
             setSaving(false);
             return;
@@ -576,7 +574,6 @@ export default function PlansClient() {
           const used = usedCount ?? 0;
           if (used < (sp.remaining_classes as number)) {
             const msg = 'Este alumno ya tiene un plan vigente con clases disponibles. Primero debe agotar ese plan antes de asignar uno nuevo.';
-            setError(msg);
             toast.error(msg);
             setSaving(false);
             return;
@@ -593,14 +590,12 @@ export default function PlansClient() {
       }
       if (!basePrice || basePrice <= 0) {
         const msg = 'El plan seleccionado no tiene un precio válido.';
-        setError(msg);
         toast.error(msg);
         setSaving(false);
         return;
       }
       if (!finalPrice || finalPrice <= 0) {
         const msg = 'El precio final debe ser mayor a 0 (revisa el descuento aplicado).';
-        setError(msg);
         toast.error(msg);
         setSaving(false);
         return;
@@ -631,7 +626,6 @@ export default function PlansClient() {
       toast.success('Plan asignado al alumno');
     } catch (err: any) {
       const msg = err.message || 'Error asignando plan';
-      setError(msg);
       toast.error(msg);
     } finally {
       setSaving(false);
