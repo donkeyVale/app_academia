@@ -293,17 +293,17 @@ export default function SchedulePage() {
 
       setStudents(enrichedStudents);
 
-      // Load classes in a safe window (from last 24h to next 14 days) to evitar problemas de zona horaria
+      // Load classes in a safe window (from last 24h to next 90 days) para poder ver varias clases recurrentes futuras
       const now = new Date();
       const from = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      const to = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+      const to = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
       const { data: clsData, error: e3 } = await supabase
         .from('class_sessions')
         .select('*')
         .gte('date', from.toISOString())
         .lte('date', to.toISOString())
         .order('date', { ascending: true })
-        .limit(100);
+        .limit(500);
       if (e3) setError(e3.message);
       setClasses(clsData ?? []);
       // Fetch bookings for these classes to compute alumnos count y mapear alumnos por clase
