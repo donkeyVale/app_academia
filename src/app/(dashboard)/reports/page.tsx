@@ -191,8 +191,8 @@ export default function ReportsPage() {
   const [totalAmount, setTotalAmount] = useState(0);
   const [studentSummary, setStudentSummary] = useState<StudentSummaryRow[]>([]);
   const [planSummary, setPlanSummary] = useState<PlanSummaryRow[]>([]);
-  const [showIncome, setShowIncome] = useState(true);
-  const [showStudentSummary, setShowStudentSummary] = useState(true);
+  const [showIncome, setShowIncome] = useState(false);
+  const [showStudentSummary, setShowStudentSummary] = useState(false);
   const [showPlanSummary, setShowPlanSummary] = useState(false);
   const [studentDetailModalOpen, setStudentDetailModalOpen] = useState(false);
   const [studentDetailName, setStudentDetailName] = useState<string | null>(null);
