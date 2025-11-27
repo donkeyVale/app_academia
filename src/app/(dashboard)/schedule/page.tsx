@@ -380,6 +380,7 @@ export default function SchedulePage() {
     e.preventDefault();
     setSaving(true);
     setError(null);
+    let extraCreated = 0;
     try {
       if (!courtId || !coachId || !day || !time) {
         const msg = 'Completa cancha, fecha y hora, y profesor';
@@ -635,8 +636,6 @@ export default function SchedulePage() {
           [createdClass.id]: [...(prev[createdClass.id] ?? []), ...selectedStudents],
         }));
       }
-
-      // Notificaciones push para coach y alumnos (no bloquea el flujo)
       try {
         await fetch('/api/push/class-created', {
           method: 'POST',
@@ -650,16 +649,265 @@ export default function SchedulePage() {
       } catch (pushErr) {
         console.error('Error enviando notificación de clase creada', pushErr);
       }
-      // reset full form for next class
+
+      if (recurringEnabled && recurringWeekdays.length > 0) {
+        const maxManual = recurringMaxCount ? parseInt(recurringMaxCount, 10) : NaN;
+        const hasManualLimit = !Number.isNaN(maxManual) && maxManual > 1;
+        let remainingByMax = hasManualLimit ? maxManual - 1 : Number.POSITIVE_INFINITY;
+        const safetyLimit = 60;
+        let current = new Date(iso);
+        const nowIsoBase = new Date().toISOString();
+
+        for (let i = 0; i < safetyLimit && remainingByMax > 0; i++) {
+          current.setDate(current.getDate() + 1);
+          const wd = current.getDay();
+          if (!recurringWeekdays.includes(wd)) continue;
+
+          const nextIso = current.toISOString();
+
+          const classStart = new Date(nextIso);
+          const nowCheck = new Date();
+          if (classStart.getTime() <= nowCheck.getTime()) {
+            toast.error('Se detuvo la creación recurrente porque una de las fechas ya pasó.');
+            break;
+          }
+
+          const { data: clashCourt, error: clashCourtErr } = await supabase
+            .from('class_sessions')
+            .select('id')
+            .eq('court_id', courtId)
+            .eq('date', nextIso)
+            .limit(1);
+          if (clashCourtErr) {
+            toast.error('No se pudo verificar disponibilidad de la cancha para una clase recurrente.');
+            break;
+          }
+          if ((clashCourt ?? []).length > 0) {
+            toast.error('Se detuvo la creación recurrente porque una de las fechas ya está ocupada en la cancha.');
+            break;
+          }
+
+          const { data: coachClashNext, error: coachClashNextErr } = await supabase
+            .from('class_sessions')
+            .select('id')
+            .eq('coach_id', coachId)
+            .eq('date', nextIso)
+            .limit(1);
+          if (coachClashNextErr) {
+            toast.error('No se pudo verificar la disponibilidad del profesor para una clase recurrente.');
+            break;
+          }
+          if ((coachClashNext ?? []).length > 0) {
+            const coachName = coachesMap[coachId]?.full_name ?? 'el profesor seleccionado';
+            toast.error(`${coachName} ya tiene una clase en una de las fechas recurrentes.`);
+            break;
+          }
+
+          const planForStudentNext: Record<string, string> = {};
+          let planError = false;
+          for (const sid of selectedStudents) {
+            const { data: plans, error: planErr } = await supabase
+              .from('student_plans')
+              .select('id, remaining_classes, purchased_at')
+              .eq('student_id', sid)
+              .order('purchased_at', { ascending: true });
+
+            if (planErr) {
+              toast.error('No se pudo verificar el plan del alumno para una clase recurrente.');
+              planError = true;
+              break;
+            }
+
+            if (!plans || plans.length === 0) {
+              toast.error('Uno de los alumnos no tiene un plan con clases disponibles para las clases recurrentes.');
+              planError = true;
+              break;
+            }
+
+            let chosenPlan: any = null;
+            for (const p of plans as any[]) {
+              const { count: usedCount, error: usageCountErr } = await supabase
+                .from('plan_usages')
+                .select('id', { count: 'exact', head: true })
+                .eq('student_plan_id', p.id)
+                .eq('student_id', sid);
+              if (usageCountErr) {
+                toast.error('No se pudo verificar el uso de clases del plan para una clase recurrente.');
+                planError = true;
+                break;
+              }
+              const used = usedCount ?? 0;
+              if (used < (p.remaining_classes as number)) {
+                chosenPlan = p;
+                break;
+              }
+            }
+            if (planError) break;
+
+            if (!chosenPlan) {
+              toast.error('Uno de los alumnos ya no tiene clases disponibles en su plan para las recurrentes.');
+              planError = true;
+              break;
+            }
+
+            const totalFromPlan = (chosenPlan.remaining_classes as number) ?? 0;
+            if (totalFromPlan > 0) {
+              const { data: futureBookings, error: futureErr } = await supabase
+                .from('bookings')
+                .select('id, class_sessions!inner(id,date)')
+                .eq('student_id', sid)
+                .gt('class_sessions.date', nowIsoBase);
+
+              if (futureErr) {
+                toast.error('No se pudo verificar las clases futuras del alumno para las recurrentes.');
+                planError = true;
+                break;
+              }
+
+              const futureCount = (futureBookings ?? []).length;
+              if (futureCount >= totalFromPlan) {
+                const s = studentsMap[sid];
+                const label = s?.full_name ?? s?.notes ?? s?.level ?? sid;
+                toast.error(
+                  `El alumno ${label} ya tiene ${futureCount} clases futuras reservadas, que es el máximo permitido por su plan. Se detuvo la creación recurrente.`
+                );
+                planError = true;
+                break;
+              }
+            }
+
+            planForStudentNext[sid] = (plans[0] as any).id as string;
+          }
+
+          if (planError) break;
+
+          const { data: conflictsNext, error: conflictsNextErr } = await supabase
+            .from('bookings')
+            .select('student_id, class_sessions!inner(id,date)')
+            .in('student_id', selectedStudents)
+            .eq('class_sessions.date', nextIso);
+
+          if (conflictsNextErr) {
+            toast.error('No se pudo verificar la disponibilidad de los alumnos para una fecha recurrente.');
+            break;
+          }
+
+          if ((conflictsNext ?? []).length > 0) {
+            const conflictIds = Array.from(
+              new Set((conflictsNext ?? []).map((c: any) => c.student_id as string))
+            );
+            const labels = conflictIds.map((sid) => {
+              const s = studentsMap[sid];
+              return s?.full_name ?? s?.notes ?? s?.level ?? sid;
+            });
+            const msg =
+              conflictIds.length === 1
+                ? `El alumno ${labels[0]} ya tiene una clase en una de las fechas recurrentes.`
+                : `Los siguientes alumnos ya tienen una clase en una de las fechas recurrentes: ${labels.join(', ')}.`;
+            toast.error(msg);
+            break;
+          }
+
+          const { error: insErrorNext, data: dataNext } = await supabase
+            .from('class_sessions')
+            .insert({
+              date: nextIso,
+              type: derivedType,
+              capacity: derivedCapacity,
+              coach_id: coachId,
+              court_id: courtId,
+              price_cents: 0,
+              currency: 'PYG',
+              // @ts-ignore
+              notes,
+            })
+            .select('*')
+            .single();
+          if (insErrorNext) {
+            toast.error('Ocurrió un error al crear una de las clases recurrentes.');
+            break;
+          }
+          const createdNext = dataNext as unknown as ClassSession;
+          setClasses((prev) => [...prev, createdNext].sort((a, b) => a.date.localeCompare(b.date)));
+          await logAudit('create', 'class_session', createdNext.id, {
+            date: createdNext.date,
+            court_id: createdNext.court_id,
+            coach_id: createdNext.coach_id,
+            capacity: createdNext.capacity,
+            price_cents: createdNext.price_cents,
+            currency: createdNext.currency,
+            students: selectedStudents,
+          });
+
+          if (selectedStudents.length) {
+            const rowsNext = selectedStudents.map((sid) => ({
+              class_id: createdNext.id,
+              student_id: sid,
+              status: 'reserved',
+            }));
+            const { error: bErrNext } = await supabase.from('bookings').insert(rowsNext);
+            if (bErrNext) {
+              toast.error('Ocurrió un error al crear reservas para una clase recurrente.');
+              break;
+            }
+
+            for (const sid of selectedStudents) {
+              const planIdNext = planForStudentNext[sid];
+              if (!planIdNext) continue;
+              try {
+                await supabase.from('plan_usages').upsert(
+                  {
+                    student_plan_id: planIdNext,
+                    class_id: createdNext.id,
+                    student_id: sid,
+                  },
+                  { onConflict: 'student_id,class_id' }
+                );
+              } catch {
+              }
+            }
+
+            setBookingsCount((prev) => ({ ...prev, [createdNext.id]: selectedStudents.length }));
+            setStudentsByClass((prev) => ({
+              ...prev,
+              [createdNext.id]: [...(prev[createdNext.id] ?? []), ...selectedStudents],
+            }));
+          }
+
+          try {
+            await fetch('/api/push/class-created', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                coachId,
+                studentIds: selectedStudents,
+                dateIso: nextIso,
+              }),
+            });
+          } catch (pushErrNext) {
+            console.error('Error enviando notificación de clase recurrente creada', pushErrNext);
+          }
+
+          extraCreated += 1;
+          remainingByMax -= 1;
+        }
+      }
+
       setDay('');
       setTime('');
-      // tipo y cupo se recalcularán según alumnos en el próximo uso
       setLocationId('');
       setCourtId('');
       setCoachId('');
       setSelectedStudents([]);
       setNotes('');
-      toast.success('Clase creada correctamente');
+      setRecurringEnabled(false);
+      setRecurringWeekdays([]);
+      setRecurringMaxCount('');
+      if (extraCreated > 0) {
+        toast.success(`Se crearon ${1 + extraCreated} clases (incluyendo las recurrentes).`);
+      } else {
+        toast.success('Clase creada correctamente');
+      }
     } catch (err: any) {
       const msg = err.message || 'Error creando la clase';
       setError(msg);
