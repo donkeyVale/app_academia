@@ -1466,6 +1466,32 @@ export default function SchedulePage() {
     }
   };
 
+  const roleResolved = role === 'admin' || role === 'coach' || role === 'student';
+
+  if (!roleResolved) {
+    return (
+      <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-gradient-to-br from-[#0f172a] via-[#1d3b4f] to-[#3cadaf] text-white">
+        <div className="flex flex-col items-center gap-3">
+          <div
+            className="h-24 w-24 rounded-full bg-white/10 border border-white/40 flex items-center justify-center overflow-hidden animate-spin"
+            style={{ animationDuration: '1.5s' }}
+          >
+            <Image
+              src="/icons/LogoAgendo1024.png"
+              alt="Icono de la app"
+              width={128}
+              height={128}
+              className="object-cover"
+            />
+          </div>
+          <div className="text-center">
+            <div className="text-xs text-white/80 mt-1">Cargando tu agenda.....</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4 overflow-x-hidden">
       <div className="flex items-center justify-between gap-4">
