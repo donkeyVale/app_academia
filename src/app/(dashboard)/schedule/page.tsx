@@ -989,6 +989,20 @@ export default function SchedulePage() {
     });
   }, [classes]);
 
+  const studentPastClasses = useMemo(() => {
+    if (role !== 'student' || !studentId) return [];
+    const now = new Date();
+    return classes
+      .filter((cls) => {
+        const startTs = new Date(cls.date).getTime();
+        const endTs = startTs + 60 * 60 * 1000;
+        if (endTs >= now.getTime()) return false;
+        const studentsForClass = studentsByClass[cls.id] ?? [];
+        return studentsForClass.includes(studentId);
+      })
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [classes, studentsByClass, role, studentId]);
+
   // Modal simple para ver los alumnos de una clase
   const [studentsModalClass, setStudentsModalClass] = useState<ClassSession | null>(null);
 
@@ -1020,6 +1034,7 @@ export default function SchedulePage() {
   const [showRecentSection, setShowRecentSection] = useState(false);
   const [showAllUpcoming, setShowAllUpcoming] = useState(false);
   const [showAllRecent, setShowAllRecent] = useState(false);
+  const [showAllStudentHistory, setShowAllStudentHistory] = useState(false);
 
   // Aplicar filtros iniciales según scope=today|week en la URL (lado cliente)
   useEffect(() => {
@@ -1838,6 +1853,95 @@ export default function SchedulePage() {
         </div>
       )}
 
+      {role === 'student' && studentPastClasses.length > 0 && (
+        <div className="border rounded-lg bg-white shadow-sm overflow-hidden">
+          <button
+            type="button"
+            className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+            onClick={() => setShowRecentSection((v) => !v)}
+          >
+            <span className="inline-flex items-center gap-2 text-[#31435d]">
+              <CalendarDays className="h-4 w-4 text-violet-500" />
+              Tus clases pasadas
+            </span>
+            <span className="text-xs text-gray-500">{showRecentSection ? '▼' : '▲'}</span>
+          </button>
+          <AnimatePresence initial={false}>
+            {showRecentSection && (
+              <motion.div
+                key="student-history-section"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.18, ease: 'easeOut' }}
+                className="p-4 space-y-4 origin-top"
+              >
+                <p className="text-xs text-gray-500">
+                  Historial de tus clases que ya se dictaron.
+                </p>
+                <ul className="space-y-3">
+                  {(showAllStudentHistory ? studentPastClasses : studentPastClasses.slice(0, 5)).map((cls) => {
+                    const d = new Date(cls.date);
+                    const yyyy = d.getFullYear();
+                    const mm = String(d.getMonth() + 1).padStart(2, '0');
+                    const dd = String(d.getDate()).padStart(2, '0');
+                    const hh = String(d.getHours()).padStart(2, '0');
+                    const min = String(d.getMinutes()).padStart(2, '0');
+                    const court = cls.court_id ? courtsMap[cls.court_id] : undefined;
+                    const location = court ? locationsMap[court.location_id] : undefined;
+                    const alumnos = bookingsCount[cls.id] ?? 0;
+
+                    return (
+                      <li
+                        key={cls.id}
+                        className="max-w-full overflow-hidden rounded-lg border bg-white p-3 text-xs shadow-sm transition hover:border-[#dbeafe] hover:shadow-md sm:text-sm"
+                      >
+                        <div className="flex max-w-full flex-col items-start justify-between gap-2 sm:flex-row">
+                          <div className="min-w-0 space-y-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="inline-flex items-center rounded-full bg-[#e0f2fe] px-2 py-0.5 text-[11px] font-medium text-[#075985]">
+                                {dd}/{mm}/{yyyy} • {hh}:{min}
+                              </span>
+                              <span className="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200">
+                                {location?.name ?? 'Sede sin asignar'}
+                              </span>
+                            </div>
+                            <div className="text-xs text-gray-600 space-y-0.5">
+                              <p className="truncate">
+                                <span className="font-semibold text-slate-700">Cancha:</span> {court?.name ?? '-'}
+                              </p>
+                              <p className="truncate">
+                                <span className="font-semibold text-slate-700">Profesor:</span>{' '}
+                                {coachesMap[cls.coach_id || '']?.full_name ?? 'Coach'}
+                              </p>
+                              <p className="truncate">
+                                <span className="font-semibold text-slate-700">Alumnos en clase:</span> {alumnos}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {studentPastClasses.length > 5 && (
+                  <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+                    {!showAllStudentHistory && <p>Mostrando tus 5 clases pasadas más recientes.</p>}
+                    <button
+                      type="button"
+                      className="text-[#3cadaf] hover:underline"
+                      onClick={() => setShowAllStudentHistory((v) => !v)}
+                    >
+                      {showAllStudentHistory ? 'Ver menos' : 'Ver más'}
+                    </button>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
       <div className="border rounded-lg bg-white shadow-sm overflow-hidden">
         <button
           type="button"
@@ -1887,7 +1991,7 @@ export default function SchedulePage() {
                       <SelectItem value="none">Sin filtro</SelectItem>
                       <SelectItem value="sede">Sede / Cancha</SelectItem>
                       <SelectItem value="profesor">Profesor</SelectItem>
-                      <SelectItem value="alumno">Alumno</SelectItem>
+                      {role !== 'student' && <SelectItem value="alumno">Alumno</SelectItem>}
                       <SelectItem value="fecha">Fecha</SelectItem>
                     </SelectContent>
                   </Select>
@@ -2065,7 +2169,7 @@ export default function SchedulePage() {
                 </Popover>
               </div>
             )}
-            {filterMode === 'alumno' && (
+            {filterMode === 'alumno' && role !== 'student' && (
               <div>
                 <label className="block text-xs mb-1">Alumno</label>
                 <Popover>
