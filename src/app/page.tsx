@@ -715,6 +715,7 @@ export default function HomePage() {
 
       <FooterNav
         isAdmin={isAdmin}
+        canSeeReports={role !== 'student'}
         rightSlot={(
           <>
             <FooterAvatarButton

@@ -91,6 +91,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [avatarOffsetY, setAvatarOffsetY] = useState(0);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [role, setRole] = useState<'admin' | 'coach' | 'student' | null>(null);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -118,10 +119,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         if (profile?.full_name) {
           displayName = profile.full_name as string;
         }
-        if (profile?.role === 'admin') {
+        const r = profile?.role as 'admin' | 'coach' | 'student' | undefined;
+        if (r === 'admin') {
           setIsAdmin(true);
         } else {
           setIsAdmin(false);
+        }
+        if (r === 'admin' || r === 'coach' || r === 'student') {
+          setRole(r);
+        } else {
+          setRole(null);
         }
       }
 
@@ -173,6 +180,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <FooterNav
         isAdmin={isAdmin}
+        canSeeReports={role !== 'student'}
         rightSlot={(
           <>
             <FooterAvatarButton
