@@ -995,8 +995,8 @@ export default function SchedulePage() {
     return classes
       .filter((cls) => {
         const startTs = new Date(cls.date).getTime();
-        const endTs = startTs + 60 * 60 * 1000;
-        if (endTs >= now.getTime()) return false;
+        // Consideramos "pasada" cualquier clase que ya haya comenzado
+        if (startTs >= now.getTime()) return false;
         const studentsForClass = studentsByClass[cls.id] ?? [];
         return studentsForClass.includes(studentId);
       })
