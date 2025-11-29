@@ -453,7 +453,7 @@ export default function StudentsPage() {
       </div>
 
       {role === 'student' && (
-        <div className="border rounded-lg bg-white shadow-sm">
+        <div className="border rounded-lg bg-white shadow-sm border-t-4 border-[#3cadaf]">
           <div className="px-4 py-3 border-b bg-gray-50 rounded-t-lg flex items-center justify-between">
             <p className="text-sm font-semibold text-[#31435d]">Tus pagos recientes</p>
             <div className="text-[11px] text-gray-600">
