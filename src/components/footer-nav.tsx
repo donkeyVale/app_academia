@@ -18,10 +18,18 @@ export function FooterNav({ isAdmin, canSeeReports, canSeeFinance, canSeeSetting
   const showFinance = canSeeFinance !== false;
   const showSettings = canSeeSettings === true;
   const studentsText = studentsLabel || 'Alumnos';
+  // Caso típico de alumno: solo 3 ítems (Agenda, Mi cuenta, Configuración)
+  const isStudentCompactNav = !isAdmin && !showReports && !showFinance && showSettings;
   return (
     <nav className="fixed bottom-0 inset-x-0 border-t bg-white/95 backdrop-blur-sm">
       <div className="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
-        <div className="flex-1 flex items-center gap-3 text-xs sm:text-sm overflow-x-auto">
+        <div
+          className={
+            isStudentCompactNav
+              ? 'flex items-center justify-center gap-6 text-xs sm:text-sm'
+              : 'flex-1 flex items-center gap-3 text-xs sm:text-sm overflow-x-auto'
+          }
+        >
           <Link
             href="/schedule"
             className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
