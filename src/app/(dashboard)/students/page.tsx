@@ -35,6 +35,8 @@ type StudentPlanRow = {
   student_id: string;
   plan_id: string | null;
   remaining_classes: number;
+  base_price?: number | null;
+  final_price?: number | null;
   plans?: { name: string | null } | null;
 };
 
@@ -104,7 +106,9 @@ export default function StudentsPage() {
       try {
         const [studentsRes, studentPlansRes] = await Promise.all([
           supabase.from('students').select('id, user_id, level, notes'),
-          supabase.from('student_plans').select('id, student_id, plan_id, remaining_classes, plans(name)'),
+          supabase
+            .from('student_plans')
+            .select('id, student_id, plan_id, remaining_classes, base_price, final_price, plans(name)'),
         ]);
 
         if (studentsRes.error) throw studentsRes.error;
@@ -117,6 +121,8 @@ export default function StudentsPage() {
           student_id: p.student_id as string,
           plan_id: (p.plan_id as string | null) ?? null,
           remaining_classes: (p.remaining_classes as number) ?? 0,
+          base_price: (p.base_price as number | null) ?? null,
+          final_price: (p.final_price as number | null) ?? null,
           plans: p.plans
             ? {
                 name: (Array.isArray(p.plans) ? p.plans[0]?.name : p.plans.name) ?? null,
@@ -374,61 +380,6 @@ export default function StudentsPage() {
               className="object-cover"
             />
           </div>
-
-      {role === 'student' && (
-        <div className="border rounded-lg bg-white shadow-sm mt-4">
-          <div className="px-4 py-3 border-b bg-gray-50 rounded-t-lg flex items-center justify-between">
-            <p className="text-sm font-semibold text-[#31435d]">Tus pagos recientes</p>
-          </div>
-          <div className="px-4 py-3 text-sm">
-            {loading ? (
-              <p className="text-gray-600">Cargando pagos...</p>
-            ) : studentPayments.length === 0 ? (
-              <p className="text-gray-600">Todavía no registramos pagos a tu nombre.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[320px] text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b bg-gray-50 text-gray-600">
-                      <th className="py-2 px-2 text-left font-medium">Fecha</th>
-                      <th className="py-2 px-2 text-left font-medium">Método</th>
-                      <th className="py-2 px-2 text-right font-medium">Monto</th>
-                      <th className="py-2 px-2 text-center font-medium">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {studentPayments.map((p) => {
-                      const d = new Date(p.payment_date);
-                      const yyyy = d.getFullYear();
-                      const mm = String(d.getMonth() + 1).padStart(2, '0');
-                      const dd = String(d.getDate()).padStart(2, '0');
-                      return (
-                        <tr key={p.id} className="border-b last:border-b-0">
-                          <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
-                          <td className="py-1.5 px-2 capitalize">{p.method}</td>
-                          <td className="py-1.5 px-2 text-right">{p.amount} {p.currency}</td>
-                          <td className="py-1.5 px-2 text-center">
-                            <span
-                              className={
-                                'inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold ' +
-                                (p.status === 'pagado'
-                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                                  : 'bg-amber-50 text-amber-700 border border-amber-100')
-                              }
-                            >
-                              {p.status}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
           <div className="text-center">
             <div className="text-xs text-white/80 mt-1">Cargando tu cuenta.....</div>
           </div>
