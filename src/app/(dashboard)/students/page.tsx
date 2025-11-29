@@ -101,7 +101,18 @@ export default function StudentsPage() {
         if (studentPlansRes.error) throw studentPlansRes.error;
 
         const studentsData = (studentsRes.data ?? []) as StudentRow[];
-        const plansData = (studentPlansRes.data ?? []) as StudentPlanRow[];
+        const rawPlansData = (studentPlansRes.data ?? []) as any[];
+        const plansData: StudentPlanRow[] = rawPlansData.map((p) => ({
+          id: p.id as string,
+          student_id: p.student_id as string,
+          plan_id: (p.plan_id as string | null) ?? null,
+          remaining_classes: (p.remaining_classes as number) ?? 0,
+          plans: p.plans
+            ? {
+                name: (Array.isArray(p.plans) ? p.plans[0]?.name : p.plans.name) ?? null,
+              }
+            : null,
+        }));
 
         // Cargar perfiles para obtener el full_name de cada alumno (cuando tenga user vinculado)
         const userIds = Array.from(
