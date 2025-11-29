@@ -501,7 +501,9 @@ export default function HomePage() {
             Hola {userName ?? '...'}
           </h1>
           <p className="text-sm text-gray-600">
-            Gestioná tu agenda desde un solo lugar.
+            {role === 'student'
+              ? 'Revisá tus próximas clases y tu plan en un solo lugar.'
+              : 'Gestioná tu agenda desde un solo lugar.'}
           </p>
         </div>
         <div className="flex items-center justify-end flex-1">
@@ -626,39 +628,92 @@ export default function HomePage() {
       )}
 
       {role === 'student' && (
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
-          <motion.button
-            type="button"
-            whileHover={{ y: -2, boxShadow: '0 10px 25px rgba(15,23,42,0.12)' }}
-            transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-            className="border rounded-xl p-4 bg-white shadow-sm border-t-4 border-[#3b82f6] text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/60 focus:ring-offset-1"
-            onClick={() => router.push('/schedule')}
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
-                <IconCalendar />
-              </div>
-              <p className="text-xs uppercase tracking-wide text-gray-500">Próximas clases</p>
-            </div>
-            <p className="text-2xl font-semibold text-[#111827]">{loading ? '...' : studentUpcomingClasses}</p>
-            <p className="text-xs text-gray-500 mt-1">Clases futuras en las que estás reservado</p>
-          </motion.button>
+        <div className="space-y-4">
+          {/* Hero principal para alumno */}
           <motion.div
-            whileHover={{ y: -2, boxShadow: '0 10px 25px rgba(15,23,42,0.12)' }}
-            transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-            className="border rounded-xl p-4 bg-white shadow-sm border-t-4 border-[#3cadaf]"
+            whileHover={{ y: -1, boxShadow: '0 16px 40px rgba(15,23,42,0.30)' }}
+            transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-sky-500 via-blue-500 to-indigo-500 text-white px-4 py-5 shadow-lg"
           >
-            <div className="flex items-center gap-2 mb-1">
-              <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
-                <IconMoney />
+            <div className="relative z-10 flex flex-col gap-3">
+              <div className="text-xs uppercase tracking-wide text-white/80">Tu próxima sesión</div>
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <div className="text-sm text-white/80">Clases reservadas</div>
+                  <div className="text-3xl font-bold leading-tight">
+                    {loading ? '...' : studentUpcomingClasses}
+                  </div>
+                  <div className="mt-1 text-xs text-white/80">
+                    {loading
+                      ? 'Cargando tus próximas clases...'
+                      : studentUpcomingClasses === 0
+                      ? 'Aún no tenés próximas clases. Reservá una desde la Agenda.'
+                      : 'Tenés clases futuras reservadas en tu Agenda.'}
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <div className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs">
+                    <CalendarClock className="w-4 h-4" />
+                    <span>Ver Agenda</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => router.push('/schedule')}
+                    className="inline-flex items-center gap-2 rounded-full bg-white text-sky-700 px-4 py-1.5 text-xs font-semibold shadow-sm hover:bg-slate-50"
+                  >
+                    Ir a Agenda
+                    <CalendarDays className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
-              <p className="text-xs uppercase tracking-wide text-gray-500">Clases restantes del plan</p>
             </div>
-            <p className="text-2xl font-semibold text-[#111827]">
-              {loading ? '...' : studentRemainingClasses === null ? '-' : studentRemainingClasses}
-            </p>
-            <p className="text-xs text-gray-500 mt-1">Clases que aún tenés disponibles en tu plan actual</p>
+            <div className="pointer-events-none absolute -right-10 -bottom-10 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
           </motion.div>
+
+          {/* Cards de apoyo: progreso de plan y resumen de próximas clases */}
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+            <motion.div
+              whileHover={{ y: -2, boxShadow: '0 10px 25px rgba(15,23,42,0.12)' }}
+              transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+              className="border rounded-2xl p-4 bg-white shadow-sm border-t-4 border-[#3cadaf]"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-9 w-9 rounded-full bg-emerald-50 flex items-center justify-center">
+                  <IconMoney />
+                </div>
+                <p className="text-xs uppercase tracking-wide text-gray-500">Tu plan y clases restantes</p>
+              </div>
+              <p className="text-3xl font-semibold text-[#111827]">
+                {loading ? '...' : studentRemainingClasses === null ? '-' : studentRemainingClasses}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Clases que aún tenés disponibles en tu plan actual.
+              </p>
+            </motion.div>
+
+            <motion.div
+              whileHover={{ y: -2, boxShadow: '0 10px 25px rgba(15,23,42,0.12)' }}
+              transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+              className="border rounded-2xl p-4 bg-white shadow-sm border-t-4 border-[#3b82f6]"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-9 w-9 rounded-full bg-sky-50 flex items-center justify-center">
+                  <IconCalendar />
+                </div>
+                <p className="text-xs uppercase tracking-wide text-gray-500">Resumen de próximas clases</p>
+              </div>
+              <p className="text-3xl font-semibold text-[#111827]">
+                {loading ? '...' : studentUpcomingClasses}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                {loading
+                  ? 'Cargando información...'
+                  : studentUpcomingClasses === 0
+                  ? 'No tenés próximas clases agendadas. Reservá tu lugar desde la Agenda.'
+                  : 'Clases futuras en las que ya estás reservado.'}
+              </p>
+            </motion.div>
+          </div>
         </div>
       )}
 
