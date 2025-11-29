@@ -48,8 +48,10 @@ export default function StudentsPage() {
   const [checking, setChecking] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [role, setRole] = useState<'admin' | 'coach' | 'student' | null>(null);
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [search, setSearch] = useState('');
+  const [currentStudentId, setCurrentStudentId] = useState<string | null>(null);
   const [plansByStudent, setPlansByStudent] = useState<Record<string, StudentPlanRow | undefined>>({});
   const [planNamesById, setPlanNamesById] = useState<Record<string, string>>({});
   const [profilesByUser, setProfilesByUser] = useState<Record<string, ProfileRow | undefined>>({});
@@ -66,6 +68,20 @@ export default function StudentsPage() {
       if (!data.user) {
         router.replace('/login');
         return;
+      }
+
+      const userId = data.user.id as string;
+
+      let roleFromProfile: 'admin' | 'coach' | 'student' | null = null;
+      const { data: profile, error: profErr } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .maybeSingle();
+      if (!profErr) {
+        const r = (profile?.role as 'admin' | 'coach' | 'student' | null) ?? null;
+        roleFromProfile = r === 'admin' || r === 'coach' || r === 'student' ? r : null;
+        setRole(roleFromProfile);
       }
 
       setChecking(false);
@@ -164,6 +180,13 @@ export default function StudentsPage() {
         }
 
         setStudents(studentsData);
+
+        if (roleFromProfile === 'student') {
+          const selfRow = studentsData.find((s) => s.user_id === userId) ?? null;
+          setCurrentStudentId(selfRow?.id ?? null);
+        } else {
+          setCurrentStudentId(null);
+        }
         setPlansByStudent(plansMap);
         setPlanNamesById(planNamesMap);
         setProfilesByUser(profilesMap);
@@ -306,7 +329,7 @@ export default function StudentsPage() {
           <div className="flex items-start gap-2">
             <Users className="h-5 w-5 text-[#3cadaf] flex-shrink-0" />
             <div className="space-y-0.5">
-              <h1 className="text-2xl font-semibold text-[#31435d]">Alumnos</h1>
+              <h1 className="text-2xl font-semibold text-[#31435d]">{role === 'student' ? 'Mi cuenta' : 'Alumnos'}</h1>
               <p className="text-sm text-gray-600">Cargando...</p>
             </div>
           </div>
@@ -334,10 +357,14 @@ export default function StudentsPage() {
         <div className="flex items-start gap-2">
           <Users className="h-5 w-5 text-[#3cadaf] flex-shrink-0" />
           <div className="space-y-0.5">
-            <h1 className="text-2xl font-semibold text-[#31435d]">Alumnos</h1>
-            <p className="text-sm text-gray-600">
-              Listado de alumnos con su plan activo y clases restantes (si corresponde).
-            </p>
+            <h1 className="text-2xl font-semibold text-[#31435d]">{role === 'student' ? 'Mi cuenta' : 'Alumnos'}</h1>
+            {role === 'student' ? (
+              <p className="text-sm text-gray-600">Resumen de tu plan y clases disponibles.</p>
+            ) : (
+              <p className="text-sm text-gray-600">
+                Listado de alumnos con su plan activo y clases restantes (si corresponde).
+              </p>
+            )}
           </div>
         </div>
         <div className="flex items-center justify-end flex-1">
@@ -359,13 +386,15 @@ export default function StudentsPage() {
 
       <div className="border rounded-lg bg-white shadow-sm border-t-4 border-[#3cadaf]">
         <div className="px-4 py-3 border-b bg-gray-50 rounded-t-lg flex items-center justify-between">
-          <p className="text-sm font-semibold text-[#31435d]">Listado general</p>
+          <p className="text-sm font-semibold text-[#31435d]">
+            {role === 'student' ? 'Resumen de tu cuenta' : 'Listado general'}
+          </p>
           <span className="text-xs text-gray-500">
             {loading ? 'Cargando...' : `${students.length} alumno${students.length === 1 ? '' : 's'}`}
           </span>
         </div>
         <div className="px-4 py-3 space-y-3">
-          {!loading && students.length > 0 && (
+          {!loading && students.length > 0 && role !== 'student' && (
             <div className="max-w-xs">
               <label className="block text-xs mb-1 text-gray-600">Buscar alumno</label>
               <Input
@@ -394,6 +423,7 @@ export default function StudentsPage() {
                 <tbody>
                   {students
                     .filter((s) => {
+                      if (role === 'student' && currentStudentId && s.id !== currentStudentId) return false;
                       const term = search.trim().toLowerCase();
                       if (!term) return true;
                       const profile = s.user_id ? profilesByUser[s.user_id] : undefined;
