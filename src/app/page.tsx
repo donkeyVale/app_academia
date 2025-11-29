@@ -716,6 +716,7 @@ export default function HomePage() {
       <FooterNav
         isAdmin={isAdmin}
         canSeeReports={role !== 'student'}
+        canSeeFinance={role !== 'student'}
         studentsLabel={role === 'student' ? 'Mi cuenta' : 'Alumnos'}
         rightSlot={(
           <>

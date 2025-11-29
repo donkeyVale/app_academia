@@ -38,6 +38,15 @@ type StudentPlanRow = {
   plans?: { name: string | null } | null;
 };
 
+type StudentPayment = {
+  id: string;
+  amount: number;
+  currency: string;
+  payment_date: string;
+  method: string;
+  status: string;
+};
+
 type ProfileRow = {
   id: string;
   full_name: string | null;
@@ -56,6 +65,7 @@ export default function StudentsPage() {
   const [plansByStudent, setPlansByStudent] = useState<Record<string, StudentPlanRow | undefined>>({});
   const [planNamesById, setPlanNamesById] = useState<Record<string, string>>({});
   const [profilesByUser, setProfilesByUser] = useState<Record<string, ProfileRow | undefined>>({});
+  const [studentPayments, setStudentPayments] = useState<StudentPayment[]>([]);
   const [historyStudent, setHistoryStudent] = useState<{ id: string; name: string } | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -190,8 +200,9 @@ export default function StudentsPage() {
 
         setStudents(studentsData);
 
+        let selfRow: StudentRow | null = null;
         if (roleFromProfile === 'student') {
-          const selfRow = studentsData.find((s) => s.user_id === userId) ?? null;
+          selfRow = studentsData.find((s) => s.user_id === userId) ?? null;
           setCurrentStudentId(selfRow?.id ?? null);
         } else {
           setCurrentStudentId(null);
@@ -199,6 +210,22 @@ export default function StudentsPage() {
         setPlansByStudent(plansMap);
         setPlanNamesById(planNamesMap);
         setProfilesByUser(profilesMap);
+
+        // Pagos recientes del alumno actual para mostrar dentro de Mi cuenta
+        let paymentsRows: StudentPayment[] = [];
+        if (roleFromProfile === 'student' && selfRow) {
+          const { data: payData, error: payErr } = await supabase
+            .from('payments')
+            .select('id,amount,currency,payment_date,method,status')
+            .eq('student_id', selfRow.id)
+            .order('payment_date', { ascending: false })
+            .limit(10);
+
+          if (payErr) throw payErr;
+          paymentsRows = ((payData ?? []) as unknown as StudentPayment[]);
+        }
+
+        setStudentPayments(paymentsRows);
       } catch (err: any) {
         setError(err?.message ?? 'Error cargando alumnos.');
       } finally {
@@ -347,6 +374,61 @@ export default function StudentsPage() {
               className="object-cover"
             />
           </div>
+
+      {role === 'student' && (
+        <div className="border rounded-lg bg-white shadow-sm mt-4">
+          <div className="px-4 py-3 border-b bg-gray-50 rounded-t-lg flex items-center justify-between">
+            <p className="text-sm font-semibold text-[#31435d]">Tus pagos recientes</p>
+          </div>
+          <div className="px-4 py-3 text-sm">
+            {loading ? (
+              <p className="text-gray-600">Cargando pagos...</p>
+            ) : studentPayments.length === 0 ? (
+              <p className="text-gray-600">Todavía no registramos pagos a tu nombre.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[320px] text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b bg-gray-50 text-gray-600">
+                      <th className="py-2 px-2 text-left font-medium">Fecha</th>
+                      <th className="py-2 px-2 text-left font-medium">Método</th>
+                      <th className="py-2 px-2 text-right font-medium">Monto</th>
+                      <th className="py-2 px-2 text-center font-medium">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {studentPayments.map((p) => {
+                      const d = new Date(p.payment_date);
+                      const yyyy = d.getFullYear();
+                      const mm = String(d.getMonth() + 1).padStart(2, '0');
+                      const dd = String(d.getDate()).padStart(2, '0');
+                      return (
+                        <tr key={p.id} className="border-b last:border-b-0">
+                          <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
+                          <td className="py-1.5 px-2 capitalize">{p.method}</td>
+                          <td className="py-1.5 px-2 text-right">{p.amount} {p.currency}</td>
+                          <td className="py-1.5 px-2 text-center">
+                            <span
+                              className={
+                                'inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold ' +
+                                (p.status === 'pagado'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                  : 'bg-amber-50 text-amber-700 border border-amber-100')
+                              }
+                            >
+                              {p.status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
           <div className="text-center">
             <div className="text-xs text-white/80 mt-1">Cargando tu cuenta.....</div>
           </div>
@@ -422,11 +504,23 @@ export default function StudentsPage() {
           <p className="text-sm font-semibold text-[#31435d]">
             {role === 'student' ? 'Resumen de tu cuenta' : 'Listado general'}
           </p>
-          {role !== 'student' && (
-            <span className="text-xs text-gray-500">
-              {loading ? 'Cargando...' : `${students.length} alumno${students.length === 1 ? '' : 's'}`}
-            </span>
-          )}
+          <div className="flex items-center gap-3">
+            {role !== 'student' && (
+              <span className="text-xs text-gray-500">
+                {loading ? 'Cargando...' : `${students.length} alumno${students.length === 1 ? '' : 's'}`}
+              </span>
+            )}
+            {role === 'student' && (
+              <button
+                type="button"
+                className="inline-flex items-center rounded-full bg-[#3cadaf] hover:bg-[#31435d] text-white text-xs font-semibold px-3 py-1.5 transition-colors disabled:opacity-60"
+                // Sin funcionalidad por ahora; se implementará cuando se integren pagos online
+                disabled={loading}
+              >
+                Pagar ahora
+              </button>
+            )}
+          </div>
         </div>
         <div className="px-4 py-3 space-y-3">
           {!loading && students.length > 0 && role !== 'student' && (
