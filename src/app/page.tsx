@@ -671,18 +671,20 @@ export default function HomePage() {
             <motion.div
               whileHover={{ y: -2, boxShadow: '0 10px 25px rgba(15,23,42,0.12)' }}
               transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-              className="border rounded-2xl p-4 bg-white shadow-sm border-t-4 border-[#3cadaf]"
+              className="border rounded-2xl p-4 bg-gradient-to-br from-emerald-50 via-white to-sky-50 shadow-sm border-t-4 border-[#3cadaf]"
             >
-              <div className="flex items-center gap-2 mb-2">
-                <div className="h-9 w-9 rounded-full bg-emerald-50 flex items-center justify-center">
-                  <IconMoney />
+              <div className="flex items-center justify-between mb-3">
+                <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100/80 text-emerald-800 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide">
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/80">
+                    <IconMoney />
+                  </span>
+                  <span>Clases restantes</span>
                 </div>
-                <p className="text-xs uppercase tracking-wide text-gray-500">Tu plan y clases restantes</p>
               </div>
-              <p className="text-3xl font-semibold text-[#111827]">
+              <p className="text-4xl font-bold text-[#0f172a] tracking-tight">
                 {loading ? '...' : studentRemainingClasses === null ? '-' : studentRemainingClasses}
               </p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 mt-2">
                 Clases que aún tenés disponibles en tu plan actual.
               </p>
             </motion.div>
