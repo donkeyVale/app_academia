@@ -575,55 +575,93 @@ export default function HomePage() {
       )}
 
       {role === 'coach' && (
-        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-          <motion.button
-            type="button"
-            whileHover={{ y: -2, boxShadow: '0 10px 25px rgba(15,23,42,0.12)' }}
-            transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-            className="border rounded-xl p-4 bg-white shadow-sm border-t-4 border-[#3b82f6] text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/60 focus:ring-offset-1"
-            onClick={() => router.push('/schedule?scope=today')}
+        <div className="space-y-4">
+          {/* Hero para coach: enfoque en las clases de hoy */}
+          <motion.div
+            whileHover={{ y: -1, boxShadow: '0 16px 40px rgba(15,23,42,0.30)' }}
+            transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-sky-600 via-blue-600 to-indigo-700 text-white px-4 py-5 shadow-lg"
           >
-            <div className="flex items-center gap-2 mb-1">
-              <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
-                <IconCalendar />
+            <div className="relative z-10 flex flex-col gap-3">
+              <div className="text-xs uppercase tracking-wide text-white/80">Tus clases de hoy</div>
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <div className="text-sm text-white/80">Clases donde sos profesor</div>
+                  <div className="text-3xl font-bold leading-tight">
+                    {loading ? '...' : coachTodayClasses}
+                  </div>
+                  <div className="mt-1 text-xs text-white/80">
+                    {loading
+                      ? 'Cargando tus clases de hoy...'
+                      : coachTodayClasses === 0
+                      ? 'Hoy no tenés clases asignadas. Podés revisar la semana desde la Agenda.'
+                      : 'Revisá el detalle de horarios y alumnos en tu Agenda.'}
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => router.push('/schedule?scope=today')}
+                    className="inline-flex items-center gap-2 rounded-full bg-white text-sky-800 px-4 py-1.5 text-xs font-semibold shadow-sm hover:bg-slate-50"
+                  >
+                    Ver clases de hoy
+                    <CalendarDays className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push('/schedule?scope=week')}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-white/40 text-xs px-3 py-1 text-white/90 hover:bg-white/10"
+                  >
+                    Semana completa
+                  </button>
+                </div>
               </div>
-              <p className="text-xs uppercase tracking-wide text-gray-500">Clases de hoy</p>
             </div>
-            <p className="text-2xl font-semibold text-[#111827]">{loading ? '...' : coachTodayClasses}</p>
-            <p className="text-xs text-gray-500 mt-1">Clases donde sos profesor en el día de hoy</p>
-          </motion.button>
-          <motion.button
-            type="button"
-            whileHover={{ y: -2, boxShadow: '0 10px 25px rgba(15,23,42,0.12)' }}
-            transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-            className="border rounded-xl p-4 bg-white shadow-sm border-t-4 border-[#22c55e] text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#22c55e]/60 focus:ring-offset-1"
-            onClick={() => router.push('/schedule?scope=week')}
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
-                <IconCalendar />
+            <div className="pointer-events-none absolute -right-10 -bottom-10 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
+          </motion.div>
+
+          {/* Cards de apoyo para coach: semana y alumnos activos */}
+          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+            <motion.div
+              whileHover={{ y: -2, boxShadow: '0 10px 25px rgba(15,23,42,0.12)' }}
+              transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+              className="border rounded-2xl p-4 bg-white shadow-sm border-t-4 border-[#22c55e]"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-9 w-9 rounded-full bg-emerald-50 flex items-center justify-center">
+                  <IconCalendar />
+                </div>
+                <p className="text-xs uppercase tracking-wide text-gray-500">Clases esta semana</p>
               </div>
-              <p className="text-xs uppercase tracking-wide text-gray-500">Clases esta semana</p>
-            </div>
-            <p className="text-2xl font-semibold text-[#111827]">{loading ? '...' : coachWeekClasses}</p>
-            <p className="text-xs text-gray-500 mt-1">Total de clases asignadas esta semana</p>
-          </motion.button>
-          <motion.button
-            type="button"
-            whileHover={{ y: -2, boxShadow: '0 10px 25px rgba(15,23,42,0.12)' }}
-            transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-            className="border rounded-xl p-4 bg-white shadow-sm border-t-4 border-[#3cadaf] text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/60 focus:ring-offset-1"
-            onClick={() => router.push('/students')}
-          >
-            <div className="flex items-center gap-2 mb-1">
-              <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
-                <IconStudents />
+              <p className="text-3xl font-semibold text-[#111827]">
+                {loading ? '...' : coachWeekClasses}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Total de clases donde sos profesor entre lunes y domingo.
+              </p>
+            </motion.div>
+
+            <motion.button
+              type="button"
+              whileHover={{ y: -2, boxShadow: '0 10px 25px rgba(15,23,42,0.12)' }}
+              transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+              onClick={() => router.push('/students')}
+              className="border rounded-2xl p-4 bg-white shadow-sm border-t-4 border-[#3cadaf] text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/60 focus:ring-offset-1"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <div className="h-9 w-9 rounded-full bg-sky-50 flex items-center justify-center">
+                  <IconStudents />
+                </div>
+                <p className="text-xs uppercase tracking-wide text-gray-500">Alumnos activos</p>
               </div>
-              <p className="text-xs uppercase tracking-wide text-gray-500">Alumnos activos</p>
-            </div>
-            <p className="text-2xl font-semibold text-[#111827]">{loading ? '...' : coachActiveStudents}</p>
-            <p className="text-xs text-gray-500 mt-1">Alumnos con clases futuras reservadas con vos</p>
-          </motion.button>
+              <p className="text-3xl font-semibold text-[#111827]">
+                {loading ? '...' : coachActiveStudents}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Alumnos con clases futuras reservadas con vos en las próximas semanas.
+              </p>
+            </motion.button>
+          </div>
         </div>
       )}
 
