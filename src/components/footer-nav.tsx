@@ -1,20 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarDays, Users, CreditCard, UserCog, BarChart3 } from "lucide-react";
+import { CalendarDays, Users, CreditCard, UserCog, BarChart3, Settings } from "lucide-react";
 import React from "react";
 
 interface FooterNavProps {
   isAdmin: boolean;
   canSeeReports?: boolean;
   canSeeFinance?: boolean;
+  canSeeSettings?: boolean;
   studentsLabel?: string;
   rightSlot: React.ReactNode;
 }
 
-export function FooterNav({ isAdmin, canSeeReports, canSeeFinance, studentsLabel, rightSlot }: FooterNavProps) {
+export function FooterNav({ isAdmin, canSeeReports, canSeeFinance, canSeeSettings, studentsLabel, rightSlot }: FooterNavProps) {
   const showReports = canSeeReports !== false;
   const showFinance = canSeeFinance !== false;
+  const showSettings = canSeeSettings === true;
   const studentsText = studentsLabel || 'Alumnos';
   return (
     <nav className="fixed bottom-0 inset-x-0 border-t bg-white/95 backdrop-blur-sm">
@@ -34,6 +36,15 @@ export function FooterNav({ isAdmin, canSeeReports, canSeeFinance, studentsLabel
             <Users className="w-4 h-4 text-[#22c55e]" />
             <span>{studentsText}</span>
           </Link>
+          {showSettings && (
+            <Link
+              href="/settings"
+              className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
+            >
+              <Settings className="w-4 h-4 text-[#64748b]" />
+              <span>Configuración</span>
+            </Link>
+          )}
           {showFinance && (
             <Link
               href="/finance"

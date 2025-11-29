@@ -717,6 +717,7 @@ export default function HomePage() {
         isAdmin={isAdmin}
         canSeeReports={role !== 'student'}
         canSeeFinance={role !== 'student'}
+        canSeeSettings={role === 'student'}
         studentsLabel={role === 'student' ? 'Mi cuenta' : 'Alumnos'}
         rightSlot={(
           <>

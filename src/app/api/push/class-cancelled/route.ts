@@ -55,13 +55,34 @@ export async function POST(req: NextRequest) {
     }
 
     if (userIds.size === 0) {
-      return NextResponse.json({ error: 'No se encontraron usuarios con push para esta clase cancelada.' }, { status: 404 });
+      return NextResponse.json({ error: 'No se encontraron usuarios para esta clase cancelada.' }, { status: 404 });
+    }
+
+    // Respetar preferencia de notificaciones en profiles.notifications_enabled
+    const { data: profiles, error: profErr } = await supabaseAdmin
+      .from('profiles')
+      .select('id, notifications_enabled')
+      .in('id', Array.from(userIds));
+
+    if (profErr) {
+      return NextResponse.json({ error: profErr.message }, { status: 500 });
+    }
+
+    const allowedUserIds = new Set<string>();
+    for (const row of profiles ?? []) {
+      const enabled = (row as any).notifications_enabled;
+      if (enabled === false) continue;
+      allowedUserIds.add((row as any).id as string);
+    }
+
+    if (allowedUserIds.size === 0) {
+      return NextResponse.json({ error: 'Ningún usuario tiene activadas las notificaciones para esta clase cancelada.' }, { status: 404 });
     }
 
     const { data: subs, error: subsError } = await supabaseAdmin
       .from('push_subscriptions')
       .select('*')
-      .in('user_id', Array.from(userIds));
+      .in('user_id', Array.from(allowedUserIds));
 
     if (subsError) {
       return NextResponse.json({ error: subsError.message }, { status: 500 });

@@ -182,6 +182,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         isAdmin={isAdmin}
         canSeeReports={role !== 'student'}
         canSeeFinance={role !== 'student'}
+        canSeeSettings={role === 'student'}
         studentsLabel={role === 'student' ? 'Mi cuenta' : 'Alumnos'}
         rightSlot={(
           <>
