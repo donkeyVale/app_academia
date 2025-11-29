@@ -62,6 +62,8 @@ export default function StudentsPage() {
     { id: string; date: string; courtName: string | null; coachName: string | null }[]
   >([]);
 
+  const roleResolved = role === 'admin' || role === 'coach' || role === 'student';
+
   useEffect(() => {
     (async () => {
       const { data } = await supabase.auth.getUser();
@@ -154,8 +156,11 @@ export default function StudentsPage() {
             remaining_classes: effectiveRemaining,
           };
 
-          // Si hay varios registros de plan para el mismo alumno, nos quedamos con el primero.
-          if (!plansMap[p.student_id]) {
+          // Si hay varios registros de plan para el mismo alumno, priorizamos uno que tenga plan_id no nulo.
+          const existing = plansMap[p.student_id];
+          if (!existing) {
+            plansMap[p.student_id] = withEffective;
+          } else if (!existing.plan_id && p.plan_id) {
             plansMap[p.student_id] = withEffective;
           }
           if (p.plan_id) {
@@ -321,6 +326,30 @@ export default function StudentsPage() {
       setHistoryLoading(false);
     }
   };
+
+  if (!roleResolved) {
+    return (
+      <section className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-gradient-to-br from-[#0f172a] via-[#1d3b4f] to-[#3cadaf] text-white">
+        <div className="flex flex-col items-center gap-3">
+          <div
+            className="h-24 w-24 rounded-full bg-white/10 border border-white/40 flex items-center justify-center overflow-hidden animate-spin"
+            style={{ animationDuration: '1.5s' }}
+          >
+            <Image
+              src="/icons/LogoAgendo1024.png"
+              alt="Icono de la app"
+              width={128}
+              height={128}
+              className="object-cover"
+            />
+          </div>
+          <div className="text-center">
+            <div className="text-xs text-white/80 mt-1">Cargando tu cuenta.....</div>
+          </div>
+        </div>
+      </section>
+    );
+  }
 
   if (checking) {
     return (
