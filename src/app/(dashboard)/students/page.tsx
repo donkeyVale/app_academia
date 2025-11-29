@@ -479,7 +479,9 @@ export default function StudentsPage() {
                     .map((s) => {
                     const planInfo = plansByStudent[s.id];
                     const planId = planInfo?.plan_id ?? null;
-                    const planName = planId ? planNamesById[planId] ?? '(sin nombre)' : '(sin plan)';
+                    const planName =
+                      (planInfo?.plans && planInfo.plans.name) ||
+                      (planId ? planNamesById[planId] ?? '(sin nombre)' : '(sin plan)');
                     const remaining = planInfo?.remaining_classes ?? null;
 
                     const profile = s.user_id ? profilesByUser[s.user_id] : undefined;
