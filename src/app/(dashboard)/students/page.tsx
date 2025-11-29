@@ -417,6 +417,10 @@ export default function StudentsPage() {
     );
   }
 
+  const currentPlanInfo = currentStudentId ? plansByStudent[currentStudentId] : undefined;
+  const planTotal = currentPlanInfo?.final_price ?? currentPlanInfo?.base_price ?? null;
+  const totalPaid = studentPayments.reduce((acc, p) => (p.status === 'pagado' ? acc + (p.amount ?? 0) : acc), 0);
+
   return (
     <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4 overflow-x-hidden">
       <div className="flex items-start justify-between gap-4">
@@ -447,6 +451,71 @@ export default function StudentsPage() {
           </Link>
         </div>
       </div>
+
+      {role === 'student' && (
+        <div className="border rounded-lg bg-white shadow-sm">
+          <div className="px-4 py-3 border-b bg-gray-50 rounded-t-lg flex items-center justify-between">
+            <p className="text-sm font-semibold text-[#31435d]">Tus pagos recientes</p>
+            <div className="text-[11px] text-gray-600">
+              {planTotal != null ? (
+                <>
+                  <span className="font-semibold text-[#31435d]">Pagado:</span>{' '}
+                  {totalPaid} / {planTotal} PYG
+                </>
+              ) : (
+                <span>Sin monto total definido para el plan.</span>
+              )}
+            </div>
+          </div>
+          <div className="px-4 py-3 text-sm">
+            {loading ? (
+              <p className="text-gray-600">Cargando pagos...</p>
+            ) : studentPayments.length === 0 ? (
+              <p className="text-gray-600">Todavía no registramos pagos a tu nombre.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[320px] text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b bg-gray-50 text-gray-600">
+                      <th className="py-2 px-2 text-left font-medium">Fecha</th>
+                      <th className="py-2 px-2 text-left font-medium">Método</th>
+                      <th className="py-2 px-2 text-right font-medium">Monto</th>
+                      <th className="py-2 px-2 text-center font-medium">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {studentPayments.map((p) => {
+                      const d = new Date(p.payment_date);
+                      const yyyy = d.getFullYear();
+                      const mm = String(d.getMonth() + 1).padStart(2, '0');
+                      const dd = String(d.getDate()).padStart(2, '0');
+                      return (
+                        <tr key={p.id} className="border-b last:border-b-0">
+                          <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
+                          <td className="py-1.5 px-2 capitalize">{p.method}</td>
+                          <td className="py-1.5 px-2 text-right">{p.amount} {p.currency}</td>
+                          <td className="py-1.5 px-2 text-center">
+                            <span
+                              className={
+                                'inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold ' +
+                                (p.status === 'pagado'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                  : 'bg-amber-50 text-amber-700 border border-amber-100')
+                              }
+                            >
+                              {p.status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
