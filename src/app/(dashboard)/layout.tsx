@@ -180,9 +180,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <FooterNav
         isAdmin={isAdmin}
-        canSeeReports={role !== 'student'}
+        canSeeReports={role === 'admin'}
         canSeeFinance={role !== 'student'}
-        canSeeSettings={role === 'student'}
+        canSeeSettings={role === 'coach' || role === 'student'}
         studentsLabel={role === 'student' ? 'Mi cuenta' : 'Alumnos'}
         rightSlot={(
           <>
