@@ -159,7 +159,6 @@ export default function StudentsPage() {
 
         // Construir mapas de planes
         const plansMap: Record<string, StudentPlanRow> = {};
-        const planIds = new Set<string>();
         for (const p of plansData) {
           const used = usageCountsByPlan[p.id] || 0;
           const effectiveRemaining = Math.max(0, (p.remaining_classes ?? 0) - used);
@@ -175,21 +174,14 @@ export default function StudentsPage() {
           } else if (!existing.plan_id && p.plan_id) {
             plansMap[p.student_id] = withEffective;
           }
-          if (p.plan_id) {
-            planIds.add(p.plan_id);
-          }
         }
 
         let planNamesMap: Record<string, string> = {};
-        if (planIds.size > 0) {
-          const plansRes = await supabase
-            .from('plans')
-            .select('id, name')
-            .in('id', Array.from(planIds));
-
+        {
+          const plansRes = await supabase.from('plans').select('id, name');
           if (plansRes.error) throw plansRes.error;
 
-          const plansRows = plansRes.data as { id: string; name: string }[];
+          const plansRows = (plansRes.data ?? []) as { id: string; name: string }[];
           planNamesMap = plansRows.reduce<Record<string, string>>((acc, p) => {
             acc[p.id] = p.name;
             return acc;
