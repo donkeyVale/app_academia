@@ -668,10 +668,12 @@ export default function HomePage() {
 
           {/* Card de apoyo: progreso de plan */}
           <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
-            <motion.div
+            <motion.button
+              type="button"
               whileHover={{ y: -2, boxShadow: '0 10px 25px rgba(15,23,42,0.12)' }}
               transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-              className="border rounded-2xl p-4 bg-gradient-to-br from-emerald-50 via-white to-sky-50 shadow-sm border-t-4 border-[#3cadaf]"
+              onClick={() => router.push('/students')}
+              className="border rounded-2xl p-4 bg-gradient-to-br from-emerald-50 via-white to-sky-50 shadow-sm border-t-4 border-[#3cadaf] text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/60 focus:ring-offset-1"
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100/80 text-emerald-800 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide">
@@ -687,7 +689,7 @@ export default function HomePage() {
               <p className="text-xs text-gray-500 mt-2">
                 Clases que aún tenés disponibles en tu plan actual.
               </p>
-            </motion.div>
+            </motion.button>
           </div>
         </div>
       )}
