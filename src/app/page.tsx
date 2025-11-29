@@ -607,13 +607,6 @@ export default function HomePage() {
                     Ver clases de hoy
                     <CalendarDays className="w-3.5 h-3.5" />
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => router.push('/schedule?scope=week')}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-white/40 text-xs px-3 py-1 text-white/90 hover:bg-white/10"
-                  >
-                    Semana completa
-                  </button>
                 </div>
               </div>
             </div>
