@@ -35,6 +35,7 @@ type StudentPlanRow = {
   student_id: string;
   plan_id: string | null;
   remaining_classes: number;
+  plans?: { name: string | null } | null;
 };
 
 type ProfileRow = {
@@ -93,7 +94,7 @@ export default function StudentsPage() {
       try {
         const [studentsRes, studentPlansRes] = await Promise.all([
           supabase.from('students').select('id, user_id, level, notes'),
-          supabase.from('student_plans').select('id, student_id, plan_id, remaining_classes'),
+          supabase.from('student_plans').select('id, student_id, plan_id, remaining_classes, plans(name)'),
         ]);
 
         if (studentsRes.error) throw studentsRes.error;
@@ -418,9 +419,11 @@ export default function StudentsPage() {
           <p className="text-sm font-semibold text-[#31435d]">
             {role === 'student' ? 'Resumen de tu cuenta' : 'Listado general'}
           </p>
-          <span className="text-xs text-gray-500">
-            {loading ? 'Cargando...' : `${students.length} alumno${students.length === 1 ? '' : 's'}`}
-          </span>
+          {role !== 'student' && (
+            <span className="text-xs text-gray-500">
+              {loading ? 'Cargando...' : `${students.length} alumno${students.length === 1 ? '' : 's'}`}
+            </span>
+          )}
         </div>
         <div className="px-4 py-3 space-y-3">
           {!loading && students.length > 0 && role !== 'student' && (
@@ -465,7 +468,8 @@ export default function StudentsPage() {
                     .map((s) => {
                     const planInfo = plansByStudent[s.id];
                     const planId = planInfo?.plan_id ?? null;
-                    const planName = planId ? planNamesById[planId] ?? '-' : '-';
+                    const planName =
+                      (planInfo?.plans && planInfo.plans.name) || (planId ? planNamesById[planId] ?? '-' : '-');
                     const remaining = planInfo?.remaining_classes ?? null;
 
                     const profile = s.user_id ? profilesByUser[s.user_id] : undefined;
