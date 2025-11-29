@@ -625,18 +625,20 @@ export default function HomePage() {
             <motion.div
               whileHover={{ y: -2, boxShadow: '0 10px 25px rgba(15,23,42,0.12)' }}
               transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-              className="border rounded-2xl p-4 bg-white shadow-sm border-t-4 border-[#22c55e]"
+              className="border rounded-2xl p-4 bg-gradient-to-br from-emerald-50 via-white to-sky-50 shadow-sm border-t-4 border-[#22c55e]"
             >
-              <div className="flex items-center gap-2 mb-2">
-                <div className="h-9 w-9 rounded-full bg-emerald-50 flex items-center justify-center">
-                  <IconCalendar />
+              <div className="flex items-center justify-between mb-3">
+                <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100/80 text-emerald-800 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide">
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/80">
+                    <IconCalendar />
+                  </span>
+                  <span>Clases esta semana</span>
                 </div>
-                <p className="text-xs uppercase tracking-wide text-gray-500">Clases esta semana</p>
               </div>
-              <p className="text-3xl font-semibold text-[#111827]">
+              <p className="text-4xl font-bold text-[#0f172a] tracking-tight">
                 {loading ? '...' : coachWeekClasses}
               </p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 mt-2">
                 Total de clases donde sos profesor entre lunes y domingo.
               </p>
             </motion.div>
@@ -646,18 +648,20 @@ export default function HomePage() {
               whileHover={{ y: -2, boxShadow: '0 10px 25px rgba(15,23,42,0.12)' }}
               transition={{ type: 'spring', stiffness: 260, damping: 20 }}
               onClick={() => router.push('/students')}
-              className="border rounded-2xl p-4 bg-white shadow-sm border-t-4 border-[#3cadaf] text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/60 focus:ring-offset-1"
+              className="border rounded-2xl p-4 bg-gradient-to-br from-sky-50 via-white to-emerald-50 shadow-sm border-t-4 border-[#3cadaf] text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/60 focus:ring-offset-1"
             >
-              <div className="flex items-center gap-2 mb-2">
-                <div className="h-9 w-9 rounded-full bg-sky-50 flex items-center justify-center">
-                  <IconStudents />
+              <div className="flex items-center justify-between mb-3">
+                <div className="inline-flex items-center gap-2 rounded-full bg-sky-100/80 text-sky-800 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide">
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/80">
+                    <IconStudents />
+                  </span>
+                  <span>Alumnos activos</span>
                 </div>
-                <p className="text-xs uppercase tracking-wide text-gray-500">Alumnos activos</p>
               </div>
-              <p className="text-3xl font-semibold text-[#111827]">
+              <p className="text-4xl font-bold text-[#0f172a] tracking-tight">
                 {loading ? '...' : coachActiveStudents}
               </p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-500 mt-2">
                 Alumnos con clases futuras reservadas con vos en las próximas semanas.
               </p>
             </motion.button>
