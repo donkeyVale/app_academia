@@ -7,11 +7,13 @@ import React from "react";
 interface FooterNavProps {
   isAdmin: boolean;
   canSeeReports?: boolean;
+  studentsLabel?: string;
   rightSlot: React.ReactNode;
 }
 
-export function FooterNav({ isAdmin, canSeeReports, rightSlot }: FooterNavProps) {
+export function FooterNav({ isAdmin, canSeeReports, studentsLabel, rightSlot }: FooterNavProps) {
   const showReports = canSeeReports !== false;
+  const studentsText = studentsLabel || 'Alumnos';
   return (
     <nav className="fixed bottom-0 inset-x-0 border-t bg-white/95 backdrop-blur-sm">
       <div className="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
@@ -28,7 +30,7 @@ export function FooterNav({ isAdmin, canSeeReports, rightSlot }: FooterNavProps)
             className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
           >
             <Users className="w-4 h-4 text-[#22c55e]" />
-            <span>Alumnos</span>
+            <span>{studentsText}</span>
           </Link>
           <Link
             href="/finance"

@@ -181,6 +181,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <FooterNav
         isAdmin={isAdmin}
         canSeeReports={role !== 'student'}
+        studentsLabel={role === 'student' ? 'Mi cuenta' : 'Alumnos'}
         rightSlot={(
           <>
             <FooterAvatarButton
