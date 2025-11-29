@@ -76,6 +76,9 @@ export default function StudentsPage() {
   const [historyItems, setHistoryItems] = useState<
     { id: string; date: string; courtName: string | null; coachName: string | null }[]
   >([]);
+  const [showOnlyMyStudents, setShowOnlyMyStudents] = useState(false);
+  const [myStudentIds, setMyStudentIds] = useState<string[]>([]);
+  const [nextClassByStudent, setNextClassByStudent] = useState<Record<string, string | null>>({});
 
   const roleResolved = role === 'admin' || role === 'coach' || role === 'student';
 
@@ -240,6 +243,69 @@ export default function StudentsPage() {
         }
 
         setStudentPayments(paymentsRows);
+
+        // Construir listado de "mis alumnos" para coach (alumnos con clases futuras con este coach)
+        let myIds: string[] = [];
+        let nextByStudent: Record<string, string | null> = {};
+        if (roleFromProfile === 'coach' && userId) {
+          const { data: coachRow, error: coachErr } = await supabase
+            .from('coaches')
+            .select('id')
+            .eq('user_id', userId)
+            .maybeSingle();
+          if (coachErr) throw coachErr;
+          const coachId = coachRow?.id as string | undefined;
+
+          if (coachId) {
+            const futureFrom = new Date();
+            const futureTo = new Date(futureFrom.getTime() + 14 * 24 * 60 * 60 * 1000);
+            const { data: futureClasses, error: futureErr } = await supabase
+              .from('class_sessions')
+              .select('id,date')
+              .eq('coach_id', coachId)
+              .gte('date', futureFrom.toISOString())
+              .lte('date', futureTo.toISOString());
+            if (futureErr) throw futureErr;
+
+            const classes = futureClasses ?? [];
+            if (classes.length > 0) {
+              const classIdMap: Record<string, string> = {};
+              classes.forEach((c: any) => {
+                classIdMap[c.id as string] = c.date as string;
+              });
+
+              const classIds = classes.map((c: any) => c.id as string);
+              const { data: bookingsData, error: bookingsErr } = await supabase
+                .from('bookings')
+                .select('student_id,class_id')
+                .in('class_id', classIds);
+              if (bookingsErr) throw bookingsErr;
+
+              const idSet = new Set<string>();
+              const nextMap: Record<string, string | null> = {};
+              (bookingsData ?? []).forEach((b: any) => {
+                const sid = b.student_id as string;
+                const cid = b.class_id as string;
+                idSet.add(sid);
+                const dateStr = classIdMap[cid];
+                if (!dateStr) return;
+                const prev = nextMap[sid];
+                if (!prev || new Date(dateStr) < new Date(prev)) {
+                  nextMap[sid] = dateStr;
+                }
+              });
+
+              myIds = Array.from(idSet);
+              nextByStudent = nextMap;
+            }
+          }
+        }
+
+        setMyStudentIds(myIds);
+        setNextClassByStudent(nextByStudent);
+        if (roleFromProfile === 'coach') {
+          setShowOnlyMyStudents(true);
+        }
       } catch (err: any) {
         setError(err?.message ?? 'Error cargando alumnos.');
       } finally {
@@ -533,7 +599,7 @@ export default function StudentsPage() {
             {role === 'student' ? 'Resumen de tu cuenta' : 'Listado general'}
           </p>
           <div className="flex items-center gap-3">
-            {role !== 'student' && (
+            {role === 'admin' && (
               <span className="text-xs text-gray-500">
                 {loading ? 'Cargando...' : `${students.length} alumno${students.length === 1 ? '' : 's'}`}
               </span>
@@ -551,113 +617,241 @@ export default function StudentsPage() {
           </div>
         </div>
         <div className="px-4 py-3 space-y-3">
-          {!loading && students.length > 0 && role !== 'student' && (
-            <div className="max-w-xs">
-              <label className="block text-xs mb-1 text-gray-600">Buscar alumno</label>
-              <Input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Nombre o nota del alumno"
-                className="h-10 text-base"
-              />
-            </div>
-          )}
-          {loading ? (
-            <p className="text-sm text-gray-600">Cargando alumnos...</p>
-          ) : students.length === 0 ? (
-            <p className="text-sm text-gray-600">Todavía no hay alumnos registrados.</p>
-          ) : (
+          {/* Vista para admin: tabla completa */}
+          {role === 'admin' && (
             <>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm border-collapse min-w-[320px]">
-                  <thead>
-                    <tr className="border-b bg-gray-50 text-xs text-gray-600">
-                      <th className="py-2 px-3 text-left font-medium">Alumno</th>
-                      <th className="py-2 px-3 text-left font-medium">Plan</th>
-                      <th className="py-2 px-3 text-center font-medium">Clases restantes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {students
-                    .filter((s) => {
-                      if (role === 'student' && currentStudentId && s.id !== currentStudentId) return false;
-                      const term = search.trim().toLowerCase();
-                      if (!term) return true;
-                      const profile = s.user_id ? profilesByUser[s.user_id] : undefined;
-                      const name = profile?.full_name || '';
-                      const notes = s.notes || '';
-                      const level = s.level || '';
-                      const combined = `${name} ${notes} ${level}`.toLowerCase();
-                      return combined.includes(term);
-                    })
-                    .map((s) => {
-                    const planInfo = plansByStudent[s.id];
-                    const planId = planInfo?.plan_id ?? null;
-                    const planNameRaw =
-                      (planInfo?.plans && planInfo.plans.name) ||
-                      (planId ? planNamesById[planId] ?? null : null);
-                    const planName = planNameRaw && planNameRaw.trim().length > 0 ? planNameRaw : '-';
-                    const remaining = planInfo?.remaining_classes ?? null;
-
-                    const profile = s.user_id ? profilesByUser[s.user_id] : undefined;
-                    const displayName = profile?.full_name || '(Sin nombre vinculado)';
-
-                    return (
-                      <tr
-                        key={s.id}
-                        className="border-b last:border-b-0 hover:bg-slate-50 cursor-pointer transition-colors"
-                        onClick={() => openHistory(s.id, displayName)}
-                      >
-                        <td className="py-2 px-3">
-                          <span className="block font-medium text-slate-800 truncate">{displayName}</span>
-                          {s.notes && (
-                            <span className="mt-0.5 block text-xs text-gray-500 truncate">{s.notes}</span>
-                          )}
-                        </td>
-                        <td className="py-2 px-3">
-                          <span className="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200">
-                            {planName}
-                          </span>
-                        </td>
-                        <td className="py-2 px-3 text-center">
-                          <span
-                            className={
-                              "inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-semibold " +
-                              (remaining !== null && remaining > 0
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                                : remaining === 0
-                                ? "bg-amber-50 text-amber-700 border border-amber-100"
-                                : "bg-slate-50 text-slate-500 border border-slate-200")
-                            }
-                          >
-                            {remaining !== null ? remaining : '-'}
-                          </span>
-                        </td>
+              {!loading && students.length > 0 && (
+                <div className="max-w-xs">
+                  <label className="block text-xs mb-1 text-gray-600">Buscar alumno</label>
+                  <Input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Nombre o nota del alumno"
+                    className="h-10 text-base"
+                  />
+                </div>
+              )}
+              {loading ? (
+                <p className="text-sm text-gray-600">Cargando alumnos...</p>
+              ) : students.length === 0 ? (
+                <p className="text-sm text-gray-600">Todavía no hay alumnos registrados.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border-collapse min-w-[320px]">
+                    <thead>
+                      <tr className="border-b bg-gray-50 text-xs text-gray-600">
+                        <th className="py-2 px-3 text-left font-medium">Alumno</th>
+                        <th className="py-2 px-3 text-left font-medium">Plan</th>
+                        <th className="py-2 px-3 text-center font-medium">Clases restantes</th>
                       </tr>
-                    );
-                  })}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {students
+                        .filter((s) => {
+                          const term = search.trim().toLowerCase();
+                          if (!term) return true;
+                          const profile = s.user_id ? profilesByUser[s.user_id] : undefined;
+                          const name = profile?.full_name || '';
+                          const notes = s.notes || '';
+                          const level = s.level || '';
+                          const combined = `${name} ${notes} ${level}`.toLowerCase();
+                          return combined.includes(term);
+                        })
+                        .map((s) => {
+                          const planInfo = plansByStudent[s.id];
+                          const planId = planInfo?.plan_id ?? null;
+                          const planNameRaw =
+                            (planInfo?.plans && planInfo.plans.name) ||
+                            (planId ? planNamesById[planId] ?? null : null);
+                          const planName = planNameRaw && planNameRaw.trim().length > 0 ? planNameRaw : '-';
+                          const remaining = planInfo?.remaining_classes ?? null;
 
-              {role === 'student' && currentPlanInfo && (
-                <div className="mt-3 flex flex-wrap gap-4 text-xs text-gray-600">
-                  <div>
-                    <span className="font-semibold text-[#31435d]">Clases totales:</span>{' '}
-                    {currentPlanInfo.total_classes != null ? currentPlanInfo.total_classes : '-'}
-                  </div>
-                  <div>
-                    <span className="font-semibold text-[#31435d]">Usadas:</span>{' '}
-                    {currentPlanInfo.used_classes != null ? currentPlanInfo.used_classes : '-'}
-                  </div>
-                  <div>
-                    <span className="font-semibold text-[#31435d]">Restantes:</span>{' '}
-                    {currentPlanInfo.remaining_classes != null ? currentPlanInfo.remaining_classes : '-'}
-                  </div>
+                          const profile = s.user_id ? profilesByUser[s.user_id] : undefined;
+                          const displayName = profile?.full_name || '(Sin nombre vinculado)';
+
+                          return (
+                            <tr
+                              key={s.id}
+                              className="border-b last:border-b-0 hover:bg-slate-50 cursor-pointer transition-colors"
+                              onClick={() => openHistory(s.id, displayName)}
+                            >
+                              <td className="py-2 px-3">
+                                <span className="block font-medium text-slate-800 truncate">{displayName}</span>
+                                {s.notes && (
+                                  <span className="mt-0.5 block text-xs text-gray-500 truncate">{s.notes}</span>
+                                )}
+                              </td>
+                              <td className="py-2 px-3">
+                                <span className="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200">
+                                  {planName}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3 text-center">
+                                <span
+                                  className={
+                                    "inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-semibold " +
+                                    (remaining !== null && remaining > 0
+                                      ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                                      : remaining === 0
+                                      ? "bg-amber-50 text-amber-700 border border-amber-100"
+                                      : "bg-slate-50 text-slate-500 border border-slate-200")
+                                  }
+                                >
+                                  {remaining !== null ? remaining : '-'}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </>
+          )}
+
+          {/* Vista para coach: cards de alumnos */}
+          {role === 'coach' && (
+            <>
+              {students.length === 0 ? (
+                <p className="text-sm text-gray-600">Todavía no hay alumnos registrados.</p>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="inline-flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-2 py-1 text-[11px] text-slate-700">
+                      <span className="font-semibold">{students.length}</span>
+                      <span>alumnos totales</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowOnlyMyStudents(true)}
+                        className={
+                          "px-3 py-1 text-xs rounded-full border text-sm font-medium " +
+                          (showOnlyMyStudents
+                            ? "bg-[#3cadaf] border-[#3cadaf] text-white"
+                            : "bg-white border-slate-200 text-slate-700")
+                        }
+                      >
+                        Solo mis alumnos
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowOnlyMyStudents(false)}
+                        className={
+                          "px-3 py-1 text-xs rounded-full border text-sm font-medium " +
+                          (!showOnlyMyStudents
+                            ? "bg-[#3cadaf] border-[#3cadaf] text-white"
+                            : "bg-white border-slate-200 text-slate-700")
+                        }
+                      >
+                        Todos los alumnos
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                    {(() => {
+                      const mySet = new Set(myStudentIds);
+                      return students
+                        .filter((s) => {
+                          if (showOnlyMyStudents && !mySet.has(s.id)) return false;
+                          const term = search.trim().toLowerCase();
+                          if (!term) return true;
+                          const profile = s.user_id ? profilesByUser[s.user_id] : undefined;
+                          const name = profile?.full_name || '';
+                          const notes = s.notes || '';
+                          const level = s.level || '';
+                          const combined = `${name} ${notes} ${level}`.toLowerCase();
+                          return combined.includes(term);
+                        })
+                        .map((s) => {
+                          const planInfo = plansByStudent[s.id];
+                          const planId = planInfo?.plan_id ?? null;
+                          const planNameRaw =
+                            (planInfo?.plans && planInfo.plans.name) ||
+                            (planId ? planNamesById[planId] ?? null : null);
+                          const planName = planNameRaw && planNameRaw.trim().length > 0 ? planNameRaw : '-';
+                          const remaining = planInfo?.remaining_classes ?? null;
+
+                          const profile = s.user_id ? profilesByUser[s.user_id] : undefined;
+                          const displayName = profile?.full_name || '(Sin nombre vinculado)';
+
+                          const nextClassDate = nextClassByStudent[s.id] ?? null;
+                          let nextLabel = 'Sin próximas clases con vos.';
+                          if (nextClassDate) {
+                            const d = new Date(nextClassDate);
+                            const yyyy = d.getFullYear();
+                            const mm = String(d.getMonth() + 1).padStart(2, '0');
+                            const dd = String(d.getDate()).padStart(2, '0');
+                            const hh = String(d.getHours()).padStart(2, '0');
+                            const min = String(d.getMinutes()).padStart(2, '0');
+                            nextLabel = `Próxima clase con vos: ${dd}/${mm}/${yyyy} ${hh}:${min} hs`;
+                          }
+
+                          return (
+                            <button
+                              key={s.id}
+                              type="button"
+                              onClick={() => openHistory(s.id, displayName)}
+                              className="border rounded-2xl p-4 bg-white shadow-sm text-left hover:bg-slate-50 transition-colors"
+                            >
+                              <div className="flex items-start justify-between gap-2 mb-2">
+                                <div>
+                                  <p className="text-sm font-semibold text-slate-900 truncate">{displayName}</p>
+                                  {s.level && (
+                                    <p className="text-[11px] text-slate-500 mt-0.5">Nivel: {s.level}</p>
+                                  )}
+                                  {s.notes && (
+                                    <p className="text-[11px] text-slate-500 mt-0.5 truncate">{s.notes}</p>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between gap-2 mt-1">
+                                <span className="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200">
+                                  Plan: {planName}
+                                </span>
+                                <span
+                                  className={
+                                    "inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-semibold " +
+                                    (remaining !== null && remaining > 0
+                                      ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                                      : remaining === 0
+                                      ? "bg-amber-50 text-amber-700 border-amber-100 border"
+                                      : "bg-slate-50 text-slate-500 border border-slate-200")
+                                  }
+                                >
+                                  Clases restantes: {remaining !== null ? remaining : '-'}
+                                </span>
+                              </div>
+                              <p className="mt-2 text-[11px] text-slate-500">{nextLabel}</p>
+                            </button>
+                          );
+                        });
+                    })()}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+
+          {/* Vista para student: resumen propio */}
+          {role === 'student' && !loading && currentPlanInfo && (
+            <div className="mt-3 flex flex-wrap gap-4 text-xs text-gray-600">
+              <div>
+                <span className="font-semibold text-[#31435d]">Clases totales:</span>{' '}
+                {currentPlanInfo.total_classes != null ? currentPlanInfo.total_classes : '-'}
+              </div>
+              <div>
+                <span className="font-semibold text-[#31435d]">Usadas:</span>{' '}
+                {currentPlanInfo.used_classes != null ? currentPlanInfo.used_classes : '-'}
+              </div>
+              <div>
+                <span className="font-semibold text-[#31435d]">Restantes:</span>{' '}
+                {currentPlanInfo.remaining_classes != null ? currentPlanInfo.remaining_classes : '-'}
+              </div>
+            </div>
           )}
         </div>
       </div>
