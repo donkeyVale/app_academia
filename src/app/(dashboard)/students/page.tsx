@@ -471,9 +471,10 @@ export default function StudentsPage() {
                     .map((s) => {
                     const planInfo = plansByStudent[s.id];
                     const planId = planInfo?.plan_id ?? null;
-                    const planName =
+                    const planNameRaw =
                       (planInfo?.plans && planInfo.plans.name) ||
-                      (planId ? planNamesById[planId] ?? '(sin nombre)' : '(sin plan)');
+                      (planId ? planNamesById[planId] ?? null : null);
+                    const planName = planNameRaw && planNameRaw.trim().length > 0 ? planNameRaw : '-';
                     const remaining = planInfo?.remaining_classes ?? null;
 
                     const profile = s.user_id ? profilesByUser[s.user_id] : undefined;
@@ -494,7 +495,6 @@ export default function StudentsPage() {
                         <td className="py-2 px-3">
                           <span className="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200">
                             {planName}
-                            {planId ? ` (${planId})` : ''}
                           </span>
                         </td>
                         <td className="py-2 px-3 text-center">
