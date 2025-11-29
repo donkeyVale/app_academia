@@ -37,6 +37,8 @@ type StudentPlanRow = {
   remaining_classes: number;
   base_price?: number | null;
   final_price?: number | null;
+  total_classes?: number | null;
+  used_classes?: number | null;
   plans?: { name: string | null } | null;
 };
 
@@ -120,7 +122,10 @@ export default function StudentsPage() {
           id: p.id as string,
           student_id: p.student_id as string,
           plan_id: (p.plan_id as string | null) ?? null,
+          // remaining_classes aquí representa inicialmente las clases totales configuradas para el plan
           remaining_classes: (p.remaining_classes as number) ?? 0,
+          total_classes: (p.remaining_classes as number | null) ?? null,
+          used_classes: null,
           base_price: (p.base_price as number | null) ?? null,
           final_price: (p.final_price as number | null) ?? null,
           plans: p.plans
@@ -177,10 +182,13 @@ export default function StudentsPage() {
         const plansMap: Record<string, StudentPlanRow> = {};
         for (const p of plansData) {
           const used = usageCountsByPlan[p.id] || 0;
-          const effectiveRemaining = Math.max(0, (p.remaining_classes ?? 0) - used);
+          const baseTotal = (p.total_classes ?? p.remaining_classes) ?? 0;
+          const effectiveRemaining = Math.max(0, baseTotal - used);
           const withEffective: StudentPlanRow = {
             ...p,
             remaining_classes: effectiveRemaining,
+            total_classes: baseTotal,
+            used_classes: used,
           };
 
           // Si hay varios registros de plan para el mismo alumno, priorizamos uno que tenga plan_id no nulo.
@@ -560,17 +568,18 @@ export default function StudentsPage() {
           ) : students.length === 0 ? (
             <p className="text-sm text-gray-600">Todavía no hay alumnos registrados.</p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse min-w-[320px]">
-                <thead>
-                  <tr className="border-b bg-gray-50 text-xs text-gray-600">
-                    <th className="py-2 px-3 text-left font-medium">Alumno</th>
-                    <th className="py-2 px-3 text-left font-medium">Plan</th>
-                    <th className="py-2 px-3 text-center font-medium">Clases restantes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {students
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border-collapse min-w-[320px]">
+                  <thead>
+                    <tr className="border-b bg-gray-50 text-xs text-gray-600">
+                      <th className="py-2 px-3 text-left font-medium">Alumno</th>
+                      <th className="py-2 px-3 text-left font-medium">Plan</th>
+                      <th className="py-2 px-3 text-center font-medium">Clases restantes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {students
                     .filter((s) => {
                       if (role === 'student' && currentStudentId && s.id !== currentStudentId) return false;
                       const term = search.trim().toLowerCase();
@@ -628,9 +637,27 @@ export default function StudentsPage() {
                       </tr>
                     );
                   })}
-                </tbody>
-              </table>
-            </div>
+                  </tbody>
+                </table>
+              </div>
+
+              {role === 'student' && currentPlanInfo && (
+                <div className="mt-3 flex flex-wrap gap-4 text-xs text-gray-600">
+                  <div>
+                    <span className="font-semibold text-[#31435d]">Clases totales:</span>{' '}
+                    {currentPlanInfo.total_classes != null ? currentPlanInfo.total_classes : '-'}
+                  </div>
+                  <div>
+                    <span className="font-semibold text-[#31435d]">Usadas:</span>{' '}
+                    {currentPlanInfo.used_classes != null ? currentPlanInfo.used_classes : '-'}
+                  </div>
+                  <div>
+                    <span className="font-semibold text-[#31435d]">Restantes:</span>{' '}
+                    {currentPlanInfo.remaining_classes != null ? currentPlanInfo.remaining_classes : '-'}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
