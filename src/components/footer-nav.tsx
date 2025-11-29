@@ -44,15 +44,6 @@ export function FooterNav({ isAdmin, canSeeReports, canSeeFinance, canSeeSetting
             <Users className="w-4 h-4 text-[#22c55e]" />
             <span>{studentsText}</span>
           </Link>
-          {showSettings && (
-            <Link
-              href="/settings"
-              className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
-            >
-              <Settings className="w-4 h-4 text-[#64748b]" />
-              <span>Configuración</span>
-            </Link>
-          )}
           {showFinance && (
             <Link
               href="/finance"
@@ -60,6 +51,15 @@ export function FooterNav({ isAdmin, canSeeReports, canSeeFinance, canSeeSetting
             >
               <CreditCard className="w-4 h-4 text-[#3cadaf]" />
               <span>Finanzas</span>
+            </Link>
+          )}
+          {showSettings && (
+            <Link
+              href="/settings"
+              className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
+            >
+              <Settings className="w-4 h-4 text-[#64748b]" />
+              <span>Configuración</span>
             </Link>
           )}
           {isAdmin && (
