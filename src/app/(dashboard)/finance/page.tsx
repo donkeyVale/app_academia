@@ -102,12 +102,25 @@ export default function FinancePage() {
           setSummary(null);
         } else {
           const row = spData[0] as any;
-          const totalClasses = (row.plans?.classes_included as number | null) ?? null;
-          const remainingClasses = (row.remaining_classes as number | null) ?? null;
+
+          // Contar usos efectivos de ese plan para calcular clases usadas/restantes
+          const { data: usagesData, error: usagesErr } = await supabase
+            .from('plan_usages')
+            .select('id')
+            .eq('student_plan_id', row.id)
+            .eq('student_id', studentId);
+
+          if (usagesErr) throw usagesErr;
+
+          const usedCount = (usagesData ?? []).length;
+          const baseRemaining = (row.remaining_classes as number | null) ?? null;
+          const effectiveRemaining = baseRemaining != null ? Math.max(0, baseRemaining - usedCount) : null;
+          const totalClasses = (row.plans?.classes_included as number | null) ?? baseRemaining;
+
           setSummary({
             planName: (row.plans?.name as string | null) ?? null,
             totalClasses,
-            remainingClasses,
+            remainingClasses: effectiveRemaining,
           });
         }
 
