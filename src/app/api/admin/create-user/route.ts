@@ -87,6 +87,61 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Verificar duplicados de documento y teléfono en metadata de usuarios existentes
+    const allUsers: any[] = [];
+    let page = 1;
+    const perPage = 1000;
+
+    // Paginamos por si hay muchos usuarios, aunque lo normal es que la lista sea pequeña
+    for (;;) {
+      const { data: usersPage, error: usersError } = await supabaseAdmin.auth.admin.listUsers({
+        page,
+        perPage,
+      });
+
+      if (usersError) {
+        return NextResponse.json(
+          { error: 'No se pudo verificar si el documento o teléfono ya están registrados.' },
+          { status: 500 }
+        );
+      }
+
+      const pageUsers = usersPage?.users ?? [];
+      if (!pageUsers.length) break;
+
+      allUsers.push(...pageUsers);
+
+      if (pageUsers.length < perPage) break;
+      page += 1;
+    }
+
+    const normalizedIncomingPhone = phone.replace(/\s+/g, '');
+
+    const phoneTaken = allUsers.some((u) => {
+      const metaPhone = (u.user_metadata?.phone as string | undefined) ?? '';
+      return metaPhone.replace(/\s+/g, '') === normalizedIncomingPhone;
+    });
+
+    if (phoneTaken) {
+      return NextResponse.json(
+        { error: 'Ya existe un usuario con ese número de teléfono.' },
+        { status: 400 }
+      );
+    }
+
+    const documentTaken = allUsers.some((u) => {
+      const metaDoc = u.user_metadata?.national_id as string | undefined;
+      if (!metaDoc) return false;
+      return metaDoc === nationalId;
+    });
+
+    if (documentTaken) {
+      return NextResponse.json(
+        { error: 'Ya existe un usuario con ese número de documento.' },
+        { status: 400 }
+      );
+    }
+
     // Crear usuario en Auth con contraseña = nro de cédula
     const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
