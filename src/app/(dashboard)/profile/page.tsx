@@ -89,6 +89,11 @@ export default function ProfilePage() {
   const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
+
   // Editor de recorte (pan/zoom) en cliente
   const [cropSrc, setCropSrc] = useState<string | null>(null);
   const [cropZoom, setCropZoom] = useState(1); // 1x-3x
@@ -197,6 +202,54 @@ export default function ProfilePage() {
       toast.error(e?.message ?? "No se pudo actualizar el perfil.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!userId || !email) return;
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      toast.error("Completá todos los campos de contraseña.");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast.error("La nueva contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error("La nueva contraseña y su confirmación no coinciden.");
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: currentPassword,
+      });
+
+      if (signInError) {
+        throw new Error("La contraseña actual no es correcta.");
+      }
+
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      toast.success("Contraseña actualizada correctamente.");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (e: any) {
+      toast.error(e?.message ?? "No se pudo actualizar la contraseña.");
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -543,6 +596,57 @@ export default function ProfilePage() {
                   className="bg-[#3cadaf] hover:bg-[#31435d] text-white text-sm px-4 py-2 disabled:opacity-50"
                 >
                   {saving ? "Guardando..." : "Guardar cambios"}
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-gray-200 space-y-3 text-sm">
+              <h2 className="text-base font-semibold text-[#31435d]">Cambiar contraseña</h2>
+              <p className="text-xs text-gray-500">
+                Para cambiar tu contraseña, ingresá la actual y luego la nueva contraseña dos veces para confirmarla.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm mb-1">Contraseña actual</label>
+                  <input
+                    type="password"
+                    className="border rounded px-3 w-full h-10 text-base md:text-sm"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    autoComplete="current-password"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">Nueva contraseña</label>
+                  <input
+                    type="password"
+                    className="border rounded px-3 w-full h-10 text-base md:text-sm"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm mb-1">Repetir nueva contraseña</label>
+                  <input
+                    type="password"
+                    className="border rounded px-3 w-full h-10 text-base md:text-sm"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    autoComplete="new-password"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end pt-1">
+                <Button
+                  type="button"
+                  onClick={handleChangePassword}
+                  disabled={changingPassword}
+                  className="bg-[#31435d] hover:bg-[#1f2937] text-white text-sm px-4 py-2 disabled:opacity-50"
+                >
+                  {changingPassword ? "Actualizando..." : "Actualizar contraseña"}
                 </Button>
               </div>
             </div>
