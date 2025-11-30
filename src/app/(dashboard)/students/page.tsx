@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { History, Users } from 'lucide-react';
+import { History, Users, StickyNote } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { createClientBrowser } from '@/lib/supabase';
 
@@ -82,6 +82,7 @@ export default function StudentsPage() {
   const [classNotesByClass, setClassNotesByClass] = useState<
     Record<string, { id: string; note: string }[]>
   >({});
+  const [studentsWithNotes, setStudentsWithNotes] = useState<string[]>([]);
   const [editingNote, setEditingNote] = useState<{ classId: string; draft: string } | null>(null);
   const [savingNote, setSavingNote] = useState(false);
   const [notesError, setNotesError] = useState<string | null>(null);
@@ -254,6 +255,7 @@ export default function StudentsPage() {
         // Construir listado de "mis alumnos" para coach (alumnos con clases futuras con este coach)
         let myIds: string[] = [];
         let nextByStudent: Record<string, string | null> = {};
+        let studentsWithNotesList: string[] = [];
         if (roleFromProfile === 'coach' && userId) {
           const { data: coachRow, error: coachErr } = await supabase
             .from('coaches')
@@ -308,11 +310,24 @@ export default function StudentsPage() {
               myIds = Array.from(idSet);
               nextByStudent = nextMap;
             }
+
+            // Buscar alumnos que tengan al menos una nota cargada por este coach
+            const { data: notesByStudent, error: notesByStudentErr } = await supabase
+              .from('class_notes')
+              .select('student_id')
+              .eq('coach_id', coachId);
+            if (notesByStudentErr) throw notesByStudentErr;
+            const notesSet = new Set<string>();
+            (notesByStudent ?? []).forEach((n: any) => {
+              if (n.student_id) notesSet.add(n.student_id as string);
+            });
+            studentsWithNotesList = Array.from(notesSet);
           }
         }
 
         setMyStudentIds(myIds);
         setNextClassByStudent(nextByStudent);
+        setStudentsWithNotes(studentsWithNotesList);
         if (roleFromProfile === 'coach') {
           setShowOnlyMyStudents(true);
         }
@@ -860,6 +875,7 @@ export default function StudentsPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                     {(() => {
                       const mySet = new Set(myStudentIds);
+                      const withNotesSet = new Set(studentsWithNotes);
                       return students
                         .filter((s) => {
                           if (showOnlyMyStudents && !mySet.has(s.id)) return false;
@@ -896,6 +912,8 @@ export default function StudentsPage() {
                             nextLabel = `Próxima clase con vos: ${dd}/${mm}/${yyyy} ${hh}:${min} hs`;
                           }
 
+                          const hasNotes = withNotesSet.has(s.id);
+
                           return (
                             <button
                               key={s.id}
@@ -913,6 +931,11 @@ export default function StudentsPage() {
                                     <p className="text-[11px] text-slate-500 mt-0.5 truncate">{s.notes}</p>
                                   )}
                                 </div>
+                                {hasNotes && (
+                                  <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                                    Con notas
+                                  </span>
+                                )}
                               </div>
                               <div className="flex items-center justify-between gap-2 mt-1">
                                 <span className="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200">
@@ -1079,7 +1102,7 @@ export default function StudentsPage() {
                                         </div>
                                       </div>
                                     ) : (
-                                      <div className="flex items-center justify-between gap-2">
+                                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                                         <p className="text-[11px] text-gray-600">
                                           {firstNote
                                             ? `Tu nota: ${firstNote.note}`
@@ -1090,8 +1113,9 @@ export default function StudentsPage() {
                                           onClick={() =>
                                             handleStartEditNote(item.id, firstNote ? firstNote.note : '')
                                           }
-                                          className="text-[11px] text-[#3cadaf] hover:underline"
+                                          className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
                                         >
+                                          <StickyNote className="w-3.5 h-3.5 text-[#3cadaf]" />
                                           {firstNote ? 'Editar nota' : 'Agregar nota'}
                                         </button>
                                       </div>
