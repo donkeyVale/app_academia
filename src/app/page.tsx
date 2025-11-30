@@ -517,68 +517,92 @@ export default function HomePage() {
             type="button"
             whileHover={{ y: -2, boxShadow: '0 10px 25px rgba(15,23,42,0.12)' }}
             transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-            className="border rounded-xl p-4 bg-white shadow-sm border-t-4 border-[#3cadaf] text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/60 focus:ring-offset-1"
+            className="rounded-2xl p-4 bg-gradient-to-br from-emerald-50 via-white to-sky-50 shadow-sm border border-emerald-100/60 text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/60 focus:ring-offset-1"
             onClick={() => router.push('/finance')}
           >
-            <div className="flex items-center gap-2 mb-1">
-              <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
-                <Layers className="w-4 h-4 text-[#3cadaf]" />
+            <div className="flex items-center justify-between mb-3">
+              <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100/80 text-emerald-900 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/90">
+                  <Layers className="w-3.5 h-3.5 text-[#3cadaf]" />
+                </span>
+                <span>Planes activos</span>
               </div>
-              <p className="text-xs uppercase tracking-wide text-gray-500">Planes con alumnos activos</p>
             </div>
-            <p className="text-2xl font-semibold text-[#111827]">{loading ? '...' : activePlansCount}</p>
-            <p className="text-xs text-gray-500 mt-1">Planes que tienen al menos un alumno con clases disponibles.</p>
+            <p className="text-4xl font-bold text-[#0f172a] tracking-tight leading-tight">
+              {loading ? '...' : activePlansCount}
+            </p>
+            <p className="text-xs text-gray-600 mt-2 max-w-xs">
+              Planes que tienen al menos un alumno con clases disponibles.
+            </p>
           </motion.button>
 
           <motion.button
             type="button"
             whileHover={{ y: -2, boxShadow: '0 10px 25px rgba(15,23,42,0.12)' }}
             transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-            className="border rounded-xl p-4 bg-white shadow-sm border-t-4 border-[#22c55e] text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#22c55e]/60 focus:ring-offset-1"
+            className="rounded-2xl p-4 bg-gradient-to-br from-lime-50 via-white to-emerald-50 shadow-sm border border-emerald-100/60 text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#22c55e]/60 focus:ring-offset-1"
             onClick={() => router.push('/students')}
           >
-            <div className="flex items-center gap-2 mb-1">
-              <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
-                <Users className="w-4 h-4 text-[#22c55e]" />
+            <div className="flex items-center justify-between mb-3">
+              <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100/80 text-emerald-900 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/90">
+                  <Users className="w-3.5 h-3.5 text-[#22c55e]" />
+                </span>
+                <span>Alumnos con plan</span>
               </div>
-              <p className="text-xs uppercase tracking-wide text-gray-500">Alumnos con plan vigente</p>
             </div>
-            <p className="text-2xl font-semibold text-[#111827]">{loading ? '...' : studentsWithPlanCount}</p>
-            <p className="text-xs text-gray-500 mt-1">Alumnos que todavía tienen clases disponibles en algún plan.</p>
+            <p className="text-4xl font-bold text-[#0f172a] tracking-tight leading-tight">
+              {loading ? '...' : studentsWithPlanCount}
+            </p>
+            <p className="text-xs text-gray-600 mt-2 max-w-xs">
+              Alumnos que todavía tienen clases disponibles en algún plan.
+            </p>
           </motion.button>
 
           <motion.button
             type="button"
             whileHover={{ y: -2, boxShadow: '0 10px 25px rgba(15,23,42,0.12)' }}
             transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-            className="border rounded-xl p-4 bg-white shadow-sm border-t-4 border-[#3b82f6] text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/60 focus:ring-offset-1"
+            className="rounded-2xl p-4 bg-gradient-to-br from-sky-50 via-white to-indigo-50 shadow-sm border border-sky-100/70 text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#3b82f6]/60 focus:ring-offset-1"
             onClick={() => router.push('/schedule?scope=today')}
           >
-            <div className="flex items-center gap-2 mb-1">
-              <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
-                <CalendarDays className="w-4 h-4 text-[#3b82f6]" />
+            <div className="flex items-center justify-between mb-3">
+              <div className="inline-flex items-center gap-2 rounded-full bg-sky-100/80 text-sky-900 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/90">
+                  <CalendarDays className="w-3.5 h-3.5 text-[#3b82f6]" />
+                </span>
+                <span>Clases de hoy</span>
               </div>
-              <p className="text-xs uppercase tracking-wide text-gray-500">Clases de hoy</p>
             </div>
-            <p className="text-2xl font-semibold text-[#111827]">{loading ? '...' : todayClassesCount}</p>
-            <p className="text-xs text-gray-500 mt-1">Total de clases programadas para el día de hoy.</p>
+            <p className="text-4xl font-bold text-[#0f172a] tracking-tight leading-tight">
+              {loading ? '...' : todayClassesCount}
+            </p>
+            <p className="text-xs text-gray-600 mt-2 max-w-xs">
+              Total de clases programadas para el día de hoy.
+            </p>
           </motion.button>
 
           <motion.button
             type="button"
             whileHover={{ y: -2, boxShadow: '0 10px 25px rgba(15,23,42,0.12)' }}
             transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-            className="border rounded-xl p-4 bg-white shadow-sm border-t-4 border-[#f97316] text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#f97316]/60 focus:ring-offset-1"
+            className="rounded-2xl p-4 bg-gradient-to-br from-amber-50 via-white to-orange-50 shadow-sm border border-amber-100/70 text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#f97316]/60 focus:ring-offset-1"
             onClick={() => router.push('/users')}
           >
-            <div className="flex items-center gap-2 mb-1">
-              <div className="h-8 w-8 rounded-full bg-[#e6f5f6] flex items-center justify-center">
-                <UserCog className="w-4 h-4 text-[#f97316]" />
+            <div className="flex items-center justify-between mb-3">
+              <div className="inline-flex items-center gap-2 rounded-full bg-amber-100/80 text-amber-900 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide">
+                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/90">
+                  <UserCog className="w-3.5 h-3.5 text-[#f97316]" />
+                </span>
+                <span>Profesores / Alumnos</span>
               </div>
-              <p className="text-xs uppercase tracking-wide text-gray-500">Profesores y alumnos</p>
             </div>
-            <p className="text-2xl font-semibold text-[#111827]">{loading ? '...' : `${coachesCount} / ${studentsCount}`}</p>
-            <p className="text-xs text-gray-500 mt-1">Cantidad total de profesores y alumnos en la academia.</p>
+            <p className="text-4xl font-bold text-[#0f172a] tracking-tight leading-tight">
+              {loading ? '...' : `${coachesCount} / ${studentsCount}`}
+            </p>
+            <p className="text-xs text-gray-600 mt-2 max-w-xs">
+              Cantidad total de profesores y alumnos en la academia.
+            </p>
           </motion.button>
         </div>
       )}
