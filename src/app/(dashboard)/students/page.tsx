@@ -79,6 +79,13 @@ export default function StudentsPage() {
   const [showOnlyMyStudents, setShowOnlyMyStudents] = useState(false);
   const [myStudentIds, setMyStudentIds] = useState<string[]>([]);
   const [nextClassByStudent, setNextClassByStudent] = useState<Record<string, string | null>>({});
+  const [classNotesByClass, setClassNotesByClass] = useState<
+    Record<string, { id: string; note: string }[]>
+  >({});
+  const [editingNote, setEditingNote] = useState<{ classId: string; draft: string } | null>(null);
+  const [savingNote, setSavingNote] = useState(false);
+  const [notesError, setNotesError] = useState<string | null>(null);
+  const [coachIdForNotes, setCoachIdForNotes] = useState<string | null>(null);
 
   const roleResolved = role === 'admin' || role === 'coach' || role === 'student';
 
@@ -255,6 +262,9 @@ export default function StudentsPage() {
             .maybeSingle();
           if (coachErr) throw coachErr;
           const coachId = coachRow?.id as string | undefined;
+          if (coachId) {
+            setCoachIdForNotes(coachId);
+          }
 
           if (coachId) {
             const futureFrom = new Date();
@@ -319,6 +329,9 @@ export default function StudentsPage() {
     setHistoryLoading(true);
     setHistoryError(null);
     setHistoryItems([]);
+    setClassNotesByClass({});
+    setEditingNote(null);
+    setNotesError(null);
     try {
       // Buscar clases efectivamente usadas (presentes) a través de plan_usages
       const { data: usagesData, error: usagesErr } = await supabase
@@ -431,10 +444,94 @@ export default function StudentsPage() {
       // Ordenar por fecha descendente por si acaso
       items.sort((a, b) => b.date.localeCompare(a.date));
       setHistoryItems(items);
+
+      // Cargar notas de clase para este alumno y estas clases
+      const classIds = items.map((i) => i.id);
+      if (classIds.length) {
+        const { data: notesData, error: notesErr } = await supabase
+          .from('class_notes')
+          .select('id,class_id,student_id,coach_id,note')
+          .eq('student_id', studentId)
+          .in('class_id', classIds);
+
+        if (notesErr) {
+          console.error('Error cargando notas de clases', notesErr.message);
+        } else {
+          const map: Record<string, { id: string; note: string }[]> = {};
+          (notesData ?? []).forEach((n: any) => {
+            const cid = n.class_id as string;
+            if (!map[cid]) map[cid] = [];
+            map[cid].push({ id: n.id as string, note: n.note as string });
+          });
+          setClassNotesByClass(map);
+        }
+      }
     } catch (err: any) {
       setHistoryError(err?.message ?? 'Error cargando historial de clases.');
     } finally {
       setHistoryLoading(false);
+    }
+  };
+
+  const handleStartEditNote = (classId: string, currentNote: string) => {
+    setEditingNote({ classId, draft: currentNote });
+    setNotesError(null);
+  };
+
+  const handleCancelEditNote = () => {
+    setEditingNote(null);
+    setNotesError(null);
+  };
+
+  const handleSaveNote = async () => {
+    if (!editingNote || !historyStudent) return;
+    if (!coachIdForNotes) {
+      setNotesError('No se pudo identificar tu usuario como profesor para guardar la nota.');
+      return;
+    }
+
+    const { classId, draft } = editingNote;
+    const existing = (classNotesByClass[classId] ?? [])[0] ?? null;
+
+    try {
+      setSavingNote(true);
+      setNotesError(null);
+
+      if (existing) {
+        const { error } = await supabase
+          .from('class_notes')
+          .update({ note: draft })
+          .eq('id', existing.id);
+        if (error) throw error;
+        setClassNotesByClass((prev) => ({
+          ...prev,
+          [classId]: [{ id: existing.id, note: draft }],
+        }));
+      } else {
+        const { data, error } = await supabase
+          .from('class_notes')
+          .insert({
+            class_id: classId,
+            student_id: historyStudent.id,
+            coach_id: coachIdForNotes,
+            note: draft,
+          })
+          .select('id,note')
+          .single();
+        if (error) throw error;
+        const newId = (data as any).id as string;
+        const newNote = (data as any).note as string;
+        setClassNotesByClass((prev) => ({
+          ...prev,
+          [classId]: [{ id: newId, note: newNote }],
+        }));
+      }
+
+      setEditingNote(null);
+    } catch (err: any) {
+      setNotesError(err?.message ?? 'No se pudo guardar la nota.');
+    } finally {
+      setSavingNote(false);
     }
   };
 
@@ -904,13 +1001,89 @@ export default function StudentsPage() {
                         const dd = String(d.getDate()).padStart(2, '0');
                         const hh = String(d.getHours()).padStart(2, '0');
                         const min = String(d.getMinutes()).padStart(2, '0');
+
+                        const notesArr = classNotesByClass[item.id] ?? [];
+                        const firstNote = notesArr[0] ?? null;
+                        const isCoach = role === 'coach';
+                        const isAdmin = role === 'admin';
+                        const isStudent = role === 'student';
+
                         return (
-                          <tr key={item.id} className="border-b last:border-b-0">
-                            <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
-                            <td className="py-1.5 px-2">{`${hh}:${min}`}</td>
-                            <td className="py-1.5 px-2">{item.courtName ?? '-'}</td>
-                            <td className="py-1.5 px-2">{item.coachName ?? '-'}</td>
-                          </tr>
+                          <>
+                            <tr key={`${item.id}-row`} className="border-b last:border-b-0">
+                              <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
+                              <td className="py-1.5 px-2">{`${hh}:${min}`}</td>
+                              <td className="py-1.5 px-2">{item.courtName ?? '-'}</td>
+                              <td className="py-1.5 px-2">{item.coachName ?? '-'}</td>
+                            </tr>
+                            <tr key={`${item.id}-note`} className="border-b last:border-b-0">
+                              <td colSpan={4} className="py-1.5 px-2 bg-gray-50/40">
+                                {isCoach ? (
+                                  <div className="space-y-1">
+                                    {editingNote && editingNote.classId === item.id ? (
+                                      <div className="space-y-1">
+                                        <label className="block text-xs text-gray-600">Nota para esta clase</label>
+                                        <textarea
+                                          className="w-full border rounded-md px-2 py-1 text-xs resize-y min-h-[60px]"
+                                          value={editingNote.draft}
+                                          onChange={(e) =>
+                                            setEditingNote((prev) =>
+                                              prev && prev.classId === item.id
+                                                ? { ...prev, draft: e.target.value }
+                                                : prev,
+                                            )
+                                          }
+                                          placeholder="Escribí una nota sobre el rendimiento del alumno en esta clase..."
+                                        />
+                                        {notesError && (
+                                          <p className="text-[11px] text-red-600">{notesError}</p>
+                                        )}
+                                        <div className="flex items-center gap-2 mt-1">
+                                          <button
+                                            type="button"
+                                            onClick={handleSaveNote}
+                                            disabled={savingNote}
+                                            className="px-3 py-1 rounded-full bg-[#3cadaf] text-white text-[11px] font-semibold hover:bg-[#31435d] disabled:opacity-60"
+                                          >
+                                            {savingNote ? 'Guardando...' : 'Guardar nota'}
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={handleCancelEditNote}
+                                            disabled={savingNote}
+                                            className="px-3 py-1 rounded-full border border-slate-300 text-[11px] text-slate-700 bg-white hover:bg-slate-50"
+                                          >
+                                            Cancelar
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center justify-between gap-2">
+                                        <p className="text-[11px] text-gray-600">
+                                          {firstNote
+                                            ? `Tu nota: ${firstNote.note}`
+                                            : 'Aún no dejaste una nota para esta clase.'}
+                                        </p>
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleStartEditNote(item.id, firstNote ? firstNote.note : '')
+                                          }
+                                          className="text-[11px] text-[#3cadaf] hover:underline"
+                                        >
+                                          {firstNote ? 'Editar nota' : 'Agregar nota'}
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (isStudent || isAdmin) && firstNote ? (
+                                  <p className="text-[11px] text-gray-600">
+                                    Nota del profesor: {firstNote.note}
+                                  </p>
+                                ) : null}
+                              </td>
+                            </tr>
+                          </>
                         );
                       })}
                     </tbody>
