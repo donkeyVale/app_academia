@@ -1,5 +1,59 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-service';
+import nodemailer from 'nodemailer';
+
+async function sendWelcomeEmail(to: string, fullName: string) {
+  const host = process.env.SMTP_HOST || 'smtp.gmail.com';
+  const port = Number(process.env.SMTP_PORT || 587);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const from = process.env.SMTP_FROM || user;
+
+  if (!user || !pass || !from) {
+    // Falta configuración SMTP; no enviamos correo pero tampoco fallamos
+    return;
+  }
+
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465,
+    auth: { user, pass },
+  });
+
+  const safeName = fullName || to;
+
+  const html = `
+    <div style="font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color:#0f172a; padding:32px 16px;">
+      <div style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 18px 45px rgba(15,23,42,0.35);">
+        <div style="background:linear-gradient(135deg,#0f172a,#1d3b4f,#3cadaf);padding:24px 24px 20px; text-align:center; color:#e5f6ff;">
+          <div style="display:inline-flex;align-items:center;justify-content:center;height:64px;width:64px;border-radius:999px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.35);margin-bottom:8px;overflow:hidden;">
+            <img src="https://agendo.nativatech.com.py/icons/LogoAgendo1024.png" alt="Agendo" style="height:40px;width:auto;display:block;" />
+          </div>
+          <h1 style="margin:0;font-size:22px;font-weight:650;letter-spacing:0.03em;">Bienvenido a Agendo</h1>
+          <p style="margin:6px 0 0;font-size:13px;opacity:0.9;">Tu panel para gestionar alumnos, clases y pagos en un solo lugar.</p>
+        </div>
+        <div style="padding:20px 24px 24px; color:#111827; font-size:14px; line-height:1.6;">
+          <p style="margin:0 0 12px;">Hola <strong>${safeName}</strong>,</p>
+          <p style="margin:0 0 10px;">Tu usuario para <strong>Agendo</strong> ya fue creado.</p>
+          <p style="margin:0 0 10px;">Ya podés ingresar al sistema con tu correo y la contraseña inicial que te indicó tu academia (normalmente tu n.º de cédula).</p>
+          <p style="margin:0 0 16px;">Una vez dentro, te recomendamos cambiar tu contraseña desde tu perfil para mayor seguridad.</p>
+          <div style="margin:18px 0 16px; text-align:center;">
+            <a href="${process.env.APP_BASE_URL || ''}" style="display:inline-block;padding:10px 20px;border-radius:999px;background:#3cadaf;color:#ffffff;font-weight:600;font-size:13px;text-decoration:none;letter-spacing:0.03em;">Ir al panel de Agendo</a>
+          </div>
+          <p style="margin:0 0 8px;font-size:12px;color:#6b7280;">Si no esperabas este correo, podés ignorarlo.</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from,
+    to,
+    subject: 'Bienvenido a Agendo',
+    html,
+  });
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -112,14 +166,11 @@ export async function POST(req: NextRequest) {
         );
       }
     }
-    // Enviar correo de bienvenida con magic link usando las plantillas de Supabase
+
     try {
-      await supabaseAdmin.auth.admin.generateLink({
-        type: 'magiclink',
-        email,
-      });
+      await sendWelcomeEmail(email, fullName);
     } catch (emailError) {
-      // No consideramos el fallo de envío de correo como fatal para la creación del usuario
+      // El fallo al enviar correo no debe impedir la creación del usuario
     }
 
     return NextResponse.json({ success: true });
