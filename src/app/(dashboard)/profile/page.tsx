@@ -509,28 +509,9 @@ export default function ProfilePage() {
                             className="w-full"
                           />
                         </div>
-                        <div>
-                          <label className="block text-[11px] text-gray-600 mb-1">Mover horizontal</label>
-                          <input
-                            type="range"
-                            min={-50}
-                            max={50}
-                            value={cropOffsetX}
-                            onChange={(e) => setCropOffsetX(Number(e.target.value))}
-                            className="w-full"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[11px] text-gray-600 mb-1">Mover vertical</label>
-                          <input
-                            type="range"
-                            min={-50}
-                            max={50}
-                            value={cropOffsetY}
-                            onChange={(e) => setCropOffsetY(Number(e.target.value))}
-                            className="w-full"
-                          />
-                        </div>
+                        <p className="text-[11px] text-gray-500">
+                          Mantené presionada la foto y arrastrá con el dedo para moverla.
+                        </p>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2 text-xs">
