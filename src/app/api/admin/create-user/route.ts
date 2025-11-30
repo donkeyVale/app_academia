@@ -112,6 +112,15 @@ export async function POST(req: NextRequest) {
         );
       }
     }
+    // Enviar correo de bienvenida con magic link usando las plantillas de Supabase
+    try {
+      await supabaseAdmin.auth.admin.generateLink({
+        type: 'magiclink',
+        email,
+      });
+    } catch (emailError) {
+      // No consideramos el fallo de envío de correo como fatal para la creación del usuario
+    }
 
     return NextResponse.json({ success: true });
   } catch (err: any) {

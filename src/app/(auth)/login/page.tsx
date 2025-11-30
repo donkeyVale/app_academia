@@ -10,15 +10,35 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setInfo(null);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) setError(error.message);
     else window.location.href = '/';
     setLoading(false);
+  };
+
+  const onForgotPassword = async () => {
+    if (!email) {
+      setError('Ingresá tu correo para restablecer la contraseña.');
+      return;
+    }
+
+    setError(null);
+    setInfo(null);
+    try {
+      await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/(auth)/login`,
+      });
+      setInfo('Te enviamos un correo para restablecer tu contraseña. Revisá tu bandeja de entrada.');
+    } catch (e: any) {
+      setError(e?.message ?? 'No se pudo enviar el correo de restablecimiento.');
+    }
   };
 
   return (
@@ -78,7 +98,18 @@ export default function LoginPage() {
             />
           </div>
 
-          {error && <p className="text-red-600 text-xs">{error}</p>}
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={onForgotPassword}
+              className="text-[11px] text-[#3cadaf] hover:text-[#31435d] underline-offset-2 hover:underline"
+            >
+              ¿Olvidaste tu contraseña?
+            </button>
+          </div>
+
+          {error && <p className="text-red-600 text-xs mt-1">{error}</p>}
+          {info && !error && <p className="text-emerald-600 text-xs mt-1">{info}</p>}
 
           <button
             className="w-full bg-[#3cadaf] hover:bg-[#31435d] text-white h-10 rounded-md text-base md:text-sm font-medium disabled:opacity-50 transition-colors"
