@@ -1103,10 +1103,15 @@ export default function StudentsPage() {
                                       </div>
                                     ) : (
                                       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                                        <p className="text-[11px] text-gray-600">
-                                          {firstNote
-                                            ? `Tu nota: ${firstNote.note}`
-                                            : 'Aún no dejaste una nota para esta clase.'}
+                                        <p className="text-[12px] text-gray-700">
+                                          {firstNote ? (
+                                            <>
+                                              <span className="font-semibold">Tu nota:</span>{' '}
+                                              <span className="font-semibold">{firstNote.note}</span>
+                                            </>
+                                          ) : (
+                                            'Aún no dejaste una nota para esta clase.'
+                                          )}
                                         </p>
                                         <button
                                           type="button"
@@ -1122,8 +1127,9 @@ export default function StudentsPage() {
                                     )}
                                   </div>
                                 ) : (isStudent || isAdmin) && firstNote ? (
-                                  <p className="text-[11px] text-gray-600">
-                                    Nota del profesor: {firstNote.note}
+                                  <p className="text-[12px] text-gray-700">
+                                    <span className="font-semibold">Nota del profesor:</span>{' '}
+                                    <span className="font-semibold">{firstNote.note}</span>
                                   </p>
                                 ) : null}
                               </td>
