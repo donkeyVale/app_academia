@@ -181,7 +181,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <FooterNav
         isAdmin={isAdmin}
         canSeeReports={role === 'admin'}
-        canSeeFinance={role !== 'student'}
+        canSeeFinance={role === 'admin'}
         canSeeSettings={role === 'coach' || role === 'student'}
         studentsLabel={role === 'student' ? 'Mi cuenta' : 'Alumnos'}
         rightSlot={(
