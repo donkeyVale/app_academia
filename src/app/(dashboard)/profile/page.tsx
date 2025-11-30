@@ -466,9 +466,6 @@ export default function ProfilePage() {
 
               <div className="space-y-1 text-sm">
                 <p className="text-gray-700 font-medium">Foto de perfil</p>
-                <p className="text-xs text-gray-500">
-                  Recomendado: imagen cuadrada, mínimo 256x256 px.
-                </p>
                 {cropSrc && (
                   <div className="mt-3 space-y-3 border-t pt-3">
                     <p className="text-xs text-gray-600 font-medium">Ajustar recorte</p>
