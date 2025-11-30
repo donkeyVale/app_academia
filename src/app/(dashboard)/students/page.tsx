@@ -473,6 +473,15 @@ export default function StudentsPage() {
     }
   };
 
+  const handleOpenSelfHistory = () => {
+    if (!currentStudentId) return;
+    const self = students.find((s) => s.id === currentStudentId) ?? null;
+    if (!self) return;
+    const profile = self.user_id ? profilesByUser[self.user_id] : undefined;
+    const displayName = profile?.full_name || 'Mi historial de clases';
+    openHistory(currentStudentId, displayName);
+  };
+
   const handleStartEditNote = (classId: string, currentNote: string) => {
     setEditingNote({ classId, draft: currentNote });
     setNotesError(null);
@@ -935,18 +944,29 @@ export default function StudentsPage() {
 
           {/* Vista para student: resumen propio */}
           {role === 'student' && !loading && currentPlanInfo && (
-            <div className="mt-3 flex flex-wrap gap-4 text-xs text-gray-600">
-              <div>
-                <span className="font-semibold text-[#31435d]">Clases totales:</span>{' '}
-                {currentPlanInfo.total_classes != null ? currentPlanInfo.total_classes : '-'}
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-4 text-xs text-gray-600">
+              <div className="flex flex-wrap gap-4">
+                <div>
+                  <span className="font-semibold text-[#31435d]">Clases totales:</span>{' '}
+                  {currentPlanInfo.total_classes != null ? currentPlanInfo.total_classes : '-'}
+                </div>
+                <div>
+                  <span className="font-semibold text-[#31435d]">Usadas:</span>{' '}
+                  {currentPlanInfo.used_classes != null ? currentPlanInfo.used_classes : '-'}
+                </div>
+                <div>
+                  <span className="font-semibold text-[#31435d]">Restantes:</span>{' '}
+                  {currentPlanInfo.remaining_classes != null ? currentPlanInfo.remaining_classes : '-'}
+                </div>
               </div>
               <div>
-                <span className="font-semibold text-[#31435d]">Usadas:</span>{' '}
-                {currentPlanInfo.used_classes != null ? currentPlanInfo.used_classes : '-'}
-              </div>
-              <div>
-                <span className="font-semibold text-[#31435d]">Restantes:</span>{' '}
-                {currentPlanInfo.remaining_classes != null ? currentPlanInfo.remaining_classes : '-'}
+                <button
+                  type="button"
+                  onClick={handleOpenSelfHistory}
+                  className="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Ver historial de clases
+                </button>
               </div>
             </div>
           )}
