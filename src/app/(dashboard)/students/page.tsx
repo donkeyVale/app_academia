@@ -1024,7 +1024,7 @@ export default function StudentsPage() {
                                       <div className="space-y-1">
                                         <label className="block text-xs text-gray-600">Nota para esta clase</label>
                                         <textarea
-                                          className="w-full border rounded-md px-2 py-1 text-xs resize-y min-h-[60px]"
+                                          className="w-full border rounded-md px-2 py-1 text-sm resize-y min-h-[60px]"
                                           value={editingNote.draft}
                                           onChange={(e) =>
                                             setEditingNote((prev) =>
