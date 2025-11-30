@@ -100,6 +100,13 @@ export default function ProfilePage() {
   const [cropOffsetX, setCropOffsetX] = useState(0); // porcentaje -50 a 50
   const [cropOffsetY, setCropOffsetY] = useState(0); // porcentaje -50 a 50
   const [cropping, setCropping] = useState(false);
+  const dragStateRef = useRef<{
+    dragging: boolean;
+    startX: number;
+    startY: number;
+    startOffsetX: number;
+    startOffsetY: number;
+  } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -348,6 +355,44 @@ export default function ProfilePage() {
     }
   };
 
+  const handleCropPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!cropSrc) return;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    dragStateRef.current = {
+      dragging: true,
+      startX: e.clientX,
+      startY: e.clientY,
+      startOffsetX: cropOffsetX,
+      startOffsetY: cropOffsetY,
+    };
+  };
+
+  const handleCropPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragStateRef.current || !dragStateRef.current.dragging) return;
+    const { startX, startY, startOffsetX, startOffsetY } = dragStateRef.current;
+    const deltaX = e.clientX - startX;
+    const deltaY = e.clientY - startY;
+
+    // Escalar deltas a porcentaje aprox. según tamaño de preview
+    const factor = 0.3; // ajustar sensibilidad
+    let nextX = startOffsetX + deltaX * factor;
+    let nextY = startOffsetY + deltaY * factor;
+
+    // Limitar a rango razonable
+    nextX = Math.max(-80, Math.min(80, nextX));
+    nextY = Math.max(-80, Math.min(80, nextY));
+
+    setCropOffsetX(nextX);
+    setCropOffsetY(nextY);
+  };
+
+  const handleCropPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (dragStateRef.current && dragStateRef.current.dragging) {
+      dragStateRef.current = null;
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    }
+  };
+
   const handleRemoveAvatar = async () => {
     if (!userId || !avatarUrl) return;
 
@@ -428,16 +473,25 @@ export default function ProfilePage() {
                   <div className="mt-3 space-y-3 border-t pt-3">
                     <p className="text-xs text-gray-600 font-medium">Ajustar recorte</p>
                     <div className="flex items-center gap-4">
-                      <div className="h-20 w-20 rounded-full border border-gray-300 overflow-hidden bg-gray-100 flex items-center justify-center">
+                      <div
+                        className="h-20 w-20 rounded-full border border-gray-300 overflow-hidden bg-gray-100 flex items-center justify-center touch-pan-y touch-pan-x"
+                      >
                         {/* Vista previa circular del recorte */}
-                        <div className="relative h-24 w-24">
+                        <div
+                          className="relative h-24 w-24"
+                          onPointerDown={handleCropPointerDown}
+                          onPointerMove={handleCropPointerMove}
+                          onPointerUp={handleCropPointerUp}
+                          onPointerCancel={handleCropPointerUp}
+                        >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={cropSrc}
                             alt="Vista previa"
-                            className="absolute inset-0 w-full h-full object-cover"
+                            className="absolute inset-0 w-full h-full object-cover select-none"
                             style={{
                               transform: `scale(${cropZoom}) translate(${cropOffsetX}%, ${cropOffsetY}%)`,
+                              touchAction: "none",
                             }}
                           />
                         </div>
