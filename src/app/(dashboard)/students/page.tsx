@@ -1127,7 +1127,7 @@ export default function StudentsPage() {
                                     )}
                                   </div>
                                 ) : (isStudent || isAdmin) && firstNote ? (
-                                  <p className="text-[12px] text-gray-700">
+                                  <p className="text-[13px] text-gray-700">
                                     <span className="font-semibold">Nota del profesor:</span>{' '}
                                     <span className="font-semibold">{firstNote.note}</span>
                                   </p>
