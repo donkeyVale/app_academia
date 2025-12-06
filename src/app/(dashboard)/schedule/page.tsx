@@ -1473,6 +1473,11 @@ export default function SchedulePage() {
       const updated = upd as unknown as ClassSession;
       setClasses((prev) => prev.map((c) => (c.id === updated.id ? updated : c)).sort((a, b) => a.date.localeCompare(b.date)));
       setBookingsCount((prev) => ({ ...prev, [editing.id]: editSelectedStudents.length }));
+      // Mantener en sync el mapa de alumnos por clase para que la UI muestre los nombres correctos tras editar
+      setStudentsByClass((prev) => ({
+        ...prev,
+        [editing.id]: [...editSelectedStudents],
+      }));
       setEditing(null);
     } catch (e: any) {
       setError(e.message || 'Error guardando cambios');
