@@ -1378,7 +1378,7 @@ export default function ReportsPage() {
                         <div className="flex justify-between items-center gap-2">
                           <span className="capitalize text-gray-600">{r.method}</span>
                           <span className="font-semibold text-[#31435d]">
-                            {r.amount} {r.currency}
+                            {formatPyg(r.amount)} {r.currency}
                           </span>
                         </div>
                       </div>
@@ -1407,7 +1407,7 @@ export default function ReportsPage() {
                             <td className="px-3 py-2 align-top">{r.plan_name ?? "-"}</td>
                             <td className="px-3 py-2 align-top capitalize">{r.method}</td>
                             <td className="px-3 py-2 align-top text-right">
-                              {r.amount} {r.currency}
+                              {formatPyg(r.amount)} {r.currency}
                             </td>
                           </tr>
                         ))}
@@ -2565,7 +2565,7 @@ export default function ReportsPage() {
                         {new Date(r.payment_date).toLocaleDateString()}
                       </span>
                       <span className="font-semibold text-[#31435d]">
-                        {r.amount} {r.currency}
+                        {formatPyg(r.amount)} {r.currency}
                       </span>
                     </div>
                     <div className="text-gray-600">
@@ -2635,7 +2635,7 @@ export default function ReportsPage() {
                         {new Date(r.payment_date).toLocaleDateString()}
                       </span>
                       <span className="font-semibold text-[#31435d]">
-                        {r.amount} {r.currency}
+                        {formatPyg(r.amount)} {r.currency}
                       </span>
                     </div>
                     <div className="text-gray-600">
