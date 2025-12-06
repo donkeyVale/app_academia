@@ -917,7 +917,7 @@ export default function PlansClient() {
                       <div className="text-xs text-gray-600">
                         <span className="font-semibold">Plan:</span> {planName || 'Sin nombre'}
                         {' • '}
-                        <span className="font-semibold">Monto:</span> {p.amount} {p.currency}
+                        <span className="font-semibold">Monto:</span> {formatPyg(p.amount)} {p.currency}
                         {' • '}
                         <span className="font-semibold">Método:</span> {p.method}
                       </div>
