@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Calendar as CalendarIcon, WalletCards, Receipt, Users, ClipboardList } from 'lucide-react';
+import { formatPyg } from '@/lib/formatters';
 
 const iconColor = "#3cadaf";
 
@@ -837,7 +838,7 @@ export default function PlansClient() {
                           <div>
                             <div className="font-medium text-[#31435d]">{p.name}</div>
                             <div className="text-xs text-gray-600">
-                              {p.classes_included} clases • {p.price_cents} {p.currency}
+                              {p.classes_included} clases • {formatPyg(p.price_cents)} {p.currency}
                             </div>
                             <div className="text-xs text-gray-500 mt-1">
                               {activeStudents > 0
@@ -1143,9 +1144,9 @@ export default function PlansClient() {
                             </div>
                             {finalPrice != null && (
                               <div className="text-xs mt-1">
-                                <span className="font-semibold text-gray-600">Total plan:</span> {finalPrice} PYG
+                                <span className="font-semibold text-gray-600">Total plan:</span> {formatPyg(finalPrice)} PYG
                                 {' • '}
-                                <span className="font-semibold text-gray-600">Pagado:</span> {totalPaid} PYG
+                                <span className="font-semibold text-gray-600">Pagado:</span> {formatPyg(totalPaid)} PYG
                                 {' • '}
                                 <span
                                   className={
@@ -1154,7 +1155,7 @@ export default function PlansClient() {
                                       : 'font-semibold text-amber-600'
                                   }
                                 >
-                                  {balance === 0 ? 'Al día' : `Saldo: ${balance} PYG`}
+                                  {balance === 0 ? 'Al día' : `Saldo: ${formatPyg(balance)} PYG`}
                                 </span>
                               </div>
                             )}
@@ -1377,11 +1378,11 @@ export default function PlansClient() {
                   const balance = Math.max(0, finalPrice - totalPaid);
                   return (
                     <span>
-                      Total plan: {finalPrice} PYG • Pagado: {totalPaid} PYG •{' '}
+                      Total plan: {formatPyg(finalPrice)} PYG • Pagado: {formatPyg(totalPaid)} PYG •{' '}
                       {balance === 0 ? (
                         <span className="text-green-600 font-semibold">Al día</span>
                       ) : (
-                        <span className="text-amber-600 font-semibold">Saldo pendiente: {balance} PYG</span>
+                        <span className="text-amber-600 font-semibold">Saldo pendiente: {formatPyg(balance)} PYG</span>
                       )}
                     </span>
                   );

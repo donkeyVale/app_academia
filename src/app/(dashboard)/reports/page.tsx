@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { createClientBrowser } from "@/lib/supabase";
+import { formatPyg } from "@/lib/formatters";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -254,9 +255,6 @@ export default function ReportsPage() {
     attendanceCoach: boolean;
     attendanceLocation: boolean;
   }>({ income: false, attendanceStudent: false, attendanceCoach: false, attendanceLocation: false });
-
-  const formatPyg = (value: number) =>
-    new Intl.NumberFormat("es-PY", { maximumFractionDigits: 0 }).format(value || 0);
 
   const exportToExcel = async (
     fileName: string,
@@ -1478,7 +1476,7 @@ export default function ReportsPage() {
                     </div>
                     <div className="text-gray-600">
                       <span className="font-semibold">Total:</span>{' '}
-                      {s.total_amount} PYG
+                      {formatPyg(s.total_amount)} PYG
                     </div>
                   </button>
                 ))}
@@ -1510,7 +1508,7 @@ export default function ReportsPage() {
                           {s.student_name ?? s.student_id}
                         </td>
                         <td className="px-3 py-2 align-top text-right">
-                          {s.total_amount} PYG
+                          {formatPyg(s.total_amount)} PYG
                         </td>
                         <td className="px-3 py-2 align-top text-right">
                           {s.payments_count}
@@ -1579,7 +1577,7 @@ export default function ReportsPage() {
                       </div>
                       <div className="text-gray-600">
                         <span className="font-semibold">Total:</span>{' '}
-                        {p.total_amount} PYG
+                        {formatPyg(p.total_amount)} PYG
                       </div>
                     </button>
                   ))}
@@ -1611,7 +1609,7 @@ export default function ReportsPage() {
                             {p.plan_name ?? 'Sin nombre'}
                           </td>
                           <td className="px-3 py-2 align-top text-right">
-                            {p.total_amount} PYG
+                            {formatPyg(p.total_amount)} PYG
                           </td>
                           <td className="px-3 py-2 align-top text-right">
                             {p.payments_count}
@@ -2587,7 +2585,7 @@ export default function ReportsPage() {
             {studentDetailRows.length > 0 && (
               <div className="mr-auto text-[11px] text-gray-600">
                 <span className="font-semibold">Total en este periodo:</span>{' '}
-                {studentDetailRows.reduce((acc, r) => acc + (r.amount || 0), 0)} PYG
+                {formatPyg(studentDetailRows.reduce((acc, r) => acc + (r.amount || 0), 0))} PYG
               </div>
             )}
             <Button
@@ -2657,7 +2655,7 @@ export default function ReportsPage() {
             {planDetailRows.length > 0 && (
               <div className="mr-auto text-[11px] text-gray-600">
                 <span className="font-semibold">Total en este periodo:</span>{' '}
-                {planDetailRows.reduce((acc, r) => acc + (r.amount || 0), 0)} PYG
+                {formatPyg(planDetailRows.reduce((acc, r) => acc + (r.amount || 0), 0))} PYG
               </div>
             )}
             <Button

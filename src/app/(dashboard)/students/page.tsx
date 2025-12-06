@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { History, Users, StickyNote } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { createClientBrowser } from '@/lib/supabase';
+import { formatPyg } from '@/lib/formatters';
 
 const iconColor = '#3cadaf';
 
@@ -655,7 +656,7 @@ export default function StudentsPage() {
               {planTotal != null ? (
                 <>
                   <span className="font-semibold text-[#31435d]">Pagado:</span>{' '}
-                  {totalPaid} / {planTotal} PYG
+                  {formatPyg(totalPaid)} / {formatPyg(planTotal)} PYG
                 </>
               ) : (
                 <span>Sin monto total definido para el plan.</span>
@@ -688,7 +689,7 @@ export default function StudentsPage() {
                         <tr key={p.id} className="border-b last:border-b-0">
                           <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
                           <td className="py-1.5 px-2 capitalize">{p.method}</td>
-                          <td className="py-1.5 px-2 text-right">{p.amount} {p.currency}</td>
+                          <td className="py-1.5 px-2 text-right">{formatPyg(p.amount)} {p.currency}</td>
                           <td className="py-1.5 px-2 text-center">
                             <span
                               className={
