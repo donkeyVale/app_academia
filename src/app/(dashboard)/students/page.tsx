@@ -739,8 +739,8 @@ export default function StudentsPage() {
           </div>
         </div>
         <div className="px-4 py-3 space-y-3">
-          {/* Vista para admin: tabla completa */}
-          {role === 'admin' && (
+          {/* Vista para admin/super_admin: tabla completa */}
+          {(role === 'admin' || role === 'super_admin') && (
             <>
               {!loading && students.length > 0 && (
                 <div className="max-w-xs">
@@ -1049,7 +1049,7 @@ export default function StudentsPage() {
                         const notesArr = classNotesByClass[item.id] ?? [];
                         const firstNote = notesArr[0] ?? null;
                         const isCoach = role === 'coach';
-                        const isAdmin = role === 'admin';
+                        const isAdmin = role === 'admin' || role === 'super_admin';
                         const isStudent = role === 'student';
 
                         return (
