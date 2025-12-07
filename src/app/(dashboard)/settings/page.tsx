@@ -171,6 +171,12 @@ export default function SettingsPage() {
               >
                 Asignar academias a usuarios
               </Link>
+              <Link
+                href="/super-admin/locations"
+                className="inline-flex items-center rounded-md bg-slate-700 px-4 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-slate-800"
+              >
+                Sedes y canchas
+              </Link>
             </div>
           </div>
         </div>
