@@ -129,6 +129,7 @@ export default function StudentsPage() {
         if (studentPlansRes.error) throw studentPlansRes.error;
 
         const studentsData = (studentsRes.data ?? []) as StudentRow[];
+        console.log('StudentsPage load:', { roleFromProfile, studentsCount: studentsData.length });
         const rawPlansData = (studentPlansRes.data ?? []) as any[];
         const plansData: StudentPlanRow[] = rawPlansData.map((p) => ({
           id: p.id as string,
