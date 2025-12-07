@@ -1508,7 +1508,7 @@ export default function SchedulePage() {
     }
   };
 
-  const roleResolved = role === 'admin' || role === 'coach' || role === 'student';
+  const roleResolved = role === 'super_admin' || role === 'admin' || role === 'coach' || role === 'student';
 
   if (!roleResolved) {
     return (

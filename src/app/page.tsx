@@ -818,8 +818,8 @@ export default function HomePage() {
 
       <FooterNav
         isAdmin={isAdmin}
-        canSeeReports={role === 'admin'}
-        canSeeFinance={role === 'admin'}
+        canSeeReports={role === 'admin' || role === 'super_admin'}
+        canSeeFinance={role === 'admin' || role === 'super_admin'}
         canSeeSettings={role === 'coach' || role === 'student'}
         studentsLabel={role === 'student' ? 'Mi cuenta' : 'Alumnos'}
         rightSlot={(
