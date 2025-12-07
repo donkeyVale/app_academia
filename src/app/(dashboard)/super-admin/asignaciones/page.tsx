@@ -9,7 +9,6 @@ type AppRole = "super_admin" | "admin" | "coach" | "student" | null;
 type ProfileUser = {
   id: string;
   full_name: string | null;
-  email: string | null;
   role: AppRole;
 };
 
@@ -92,7 +91,7 @@ export default function AssignmentsPage() {
         const [{ data: usersData, error: usersErr }, { data: acadData, error: acadErr }] = await Promise.all([
           supabase
             .from("profiles")
-            .select("id, full_name, email, role")
+            .select("id, full_name, role")
             .order("full_name", { ascending: true }),
           supabase.from("academies").select("id, name").order("name", { ascending: true }),
         ]);
@@ -105,7 +104,6 @@ export default function AssignmentsPage() {
           (usersData ?? []).map((u: any) => ({
             id: u.id as string,
             full_name: (u.full_name as string | null) ?? null,
-            email: (u.email as string | null) ?? null,
             role: (u.role as AppRole) ?? null,
           }))
         );
@@ -276,7 +274,7 @@ export default function AssignmentsPage() {
                             : "border-gray-200 hover:bg-gray-50 text-gray-700")
                         }
                       >
-                        <span className="font-medium">{u.full_name || u.email || u.id}</span>
+                        <span className="font-medium">{u.full_name || u.id}</span>
                         <span className="text-[11px] text-gray-500">
                           Rol actual: {u.role ?? "sin rol"}
                         </span>
@@ -301,7 +299,7 @@ export default function AssignmentsPage() {
                 {selectedUser && (
                   <>
                     <p className="text-xs text-gray-600 mb-1">
-                      Usuario seleccionado: <span className="font-medium">{selectedUser.full_name || selectedUser.email || selectedUser.id}</span>
+                      Usuario seleccionado: <span className="font-medium">{selectedUser.full_name || selectedUser.id}</span>
                     </p>
 
                     <form onSubmit={onAddAssignment} className="space-y-2 border-b pb-3 mb-2">
