@@ -146,7 +146,9 @@ export default function UsersPage() {
         .eq('id', userId)
         .maybeSingle();
 
-      if (!profile || profile.role !== 'admin') {
+      const role = (profile?.role as string | null) ?? null;
+      const isAdminLike = role === 'admin' || role === 'super_admin';
+      if (!isAdminLike) {
         setForbidden(true);
         setLoadingList(false);
         return;
