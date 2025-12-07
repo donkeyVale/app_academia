@@ -820,7 +820,7 @@ export default function HomePage() {
         isAdmin={isAdmin}
         canSeeReports={role === 'admin' || role === 'super_admin'}
         canSeeFinance={role === 'admin' || role === 'super_admin'}
-        canSeeSettings={role === 'coach' || role === 'student'}
+        canSeeSettings={role === 'coach' || role === 'student' || role === 'super_admin'}
         studentsLabel={role === 'student' ? 'Mi cuenta' : 'Alumnos'}
         rightSlot={(
           <>
