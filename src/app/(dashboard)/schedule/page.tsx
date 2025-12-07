@@ -1100,6 +1100,17 @@ export default function SchedulePage() {
   useEffect(() => {
     (async () => {
       if (!editing) return;
+
+      // Preferimos el estado en memoria de alumnos por clase si existe,
+      // porque se mantiene en sync al crear/editar clases.
+      const fromState = studentsByClass[editing.id];
+      if (fromState && fromState.length > 0) {
+        const unique = Array.from(new Set(fromState));
+        setEditExistingStudents(unique);
+        setEditSelectedStudents(unique);
+        return;
+      }
+
       const { data: bData } = await supabase
         .from('bookings')
         .select('student_id')
@@ -1108,7 +1119,7 @@ export default function SchedulePage() {
       setEditExistingStudents(current);
       setEditSelectedStudents(current);
     })();
-  }, [supabase, editing]);
+  }, [supabase, editing, studentsByClass]);
 
   const openAttendance = async (cls: ClassSession) => {
     setAttendanceClass(cls);
@@ -1486,9 +1497,12 @@ export default function SchedulePage() {
         ...prev,
         [editing.id]: [...editSelectedStudents],
       }));
+      toast.success('Clase actualizada correctamente');
       setEditing(null);
     } catch (e: any) {
-      setError(e.message || 'Error guardando cambios');
+      const msg = e.message || 'Error guardando cambios de la clase';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
