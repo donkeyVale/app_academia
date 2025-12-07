@@ -1075,9 +1075,12 @@ export default function SchedulePage() {
 
   // Open edit with prefill
   const openEdit = (cls: ClassSession) => {
-    setEditing(cls);
-    setEditCourtId(cls.court_id || '');
-    const d = new Date(cls.date);
+    // Usamos una copia para forzar un nuevo reference y que el efecto que carga bookings
+    // se ejecute incluso si se edita la misma clase varias veces seguidas.
+    const copy: ClassSession = { ...cls };
+    setEditing(copy);
+    setEditCourtId(copy.court_id || '');
+    const d = new Date(copy.date);
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
@@ -1085,9 +1088,9 @@ export default function SchedulePage() {
     const min = '00';
     setEditDay(`${yyyy}-${mm}-${dd}`);
     setEditTime(`${hh}:${min}`);
-    setEditCoachId(cls.coach_id || '');
+    setEditCoachId(copy.coach_id || '');
     // @ts-ignore
-    setEditNotes((cls as any).notes || '');
+    setEditNotes((copy as any).notes || '');
     setEditStudentQuery('');
     setEditSelectedStudents([]);
     setEditExistingStudents([]);
