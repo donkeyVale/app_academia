@@ -130,7 +130,7 @@ export default function SchedulePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [role, setRole] = useState<'admin' | 'coach' | 'student' | null>(null);
+  const [role, setRole] = useState<'super_admin' | 'admin' | 'coach' | 'student' | null>(null);
   const [studentId, setStudentId] = useState<string | null>(null);
 
   // Form state
@@ -184,8 +184,8 @@ export default function SchedulePage() {
           console.error('Error cargando perfil en Agenda', profErr);
           setRole(null);
         } else {
-          const r = (profile?.role as 'admin' | 'coach' | 'student' | null) ?? null;
-          setRole(r === 'admin' || r === 'coach' || r === 'student' ? r : null);
+          const r = (profile?.role as 'super_admin' | 'admin' | 'coach' | 'student' | null) ?? null;
+          setRole(r === 'super_admin' || r === 'admin' || r === 'coach' || r === 'student' ? r : null);
         }
 
         if (profile?.role === 'student') {

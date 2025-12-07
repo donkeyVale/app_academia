@@ -7,7 +7,7 @@ import PlansClient from './PlansClient';
 import { CreditCard } from 'lucide-react';
 import { createClientBrowser } from '@/lib/supabase';
 
-type Role = 'admin' | 'coach' | 'student' | null;
+type Role = 'super_admin' | 'admin' | 'coach' | 'student' | null;
 
 type StudentFinanceSummary = {
   planName: string | null;
@@ -33,7 +33,7 @@ export default function FinancePage() {
   const [summary, setSummary] = useState<StudentFinanceSummary | null>(null);
   const [payments, setPayments] = useState<StudentPayment[]>([]);
 
-  const roleResolved = role === 'admin' || role === 'coach' || role === 'student';
+  const roleResolved = role === 'super_admin' || role === 'admin' || role === 'coach' || role === 'student';
 
   useEffect(() => {
     (async () => {
@@ -57,7 +57,7 @@ export default function FinancePage() {
 
       if (!profErr) {
         const r = (profile?.role as Role) ?? null;
-        roleFromProfile = r === 'admin' || r === 'coach' || r === 'student' ? r : null;
+        roleFromProfile = r === 'super_admin' || r === 'admin' || r === 'coach' || r === 'student' ? r : null;
       }
 
       setRole(roleFromProfile);
@@ -167,8 +167,8 @@ export default function FinancePage() {
     );
   }
 
-  // Vista completa de finanzas SOLO para admin
-  if (role === 'admin') {
+  // Vista completa de finanzas para admin y super_admin
+  if (role === 'admin' || role === 'super_admin') {
     return (
       <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4">
         <div className="flex items-start justify-between gap-4">

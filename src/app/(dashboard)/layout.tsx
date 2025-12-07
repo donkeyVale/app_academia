@@ -81,6 +81,8 @@ const IconUsers = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 );
 
+type AppRole = 'super_admin' | 'admin' | 'coach' | 'student' | null;
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClientBrowser();
   const router = useRouter();
@@ -91,7 +93,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [avatarOffsetY, setAvatarOffsetY] = useState(0);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [role, setRole] = useState<'admin' | 'coach' | 'student' | null>(null);
+  const [role, setRole] = useState<AppRole>(null);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -119,13 +121,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         if (profile?.full_name) {
           displayName = profile.full_name as string;
         }
-        const r = profile?.role as 'admin' | 'coach' | 'student' | undefined;
-        if (r === 'admin') {
-          setIsAdmin(true);
-        } else {
-          setIsAdmin(false);
-        }
-        if (r === 'admin' || r === 'coach' || r === 'student') {
+        const r = (profile?.role as AppRole) ?? null;
+        const isSuperAdmin = r === 'super_admin';
+        setIsAdmin(r === 'admin' || isSuperAdmin);
+        if (r === 'super_admin' || r === 'admin' || r === 'coach' || r === 'student') {
           setRole(r);
         } else {
           setRole(null);
@@ -180,8 +179,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <FooterNav
         isAdmin={isAdmin}
-        canSeeReports={role === 'admin'}
-        canSeeFinance={role === 'admin'}
+        canSeeReports={role === 'admin' || role === 'super_admin'}
+        canSeeFinance={role === 'admin' || role === 'super_admin'}
         canSeeSettings={role === 'coach' || role === 'student'}
         studentsLabel={role === 'student' ? 'Mi cuenta' : 'Alumnos'}
         rightSlot={(

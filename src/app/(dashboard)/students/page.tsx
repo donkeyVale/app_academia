@@ -63,7 +63,7 @@ export default function StudentsPage() {
   const [checking, setChecking] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [role, setRole] = useState<'admin' | 'coach' | 'student' | null>(null);
+  const [role, setRole] = useState<'super_admin' | 'admin' | 'coach' | 'student' | null>(null);
   const [students, setStudents] = useState<StudentRow[]>([]);
   const [search, setSearch] = useState('');
   const [currentStudentId, setCurrentStudentId] = useState<string | null>(null);
@@ -89,7 +89,7 @@ export default function StudentsPage() {
   const [notesError, setNotesError] = useState<string | null>(null);
   const [coachIdForNotes, setCoachIdForNotes] = useState<string | null>(null);
 
-  const roleResolved = role === 'admin' || role === 'coach' || role === 'student';
+  const roleResolved = role === 'super_admin' || role === 'admin' || role === 'coach' || role === 'student';
 
   useEffect(() => {
     (async () => {
@@ -101,15 +101,15 @@ export default function StudentsPage() {
 
       const userId = data.user.id as string;
 
-      let roleFromProfile: 'admin' | 'coach' | 'student' | null = null;
+      let roleFromProfile: 'super_admin' | 'admin' | 'coach' | 'student' | null = null;
       const { data: profile, error: profErr } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', userId)
         .maybeSingle();
       if (!profErr) {
-        const r = (profile?.role as 'admin' | 'coach' | 'student' | null) ?? null;
-        roleFromProfile = r === 'admin' || r === 'coach' || r === 'student' ? r : null;
+        const r = (profile?.role as 'super_admin' | 'admin' | 'coach' | 'student' | null) ?? null;
+        roleFromProfile = r === 'super_admin' || r === 'admin' || r === 'coach' || r === 'student' ? r : null;
         setRole(roleFromProfile);
       }
 
@@ -721,7 +721,7 @@ export default function StudentsPage() {
             {role === 'student' ? 'Resumen de tu cuenta' : 'Listado general'}
           </p>
           <div className="flex items-center gap-3">
-            {role === 'admin' && (
+            {(role === 'admin' || role === 'super_admin') && (
               <span className="text-xs text-gray-500">
                 {loading ? 'Cargando...' : `${students.length} alumno${students.length === 1 ? '' : 's'}`}
               </span>
