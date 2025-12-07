@@ -116,6 +116,8 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
+type AppRole = 'super_admin' | 'admin' | 'coach' | 'student' | null;
+
 export default function HomePage() {
   const supabase = createClientBrowser();
   const router = useRouter();
@@ -123,7 +125,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [role, setRole] = useState<'admin' | 'coach' | 'student' | null>(null);
+  const [role, setRole] = useState<AppRole>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarOffsetX, setAvatarOffsetX] = useState(0);
   const [avatarOffsetY, setAvatarOffsetY] = useState(0);
@@ -176,13 +178,11 @@ export default function HomePage() {
         if (profile?.full_name) {
           displayName = profile.full_name as string;
         }
-        if (profile?.role === 'admin') {
-          setIsAdmin(true);
-        } else {
-          setIsAdmin(false);
-        }
-        if (profile?.role === 'admin' || profile?.role === 'coach' || profile?.role === 'student') {
-          setRole(profile.role as 'admin' | 'coach' | 'student');
+        const r = (profile?.role as AppRole) ?? null;
+        const isSuperAdmin = r === 'super_admin';
+        setIsAdmin(r === 'admin' || isSuperAdmin);
+        if (r === 'super_admin' || r === 'admin' || r === 'coach' || r === 'student') {
+          setRole(r);
         } else {
           setRole(null);
         }
@@ -223,7 +223,7 @@ export default function HomePage() {
         const end = new Date(today);
         end.setHours(23, 59, 59, 999);
 
-        if (role === 'admin' || role === null) {
+        if (role === 'admin' || role === 'super_admin' || role === null) {
           // Dashboard global para admin (y fallback cuando aún no se cargó role)
           const [spRes, clsRes, coachRes, studRes] = await Promise.all([
             supabase
@@ -467,7 +467,10 @@ export default function HomePage() {
     return `${first ?? ''}${second ?? ''}`.toUpperCase();
   })();
 
-  const roleResolved = role === 'admin' || role === 'coach' || role === 'student';
+  const roleResolved = role === 'super_admin' || role === 'admin' || role === 'coach' || role === 'student';
+
+  const isSuperAdmin = role === 'super_admin';
+  const isAdminRole = role === 'admin' || isSuperAdmin;
 
   if (!roleResolved) {
     return (
@@ -511,7 +514,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {(!role || role === 'admin') && (
+      {(!role || isAdminRole) && (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
           <motion.button
             type="button"
