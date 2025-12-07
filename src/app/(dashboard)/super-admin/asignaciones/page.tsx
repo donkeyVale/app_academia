@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { createClientBrowser } from "@/lib/supabase";
 
 type AppRole = "super_admin" | "admin" | "coach" | "student" | null;
@@ -224,15 +225,17 @@ export default function AssignmentsPage() {
           </p>
         </div>
         <div className="flex items-center justify-end flex-1">
-          <div className="h-16 w-32 relative">
-            <Image
-              src="/icons/logoHome.png"
-              alt="Agendo"
-              fill
-              className="object-contain"
-              priority
-            />
-          </div>
+          <Link href="/" className="flex items-center">
+            <div className="h-16 w-32 relative">
+              <Image
+                src="/icons/logoHome.png"
+                alt="Agendo"
+                fill
+                className="object-contain"
+                priority
+              />
+            </div>
+          </Link>
         </div>
       </div>
 
