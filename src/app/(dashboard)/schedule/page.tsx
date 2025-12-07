@@ -1112,10 +1112,10 @@ export default function SchedulePage() {
     setAttendanceLoading(true);
     setError(null);
     try {
-      // Load bookings with basic student info
+      // Cargar reservas para esta clase (para fallback si aún no tenemos studentsByClass actualizado)
       const { data: bookingsData, error: bErr } = await supabase
         .from('bookings')
-        .select('student_id, students(id, level, notes)')
+        .select('student_id')
         .eq('class_id', cls.id);
       if (bErr) throw bErr;
 
@@ -1127,18 +1127,23 @@ export default function SchedulePage() {
 
       const attMap = new Map((attData ?? []).map((a: any) => [a.student_id as string, !!a.present]));
 
-      const list = (bookingsData ?? []).map((b: any) => {
-        const s = b.students;
-        const studentInfo = students.find((stu) => stu.id === b.student_id);
+      // Usamos primero el mapa en memoria de alumnos por clase (studentsByClass),
+      // que se mantiene en sync al crear/editar clases. Si no hay entrada, usamos bookings.
+      const fromState = studentsByClass[cls.id];
+      const bookingIds = (bookingsData ?? []).map((b: any) => b.student_id as string);
+      const baseIds = (fromState && fromState.length > 0) ? fromState : bookingIds;
+
+      const list = baseIds.map((sid) => {
+        const s = studentsMap[sid] as Student | undefined;
         const label =
-          (studentInfo?.full_name || '') ||
+          (s?.full_name || '') ||
           (s?.notes || '') ||
           (s?.level || '') ||
           s?.id ||
-          b.student_id;
+          sid;
         return {
-          student_id: b.student_id as string,
-          present: attMap.get(b.student_id) ?? false,
+          student_id: sid,
+          present: attMap.get(sid) ?? false,
           label,
         };
       });
