@@ -6,12 +6,15 @@ import Link from "next/link";
 import { createClientBrowser } from "@/lib/supabase";
 import { Bell, BellOff } from "lucide-react";
 
+type AppRole = "super_admin" | "admin" | "coach" | "student" | null;
+
 export default function SettingsPage() {
   const supabase = createClientBrowser();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notifyClasses, setNotifyClasses] = useState<boolean>(true);
+  const [role, setRole] = useState<AppRole>(null);
 
   useEffect(() => {
     (async () => {
@@ -27,7 +30,7 @@ export default function SettingsPage() {
       try {
         const { data: profile, error: profErr } = await supabase
           .from("profiles")
-          .select("notifications_enabled")
+          .select("notifications_enabled, role")
           .eq("id", user.id)
           .maybeSingle();
 
@@ -37,6 +40,13 @@ export default function SettingsPage() {
           setNotifyClasses(profile.notifications_enabled);
         } else {
           setNotifyClasses(true);
+        }
+
+        const r = (profile?.role as AppRole) ?? null;
+        if (r === "super_admin" || r === "admin" || r === "coach" || r === "student") {
+          setRole(r);
+        } else {
+          setRole(null);
         }
       } catch (err: any) {
         setError(err?.message ?? "Error cargando configuración.");
@@ -138,6 +148,33 @@ export default function SettingsPage() {
           {saving && <p className="text-xs text-gray-500">Guardando cambios...</p>}
         </div>
       </div>
+
+      {role === "super_admin" && (
+        <div className="border rounded-lg bg-white shadow-sm border-t-4 border-indigo-500">
+          <div className="px-4 py-3 border-b bg-gray-50 rounded-t-lg">
+            <p className="text-sm font-semibold text-[#31435d]">Configuración avanzada (super admin)</p>
+          </div>
+          <div className="px-4 py-4 space-y-3 text-sm">
+            <p className="text-xs text-gray-600">
+              Gestioná las academias y las asignaciones de usuarios a academias.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href="/super-admin/academias"
+                className="inline-flex items-center rounded-md bg-[#3cadaf] px-4 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-[#34989e]"
+              >
+                Administrar academias
+              </Link>
+              <Link
+                href="/super-admin/asignaciones"
+                className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-indigo-700"
+              >
+                Asignar academias a usuarios
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
