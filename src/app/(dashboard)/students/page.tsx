@@ -1053,14 +1053,16 @@ export default function StudentsPage() {
                         const isAdmin = role === 'admin' || role === 'super_admin';
                         const isStudent = role === 'student';
 
-                        return (
-                          <>
+                        return [
+                          (
                             <tr key={`${item.id}-row`} className="border-b last:border-b-0">
                               <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
                               <td className="py-1.5 px-2">{`${hh}:${min}`}</td>
                               <td className="py-1.5 px-2">{item.courtName ?? '-'}</td>
                               <td className="py-1.5 px-2">{item.coachName ?? '-'}</td>
                             </tr>
+                          ),
+                          (
                             <tr key={`${item.id}-note`} className="border-b last:border-b-0">
                               <td colSpan={4} className="py-1.5 px-2 bg-gray-50/40">
                                 {isCoach ? (
@@ -1136,8 +1138,8 @@ export default function StudentsPage() {
                                 ) : null}
                               </td>
                             </tr>
-                          </>
-                        );
+                          ),
+                        ];
                       })}
                     </tbody>
                   </table>
