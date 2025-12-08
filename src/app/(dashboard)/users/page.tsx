@@ -516,7 +516,7 @@ export default function UsersPage() {
               </p>
             ) : (
               <p className="text-sm text-gray-600">
-                Como administrador podés consultar los usuarios vinculados a la academia seleccionada. Solo el super administrador puede crear o editar usuarios.
+                Como admin podés consultar usuarios de tu academia. Solo el super admin puede crear o editar.
               </p>
             )}
           </div>
