@@ -237,37 +237,43 @@ export default function HomePage() {
               }
             } else {
               setHasAcademies(false);
+              setAcademyOptions([]);
+              setSelectedAcademyId(null);
+              if (typeof window !== 'undefined') {
+                window.localStorage.removeItem('selectedAcademyId');
+              }
             }
           }
-        } catch {
-          setAcademyOptions([]);
+        } catch (e) {
+          console.error('Error cargando academias del usuario en Home', e);
+          setHasAcademies(false);
         }
-      }
 
-      const meta = (user?.user_metadata ?? {}) as any;
+        const meta = (user?.user_metadata ?? {}) as any;
 
-      if (!displayName) {
-        const fn = (meta.first_name as string | null) ?? '';
-        const ln = (meta.last_name as string | null) ?? '';
-        const fullFromMeta = `${fn} ${ln}`.trim();
-        if (fullFromMeta) {
-          displayName = fullFromMeta;
+        if (!displayName) {
+          const fn = (meta.first_name as string | null) ?? '';
+          const ln = (meta.last_name as string | null) ?? '';
+          const fullFromMeta = `${fn} ${ln}`.trim();
+          if (fullFromMeta) {
+            displayName = fullFromMeta;
+          }
         }
+
+        if (!displayName) {
+          displayName = user?.email ?? null;
+        }
+
+        const avatarMeta = (meta.avatar_url as string | null) ?? null;
+        setAvatarUrl(avatarMeta);
+
+        const offX = Number(meta.avatar_offset_x ?? 0);
+        const offY = Number(meta.avatar_offset_y ?? 0);
+        setAvatarOffsetX(Number.isFinite(offX) ? offX : 0);
+        setAvatarOffsetY(Number.isFinite(offY) ? offY : 0);
+
+        setUserName(displayName);
       }
-
-      if (!displayName) {
-        displayName = user?.email ?? null;
-      }
-
-      const avatarMeta = (meta.avatar_url as string | null) ?? null;
-      setAvatarUrl(avatarMeta);
-
-      const offX = Number(meta.avatar_offset_x ?? 0);
-      const offY = Number(meta.avatar_offset_y ?? 0);
-      setAvatarOffsetX(Number.isFinite(offX) ? offX : 0);
-      setAvatarOffsetY(Number.isFinite(offY) ? offY : 0);
-
-      setUserName(displayName);
 
       // métricas de dashboard
       setLoading(true);
@@ -279,7 +285,12 @@ export default function HomePage() {
         const end = new Date(today);
         end.setHours(23, 59, 59, 999);
 
-        if (role === 'admin' || role === 'super_admin' || role === null) {
+        // Esperar a que el rol esté resuelto antes de calcular métricas
+        if (!role) {
+          return;
+        }
+
+        if (role === 'admin' || role === 'super_admin') {
           // Dashboard para admin / super_admin (y fallback cuando aún no se cargó role)
 
           // Si el usuario no tiene academias asignadas, mostramos todo en 0
