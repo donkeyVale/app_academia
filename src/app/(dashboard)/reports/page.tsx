@@ -377,30 +377,36 @@ export default function ReportsPage() {
   useEffect(() => {
     (async () => {
       try {
+        if (!selectedAcademyId) {
+          // Sin academia seleccionada: no mostramos alumnos ni profesores
+          setAttendanceStudents([]);
+          setCoachOptions([]);
+          return;
+        }
+
         const { data: studs, error: sErr } = await supabase
           .from("students")
           .select("id,user_id,level,notes");
         if (sErr) throw sErr;
         let studentsRaw = (studs ?? []) as { id: string; user_id: string | null; level: string | null; notes: string | null }[];
 
-        // Filtrar alumnos por academia seleccionada usando student_plans.academy_id
-        if (selectedAcademyId) {
-          const { data: spData, error: spErr } = await supabase
-            .from("student_plans")
-            .select("student_id,academy_id")
-            .eq("academy_id", selectedAcademyId);
-          if (spErr) throw spErr;
-          const allowedStudentIds = new Set<string>(
-            ((spData ?? []) as { student_id: string | null; academy_id: string | null }[])
-              .map((r) => r.student_id)
-              .filter((id): id is string => !!id)
-          );
-          studentsRaw = studentsRaw.filter((s) => allowedStudentIds.has(s.id));
-        } else {
-          // Sin academia seleccionada: no mostramos alumnos en el selector
-          setAttendanceStudents([]);
-          return;
-        }
+        // user_academies para determinar qué usuarios pertenecen a la academia seleccionada
+        const { data: uaData, error: uaErr } = await supabase
+          .from("user_academies")
+          .select("user_id,academy_id,role")
+          .eq("academy_id", selectedAcademyId);
+        if (uaErr) throw uaErr;
+        const uaRows = (uaData ?? []) as { user_id: string | null; academy_id: string | null; role: string | null }[];
+
+        const studentUserIds = new Set<string>(
+          uaRows
+            .filter((r) => (r.role ?? '').includes('student'))
+            .map((r) => r.user_id)
+            .filter((id): id is string => !!id)
+        );
+
+        // Filtrar alumnos por user_id presente en user_academies para esta academia
+        studentsRaw = studentsRaw.filter((s) => s.user_id && studentUserIds.has(s.user_id));
 
         const userIds = Array.from(
           new Set(
@@ -442,7 +448,18 @@ export default function ReportsPage() {
           .from("coaches")
           .select("id,user_id");
         if (coachesErr) throw coachesErr;
-        const coachesRaw = (coachesData ?? []) as { id: string; user_id: string | null }[];
+        let coachesRaw = (coachesData ?? []) as { id: string; user_id: string | null }[];
+
+        const coachUserIdsAcademy = new Set<string>(
+          uaRows
+            .filter((r) => (r.role ?? '').includes('coach'))
+            .map((r) => r.user_id)
+            .filter((id): id is string => !!id)
+        );
+
+        // Filtrar coaches por user_id presente en user_academies para esta academia
+        coachesRaw = coachesRaw.filter((c) => c.user_id && coachUserIdsAcademy.has(c.user_id));
+
         const coachUserIds = Array.from(
           new Set(coachesRaw.map((c) => c.user_id).filter((id): id is string => !!id))
         );
@@ -475,7 +492,7 @@ export default function ReportsPage() {
         setError(msg);
       }
     })();
-  }, [supabase]);
+  }, [supabase, selectedAcademyId]);
 
   // Cargar sedes y canchas para reporte por sede/cancha
   useEffect(() => {
