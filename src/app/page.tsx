@@ -276,35 +276,33 @@ export default function HomePage() {
         end.setHours(23, 59, 59, 999);
 
         if (role === 'admin' || role === 'super_admin' || role === null) {
-          // Dashboard global para admin (y fallback cuando aún no se cargó role)
-          const [spRes, coachRes, studRes] = await Promise.all([
-            supabase
-              .from('student_plans')
-              .select('student_id,plan_id,remaining_classes')
-              .gt('remaining_classes', 0),
-            supabase
-              .from('coaches')
-              .select('id', { count: 'exact', head: true }),
-            supabase
-              .from('students')
-              .select('id', { count: 'exact', head: true }),
-          ]);
+          // Dashboard para admin / super_admin (y fallback cuando aún no se cargó role)
 
+          // 1) Planes activos y alumnos con plan (filtrados por academia si aplica)
+          let spQuery = supabase
+            .from('student_plans')
+            .select('student_id,plan_id,remaining_classes,academy_id')
+            .gt('remaining_classes', 0);
+
+          if (selectedAcademyId) {
+            spQuery = spQuery.eq('academy_id', selectedAcademyId);
+          }
+
+          const spRes = await spQuery;
           if (spRes.error) throw spRes.error;
-          if (coachRes.error) throw coachRes.error;
-          if (studRes.error) throw studRes.error;
 
           const spRows = spRes.data ?? [];
           const planIds = new Set<string>();
           const studentIds = new Set<string>();
           (spRows as any[]).forEach((sp) => {
-            planIds.add(sp.plan_id as string);
-            studentIds.add(sp.student_id as string);
+            if (sp.plan_id) planIds.add(sp.plan_id as string);
+            if (sp.student_id) studentIds.add(sp.student_id as string);
           });
 
           setActivePlansCount(planIds.size);
           setStudentsWithPlanCount(studentIds.size);
-          // Clases de hoy filtradas por academia (si hay academia seleccionada)
+
+          // 2) Clases de hoy filtradas por academia (si hay academia seleccionada)
           let todayCount = 0;
           if (selectedAcademyId && academyLocationIds.size > 0) {
             const locationIds = Array.from(academyLocationIds);
@@ -327,8 +325,61 @@ export default function HomePage() {
           }
 
           setTodayClassesCount(todayCount);
-          setCoachesCount(coachRes.count ?? 0);
-          setStudentsCount(studRes.count ?? 0);
+
+          // 3) Profesores / Alumnos: si hay academia seleccionada, contamos por user_academies
+          if (selectedAcademyId) {
+            const { data: uaRows, error: uaErr } = await supabase
+              .from('user_academies')
+              .select('user_id')
+              .eq('academy_id', selectedAcademyId);
+            if (uaErr) throw uaErr;
+
+            const userIds = Array.from(
+              new Set(
+                ((uaRows as { user_id: string | null }[] | null) ?? [])
+                  .map((r) => r.user_id)
+                  .filter((id): id is string => !!id)
+              )
+            );
+
+            if (userIds.length === 0) {
+              setCoachesCount(0);
+              setStudentsCount(0);
+            } else {
+              const [{ count: coachCount, error: coachErr }, { count: studCount, error: studErr }] = await Promise.all([
+                supabase
+                  .from('coaches')
+                  .select('id', { count: 'exact', head: true })
+                  .in('user_id', userIds),
+                supabase
+                  .from('students')
+                  .select('id', { count: 'exact', head: true })
+                  .in('user_id', userIds),
+              ]);
+
+              if (coachErr) throw coachErr;
+              if (studErr) throw studErr;
+
+              setCoachesCount(coachCount ?? 0);
+              setStudentsCount(studCount ?? 0);
+            }
+          } else {
+            // Sin academia seleccionada: totales globales
+            const [{ count: coachCount, error: coachErr }, { count: studCount, error: studErr }] = await Promise.all([
+              supabase
+                .from('coaches')
+                .select('id', { count: 'exact', head: true }),
+              supabase
+                .from('students')
+                .select('id', { count: 'exact', head: true }),
+            ]);
+
+            if (coachErr) throw coachErr;
+            if (studErr) throw studErr;
+
+            setCoachesCount(coachCount ?? 0);
+            setStudentsCount(studCount ?? 0);
+          }
         } else if (role === 'coach' && userId) {
           // Dashboard específico para coach
           // 1) Obtener id de coach vinculado al usuario
