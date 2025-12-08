@@ -471,19 +471,37 @@ export default function HomePage() {
             const nowIso = new Date().toISOString();
             const { data: upcomingData, error: upcomingErr } = await supabase
               .from('bookings')
-              .select('class_id,class_sessions!inner(id,date)')
+              .select('class_id,class_sessions!inner(id,date,court_id,courts!inner(location_id))')
               .eq('student_id', studentId)
               .gte('class_sessions.date', nowIso);
             if (upcomingErr) throw upcomingErr;
-            setStudentUpcomingClasses((upcomingData ?? []).length);
+
+            let upcomingCount = (upcomingData ?? []).length;
+            // Si hay academia seleccionada, filtramos por sus locations
+            if (selectedAcademyId && academyLocationIds.size > 0) {
+              const allowedLocations = academyLocationIds;
+              upcomingCount = (upcomingData ?? []).filter((row: any) => {
+                const cls = (row as any).class_sessions;
+                const court = cls?.courts;
+                const locId = court?.location_id as string | undefined;
+                return locId ? allowedLocations.has(locId) : false;
+              }).length;
+            }
+            setStudentUpcomingClasses(upcomingCount);
 
             // Clases restantes del plan actual (último plan asignado)
-            const { data: spData, error: spErr } = await supabase
+            let spQuery = supabase
               .from('student_plans')
-              .select('id, remaining_classes, purchased_at, plans(name,classes_included)')
+              .select('id, remaining_classes, purchased_at, academy_id, plans(name,classes_included)')
               .eq('student_id', studentId)
               .order('purchased_at', { ascending: false })
               .limit(1);
+
+            if (selectedAcademyId) {
+              spQuery = spQuery.eq('academy_id', selectedAcademyId);
+            }
+
+            const { data: spData, error: spErr } = await spQuery;
             if (spErr) throw spErr;
 
             if (!spData || spData.length === 0) {
