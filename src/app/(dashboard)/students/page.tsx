@@ -122,16 +122,53 @@ export default function StudentsPage() {
           supabase.from('students').select('id, user_id, level, notes'),
           supabase
             .from('student_plans')
-            .select('id, student_id, plan_id, remaining_classes, base_price, final_price, plans(name)'),
+            .select('id, student_id, plan_id, remaining_classes, base_price, final_price, academy_id, plans(name)'),
         ]);
 
         if (studentsRes.error) throw studentsRes.error;
         if (studentPlansRes.error) throw studentPlansRes.error;
 
         const studentsData = (studentsRes.data ?? []) as StudentRow[];
-        console.log('StudentsPage load:', { roleFromProfile, studentsCount: studentsData.length });
-        const rawPlansData = (studentPlansRes.data ?? []) as any[];
-        const plansData: StudentPlanRow[] = rawPlansData.map((p) => ({
+
+        let effectiveStudents: StudentRow[] = studentsData;
+        let effectiveRawPlans: any[] = (studentPlansRes.data ?? []) as any[];
+
+        const isAdminLike = roleFromProfile === 'admin' || roleFromProfile === 'super_admin';
+        let selectedAcademyId: string | null = null;
+        if (isAdminLike && typeof window !== 'undefined') {
+          const stored = window.localStorage.getItem('selectedAcademyId');
+          selectedAcademyId = stored && stored.trim() ? stored : null;
+        }
+
+        if (isAdminLike) {
+          if (!selectedAcademyId) {
+            effectiveStudents = [];
+            effectiveRawPlans = [];
+          } else {
+            const { data: uaRows, error: uaErr } = await supabase
+              .from('user_academies')
+              .select('user_id, role, academy_id')
+              .eq('academy_id', selectedAcademyId);
+            if (uaErr) throw uaErr;
+
+            const rows = (uaRows as { user_id: string | null; role: string; academy_id: string | null }[] | null) ?? [];
+            const studentUserIds = new Set(
+              rows
+                .filter((r) => r.role === 'student' && r.user_id)
+                .map((r) => r.user_id as string)
+            );
+
+            effectiveStudents = studentsData.filter((s) => s.user_id && studentUserIds.has(s.user_id));
+
+            if (selectedAcademyId) {
+              effectiveRawPlans = effectiveRawPlans.filter((p) => p.academy_id === selectedAcademyId);
+            }
+          }
+        }
+
+        console.log('StudentsPage load:', { roleFromProfile, studentsCount: effectiveStudents.length });
+
+        const plansData: StudentPlanRow[] = effectiveRawPlans.map((p) => ({
           id: p.id as string,
           student_id: p.student_id as string,
           plan_id: (p.plan_id as string | null) ?? null,
@@ -146,12 +183,13 @@ export default function StudentsPage() {
                 name: (Array.isArray(p.plans) ? p.plans[0]?.name : p.plans.name) ?? null,
               }
             : null,
+          academy_id: (p.academy_id as string | null) ?? null,
         }));
 
         // Cargar perfiles para obtener el full_name de cada alumno (cuando tenga user vinculado)
         const userIds = Array.from(
           new Set(
-            studentsData
+            effectiveStudents
               .map((s) => s.user_id)
               .filter((id): id is string => !!id)
           )
@@ -225,7 +263,7 @@ export default function StudentsPage() {
           }, {});
         }
 
-        setStudents(studentsData);
+        setStudents(effectiveStudents);
 
         let selfRow: StudentRow | null = null;
         if (roleFromProfile === 'student') {
