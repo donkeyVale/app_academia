@@ -339,9 +339,10 @@ export default function SchedulePage() {
         }
       }
 
-      // Si hay academia seleccionada, filtramos coaches y alumnos por user_academies
+      // Si hay academia seleccionada, filtramos SOLO coaches por user_academies.
+      // Los alumnos no se filtran acá para que siempre podamos resolver sus nombres
+      // en los labels (studentsMap), incluso si la academia seleccionada cambió.
       let finalCoaches = enrichedCoaches;
-      let finalStudents = enrichedStudents;
       if (selectedAcademyId) {
         const { data: uaRows } = await supabase
           .from('user_academies')
@@ -353,27 +354,16 @@ export default function SchedulePage() {
             .filter((r) => r.role === 'coach' && r.user_id)
             .map((r) => r.user_id as string)
         );
-        const studentUserIds = new Set(
-          ((uaRows as { user_id: string | null; role: string }[] | null) ?? [])
-            .filter((r) => r.role === 'student' && r.user_id)
-            .map((r) => r.user_id as string)
-        );
 
         if (coachUserIds.size > 0) {
           finalCoaches = enrichedCoaches.filter((c) => c.user_id && coachUserIds.has(c.user_id));
         } else {
           finalCoaches = [];
         }
-
-        if (studentUserIds.size > 0) {
-          finalStudents = enrichedStudents.filter((s) => s.user_id && studentUserIds.has(s.user_id));
-        } else {
-          finalStudents = [];
-        }
       }
 
       setCoaches(finalCoaches);
-      setStudents(finalStudents);
+      setStudents(enrichedStudents);
 
       // Load classes in a safe window (from last 24h to next 90 days) para poder ver varias clases recurrentes futuras
       const now = new Date();
