@@ -129,7 +129,9 @@ export default function HomePage() {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarOffsetX, setAvatarOffsetX] = useState(0);
   const [avatarOffsetY, setAvatarOffsetY] = useState(0);
-
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+  const [academyOptions, setAcademyOptions] = useState<{ id: string; name: string }[]>([]);
+  const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
   const [activePlansCount, setActivePlansCount] = useState(0);
   const [studentsWithPlanCount, setStudentsWithPlanCount] = useState(0);
   const [todayClassesCount, setTodayClassesCount] = useState(0);
@@ -138,7 +140,6 @@ export default function HomePage() {
   const [showInstallHelpOpen, setShowInstallHelpOpen] = useState(false);
   const [showInstallPopup, setShowInstallPopup] = useState(false);
   const [popupDontShowAgain, setPopupDontShowAgain] = useState(false);
-  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
 
   // métricas específicas para coach
   const [coachTodayClasses, setCoachTodayClasses] = useState(0);
@@ -185,6 +186,56 @@ export default function HomePage() {
           setRole(r);
         } else {
           setRole(null);
+        }
+
+        // Cargar academias asignadas al usuario (para selector de academia actual)
+        try {
+          const { data: uaRows, error: uaErr } = await supabase
+            .from('user_academies')
+            .select('academy_id')
+            .eq('user_id', userId);
+
+          if (!uaErr && uaRows) {
+            const academyIds = Array.from(
+              new Set(
+                (uaRows as { academy_id: string | null }[])
+                  .map((row) => row.academy_id)
+                  .filter((id): id is string => !!id)
+              )
+            );
+
+            if (academyIds.length > 0) {
+              const { data: acadRows, error: acadErr } = await supabase
+                .from('academies')
+                .select('id,name')
+                .in('id', academyIds)
+                .order('name');
+
+              if (!acadErr && acadRows) {
+                const options = (acadRows as { id: string; name: string | null }[]).map((a) => ({
+                  id: a.id,
+                  name: a.name ?? a.id,
+                }));
+                setAcademyOptions(options);
+
+                let stored: string | null = null;
+                if (typeof window !== 'undefined') {
+                  stored = window.localStorage.getItem('selectedAcademyId');
+                }
+                const validIds = options.map((o) => o.id);
+                const initial = stored && validIds.includes(stored) ? stored : validIds[0] ?? null;
+                setSelectedAcademyId(initial);
+                if (initial && typeof window !== 'undefined') {
+                  window.localStorage.setItem('selectedAcademyId', initial);
+                }
+              }
+            } else {
+              setAcademyOptions([]);
+              setSelectedAcademyId(null);
+            }
+          }
+        } catch {
+          setAcademyOptions([]);
         }
       }
 
@@ -824,6 +875,27 @@ export default function HomePage() {
         studentsLabel={role === 'student' ? 'Mi cuenta' : 'Alumnos'}
         rightSlot={(
           <>
+            {academyOptions.length > 0 && (
+              <div className="mr-2">
+                <select
+                  value={selectedAcademyId ?? ''}
+                  onChange={(e) => {
+                    const next = e.target.value || null;
+                    setSelectedAcademyId(next);
+                    if (typeof window !== 'undefined' && next) {
+                      window.localStorage.setItem('selectedAcademyId', next);
+                    }
+                  }}
+                  className="border border-gray-300 rounded-md px-2 py-1 text-[11px] bg-white max-w-[160px] truncate"
+                >
+                  {academyOptions.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <FooterAvatarButton
               avatarUrl={avatarUrl}
               initials={initials}
