@@ -353,12 +353,12 @@ export default function HomePage() {
 
           // 3) Profesores / Alumnos: contamos directamente desde user_academies por rol
           if (selectedAcademyId) {
-            const [coachLikeRes, studRes] = await Promise.all([
+            const [coachRes, studRes] = await Promise.all([
               supabase
                 .from('user_academies')
                 .select('id', { count: 'exact', head: true })
                 .eq('academy_id', selectedAcademyId)
-                .in('role', ['coach', 'admin']),
+                .eq('role', 'coach'),
               supabase
                 .from('user_academies')
                 .select('id', { count: 'exact', head: true })
@@ -366,10 +366,10 @@ export default function HomePage() {
                 .eq('role', 'student'),
             ]);
 
-            if (coachLikeRes.error) throw coachLikeRes.error;
+            if (coachRes.error) throw coachRes.error;
             if (studRes.error) throw studRes.error;
 
-            setCoachesCount(coachLikeRes.count ?? 0);
+            setCoachesCount(coachRes.count ?? 0);
             setStudentsCount(studRes.count ?? 0);
           } else {
             setCoachesCount(0);
