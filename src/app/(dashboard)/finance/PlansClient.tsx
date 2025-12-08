@@ -114,6 +114,7 @@ type StudentPlanRow = {
   final_price?: number | null;
   plans: { name: string; classes_included: number } | null;
   students: { level: string | null; notes: string | null } | null;
+  academy_id?: string | null;
 };
 
 type PaymentRow = {
@@ -201,6 +202,14 @@ export default function PlansClient() {
     (async () => {
       setLoading(true);
       setError(null);
+
+      // Leer academia seleccionada desde localStorage (lado cliente)
+      let selectedAcademyId: string | null = null;
+      if (typeof window !== 'undefined') {
+        const stored = window.localStorage.getItem('selectedAcademyId');
+        selectedAcademyId = stored && stored.trim() ? stored : null;
+      }
+
       const { data: plansData, error: pErr } = await supabase
         .from('plans')
         .select('id,name,classes_included,price_cents,currency')
@@ -246,15 +255,41 @@ export default function PlansClient() {
           }
         }
       }
+      // Si hay academia seleccionada, filtramos alumnos por user_academies (rol student)
+      let finalStudents = enrichedStudents;
+      if (selectedAcademyId) {
+        const { data: uaRows, error: uaErr } = await supabase
+          .from('user_academies')
+          .select('user_id, role, academy_id')
+          .eq('academy_id', selectedAcademyId);
+        if (uaErr) {
+          setError(uaErr.message);
+        } else {
+          const rows = (uaRows as { user_id: string | null; role: string; academy_id: string | null }[] | null) ?? [];
+          const studentUserIds = new Set(
+            rows
+              .filter((r) => r.role === 'student' && r.user_id)
+              .map((r) => r.user_id as string)
+          );
+          finalStudents = enrichedStudents.filter((s) => s.user_id && studentUserIds.has(s.user_id));
+        }
+      }
 
-      setStudents(enrichedStudents);
+      setStudents(finalStudents);
 
       const { data: spData, error: spErr } = await supabase
         .from('student_plans')
-        .select('id,student_id,plan_id,remaining_classes,purchased_at,base_price,discount_type,discount_value,final_price,plans(name,classes_included),students(level,notes)')
+        .select('id,student_id,plan_id,remaining_classes,purchased_at,base_price,discount_type,discount_value,final_price,academy_id,plans(name,classes_included),students(level,notes)')
         .order('purchased_at', { ascending: false });
       if (spErr) setError(spErr.message);
-      setStudentPlans(((spData ?? []) as unknown as StudentPlanRow[]));
+
+      let finalStudentPlans: StudentPlanRow[] = ((spData ?? []) as unknown as StudentPlanRow[]);
+      if (selectedAcademyId) {
+        finalStudentPlans = finalStudentPlans.filter((sp) => sp.academy_id === selectedAcademyId);
+      }
+      setStudentPlans(finalStudentPlans);
+
+      const allowedPlanIds = new Set(finalStudentPlans.map((sp) => sp.id));
 
       const { data: payData, error: payErr } = await supabase
         .from('payments')
@@ -262,7 +297,11 @@ export default function PlansClient() {
         .order('payment_date', { ascending: false })
         .limit(10);
       if (payErr) setError(payErr.message);
-      setPayments(((payData ?? []) as unknown as PaymentRow[]));
+      const allPayments = ((payData ?? []) as unknown as PaymentRow[]);
+      const filteredPayments = selectedAcademyId
+        ? allPayments.filter((p) => allowedPlanIds.has(p.student_plan_id))
+        : allPayments;
+      setPayments(filteredPayments);
 
       const { data: payAggData, error: payAggErr } = await supabase
         .from('payments')
@@ -271,6 +310,7 @@ export default function PlansClient() {
         const map: Record<string, number> = {};
         (payAggData as { student_plan_id: string; amount: number; status: string }[]).forEach((p) => {
           if (p.status !== 'pagado') return;
+          if (selectedAcademyId && !allowedPlanIds.has(p.student_plan_id)) return;
           map[p.student_plan_id] = (map[p.student_plan_id] ?? 0) + (p.amount ?? 0);
         });
         setPaymentsByPlan(map);
@@ -601,6 +641,19 @@ export default function PlansClient() {
         setSaving(false);
         return;
       }
+      // Asociar el plan al alumno dentro de la academia seleccionada
+      let selectedAcademyId: string | null = null;
+      if (typeof window !== 'undefined') {
+        const stored = window.localStorage.getItem('selectedAcademyId');
+        selectedAcademyId = stored && stored.trim() ? stored : null;
+      }
+      if (!selectedAcademyId) {
+        const msg = 'Debes seleccionar una academia antes de asignar un plan.';
+        toast.error(msg);
+        setSaving(false);
+        return;
+      }
+
       const { error: insErr } = await supabase.from('student_plans').insert({
         student_id: selectedStudentId,
         plan_id: selectedPlanId,
@@ -609,15 +662,21 @@ export default function PlansClient() {
         discount_type: discountType,
         discount_value: discountNum,
         final_price: finalPrice,
+        academy_id: selectedAcademyId,
       });
       if (insErr) throw insErr;
 
       const { data: spData, error: spErr } = await supabase
         .from('student_plans')
-        .select('id,student_id,plan_id,remaining_classes,purchased_at,base_price,discount_type,discount_value,final_price,plans(name,classes_included),students(level,notes)')
+        .select('id,student_id,plan_id,remaining_classes,purchased_at,base_price,discount_type,discount_value,final_price,academy_id,plans(name,classes_included),students(level,notes)')
         .order('purchased_at', { ascending: false });
       if (spErr) throw spErr;
-      setStudentPlans(((spData ?? []) as unknown as StudentPlanRow[]));
+
+      let refreshedPlans: StudentPlanRow[] = ((spData ?? []) as unknown as StudentPlanRow[]);
+      if (selectedAcademyId) {
+        refreshedPlans = refreshedPlans.filter((sp) => sp.academy_id === selectedAcademyId);
+      }
+      setStudentPlans(refreshedPlans);
 
       setSelectedStudentId('');
       setSelectedPlanId('');
