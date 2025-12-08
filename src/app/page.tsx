@@ -132,6 +132,7 @@ export default function HomePage() {
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [academyOptions, setAcademyOptions] = useState<{ id: string; name: string }[]>([]);
   const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
+  const [academyLocationIds, setAcademyLocationIds] = useState<Set<string>>(new Set());
   const [activePlansCount, setActivePlansCount] = useState(0);
   const [studentsWithPlanCount, setStudentsWithPlanCount] = useState(0);
   const [todayClassesCount, setTodayClassesCount] = useState(0);
@@ -276,16 +277,11 @@ export default function HomePage() {
 
         if (role === 'admin' || role === 'super_admin' || role === null) {
           // Dashboard global para admin (y fallback cuando aún no se cargó role)
-          const [spRes, clsRes, coachRes, studRes] = await Promise.all([
+          const [spRes, coachRes, studRes] = await Promise.all([
             supabase
               .from('student_plans')
               .select('student_id,plan_id,remaining_classes')
               .gt('remaining_classes', 0),
-            supabase
-              .from('class_sessions')
-              .select('id', { count: 'exact', head: true })
-              .gte('date', start.toISOString())
-              .lte('date', end.toISOString()),
             supabase
               .from('coaches')
               .select('id', { count: 'exact', head: true }),
@@ -295,7 +291,6 @@ export default function HomePage() {
           ]);
 
           if (spRes.error) throw spRes.error;
-          if (clsRes.error) throw clsRes.error;
           if (coachRes.error) throw coachRes.error;
           if (studRes.error) throw studRes.error;
 
@@ -309,7 +304,29 @@ export default function HomePage() {
 
           setActivePlansCount(planIds.size);
           setStudentsWithPlanCount(studentIds.size);
-          setTodayClassesCount(clsRes.count ?? 0);
+          // Clases de hoy filtradas por academia (si hay academia seleccionada)
+          let todayCount = 0;
+          if (selectedAcademyId && academyLocationIds.size > 0) {
+            const locationIds = Array.from(academyLocationIds);
+            const { count, error: clsErr } = await supabase
+              .from('class_sessions')
+              .select('id, courts!inner(location_id)', { count: 'exact', head: true })
+              .gte('date', start.toISOString())
+              .lte('date', end.toISOString())
+              .in('courts.location_id', locationIds);
+            if (clsErr) throw clsErr;
+            todayCount = count ?? 0;
+          } else {
+            const { count, error: clsErr } = await supabase
+              .from('class_sessions')
+              .select('id', { count: 'exact', head: true })
+              .gte('date', start.toISOString())
+              .lte('date', end.toISOString());
+            if (clsErr) throw clsErr;
+            todayCount = count ?? 0;
+          }
+
+          setTodayClassesCount(todayCount);
           setCoachesCount(coachRes.count ?? 0);
           setStudentsCount(studRes.count ?? 0);
         } else if (role === 'coach' && userId) {
@@ -448,7 +465,37 @@ export default function HomePage() {
     })();
 
     return () => { active = false; };
-  }, [supabase, role]);
+  }, [supabase, role, selectedAcademyId, academyLocationIds]);
+
+  // Cargar locations vinculadas a la academia seleccionada (para filtrar métricas por sede)
+  useEffect(() => {
+    if (!selectedAcademyId) {
+      setAcademyLocationIds(new Set());
+      return;
+    }
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('academy_locations')
+          .select('location_id')
+          .eq('academy_id', selectedAcademyId);
+        if (error) {
+          console.error('Error cargando academy_locations en Home', error);
+          setAcademyLocationIds(new Set());
+          return;
+        }
+        const ids = new Set(
+          (data as { location_id: string | null }[] | null ?? [])
+            .map((row) => row.location_id)
+            .filter((id): id is string => !!id)
+        );
+        setAcademyLocationIds(ids);
+      } catch (e) {
+        console.error('Error cargando academy_locations en Home', e);
+        setAcademyLocationIds(new Set());
+      }
+    })();
+  }, [selectedAcademyId, supabase]);
 
   // Registro de service worker y suscripción Web Push
   useEffect(() => {
