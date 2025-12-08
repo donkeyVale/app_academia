@@ -510,9 +510,15 @@ export default function UsersPage() {
           <Users className="h-5 w-5 text-[#3cadaf] flex-shrink-0" />
           <div className="space-y-0.5">
             <h1 className="text-2xl font-semibold text-[#31435d]">Usuarios</h1>
-            <p className="text-sm text-gray-600">
-              Creá usuarios de acceso al sistema y asignales uno o varios roles.
-            </p>
+            {isSuperAdmin ? (
+              <p className="text-sm text-gray-600">
+                Creá usuarios de acceso al sistema y asignales uno o varios roles.
+              </p>
+            ) : (
+              <p className="text-sm text-gray-600">
+                Como administrador podés consultar los usuarios vinculados a la academia seleccionada. Solo el super administrador puede crear o editar usuarios.
+              </p>
+            )}
           </div>
         </div>
         <div className="flex items-center justify-end flex-1">
