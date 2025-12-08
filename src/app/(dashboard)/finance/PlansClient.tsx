@@ -92,6 +92,7 @@ type Plan = {
   classes_included: number;
   price_cents: number;
   currency: string;
+  academy_id?: string | null;
 };
 
 type Student = {
@@ -212,10 +213,14 @@ export default function PlansClient() {
 
       const { data: plansData, error: pErr } = await supabase
         .from('plans')
-        .select('id,name,classes_included,price_cents,currency')
+        .select('id,name,classes_included,price_cents,currency,academy_id')
         .order('classes_included');
       if (pErr) setError(pErr.message);
-      setPlans((plansData as Plan[]) ?? []);
+      let loadedPlans: Plan[] = (plansData as Plan[]) ?? [];
+      if (selectedAcademyId) {
+        loadedPlans = loadedPlans.filter((p) => p.academy_id === selectedAcademyId);
+      }
+      setPlans(loadedPlans);
 
       const { data: studentsData, error: sErr } = await supabase
         .from('students')
@@ -348,20 +353,37 @@ export default function PlansClient() {
         setSaving(false);
         return;
       }
+      // Asociar plan a la academia seleccionada
+      let selectedAcademyId: string | null = null;
+      if (typeof window !== 'undefined') {
+        const stored = window.localStorage.getItem('selectedAcademyId');
+        selectedAcademyId = stored && stored.trim() ? stored : null;
+      }
+      if (!selectedAcademyId) {
+        const msg = 'Debes seleccionar una academia antes de crear un plan.';
+        setError(msg);
+        toast.error(msg);
+        setSaving(false);
+        return;
+      }
+
       const { error: insErr } = await supabase.from('plans').insert({
         name: planName.trim(),
         classes_included: classes,
         price_cents: price,
         currency: 'PYG',
+        academy_id: selectedAcademyId,
       });
       if (insErr) throw insErr;
 
       const { data: plansData, error: pErr } = await supabase
         .from('plans')
-        .select('id,name,classes_included,price_cents,currency')
+        .select('id,name,classes_included,price_cents,currency,academy_id')
         .order('classes_included');
       if (pErr) throw pErr;
-      setPlans((plansData as Plan[]) ?? []);
+      let reloadedPlans: Plan[] = (plansData as Plan[]) ?? [];
+      reloadedPlans = reloadedPlans.filter((p) => p.academy_id === selectedAcademyId);
+      setPlans(reloadedPlans);
 
       setPlanName('');
       setPlanClasses('');
@@ -400,12 +422,23 @@ export default function PlansClient() {
       const { error: delErr } = await supabase.from('plans').delete().eq('id', plan.id);
       if (delErr) throw delErr;
 
+      let selectedAcademyId: string | null = null;
+      if (typeof window !== 'undefined') {
+        const stored = window.localStorage.getItem('selectedAcademyId');
+        selectedAcademyId = stored && stored.trim() ? stored : null;
+      }
+
       const { data: plansData, error: pErr } = await supabase
         .from('plans')
-        .select('id,name,classes_included,price_cents,currency')
+        .select('id,name,classes_included,price_cents,currency,academy_id')
         .order('classes_included');
       if (pErr) throw pErr;
-      setPlans((plansData as Plan[]) ?? []);
+      let reloadedPlans: Plan[] = (plansData as Plan[]) ?? [];
+      if (selectedAcademyId) {
+        reloadedPlans = reloadedPlans.filter((p) => p.academy_id === selectedAcademyId);
+      }
+      setPlans(reloadedPlans);
+
       toast.success('Plan eliminado correctamente');
     } catch (err: any) {
       const msg = err.message || 'Error eliminando plan';
@@ -460,12 +493,22 @@ export default function PlansClient() {
         .eq('id', editingPlanId);
       if (updErr) throw updErr;
 
+      let selectedAcademyId: string | null = null;
+      if (typeof window !== 'undefined') {
+        const stored = window.localStorage.getItem('selectedAcademyId');
+        selectedAcademyId = stored && stored.trim() ? stored : null;
+      }
+
       const { data: plansData, error: pErr } = await supabase
         .from('plans')
-        .select('id,name,classes_included,price_cents,currency')
+        .select('id,name,classes_included,price_cents,currency,academy_id')
         .order('classes_included');
       if (pErr) throw pErr;
-      setPlans((plansData as Plan[]) ?? []);
+      let reloadedPlans: Plan[] = (plansData as Plan[]) ?? [];
+      if (selectedAcademyId) {
+        reloadedPlans = reloadedPlans.filter((p) => p.academy_id === selectedAcademyId);
+      }
+      setPlans(reloadedPlans);
 
       setEditingPlanId(null);
       setEditPlanName('');
