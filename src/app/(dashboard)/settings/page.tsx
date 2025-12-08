@@ -15,6 +15,8 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [notifyClasses, setNotifyClasses] = useState<boolean>(true);
   const [role, setRole] = useState<AppRole>(null);
+  const [academyOptions, setAcademyOptions] = useState<{ id: string; name: string }[]>([]);
+  const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -47,6 +49,56 @@ export default function SettingsPage() {
           setRole(r);
         } else {
           setRole(null);
+        }
+
+        // Cargar academias asignadas al usuario (para seleccionar academia actual)
+        try {
+          const { data: uaRows, error: uaErr } = await supabase
+            .from("user_academies")
+            .select("academy_id")
+            .eq("user_id", user.id);
+
+          if (!uaErr && uaRows) {
+            const academyIds = Array.from(
+              new Set(
+                (uaRows as { academy_id: string | null }[])
+                  .map((row) => row.academy_id)
+                  .filter((id): id is string => !!id)
+              )
+            );
+
+            if (academyIds.length > 0) {
+              const { data: acadRows, error: acadErr } = await supabase
+                .from("academies")
+                .select("id,name")
+                .in("id", academyIds)
+                .order("name");
+
+              if (!acadErr && acadRows) {
+                const options = (acadRows as { id: string; name: string | null }[]).map((a) => ({
+                  id: a.id,
+                  name: a.name ?? a.id,
+                }));
+                setAcademyOptions(options);
+
+                let stored: string | null = null;
+                if (typeof window !== "undefined") {
+                  stored = window.localStorage.getItem("selectedAcademyId");
+                }
+                const validIds = options.map((o) => o.id);
+                const initial = stored && validIds.includes(stored) ? stored : validIds[0] ?? null;
+                setSelectedAcademyId(initial);
+                if (initial && typeof window !== "undefined") {
+                  window.localStorage.setItem("selectedAcademyId", initial);
+                }
+              }
+            } else {
+              setAcademyOptions([]);
+              setSelectedAcademyId(null);
+            }
+          }
+        } catch {
+          setAcademyOptions([]);
         }
       } catch (err: any) {
         setError(err?.message ?? "Error cargando configuración.");
@@ -148,6 +200,39 @@ export default function SettingsPage() {
           {saving && <p className="text-xs text-gray-500">Guardando cambios...</p>}
         </div>
       </div>
+
+      {academyOptions.length > 0 && (
+        <div className="border rounded-lg bg-white shadow-sm border-t-4 border-emerald-500">
+          <div className="px-4 py-3 border-b bg-gray-50 rounded-t-lg">
+            <p className="text-sm font-semibold text-[#31435d]">Academia actual</p>
+          </div>
+          <div className="px-4 py-4 space-y-3 text-sm">
+            <p className="text-xs text-gray-600">
+              Seleccioná con qué academia querés trabajar. Esta elección se usará para filtrar los datos cuando tengas varias academias asignadas.
+            </p>
+            <div className="flex flex-col gap-1 max-w-xs">
+              <label className="text-xs font-medium text-gray-700">Academia</label>
+              <select
+                value={selectedAcademyId ?? ""}
+                onChange={(e) => {
+                  const next = e.target.value || null;
+                  setSelectedAcademyId(next);
+                  if (typeof window !== "undefined" && next) {
+                    window.localStorage.setItem("selectedAcademyId", next);
+                  }
+                }}
+                className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#3cadaf] focus:border-[#3cadaf] bg-white"
+              >
+                {academyOptions.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
 
       {role === "super_admin" && (
         <div className="border rounded-lg bg-white shadow-sm border-t-4 border-indigo-500">

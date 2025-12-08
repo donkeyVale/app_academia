@@ -875,27 +875,6 @@ export default function HomePage() {
         studentsLabel={role === 'student' ? 'Mi cuenta' : 'Alumnos'}
         rightSlot={(
           <>
-            {academyOptions.length > 0 && (
-              <div className="mr-2">
-                <select
-                  value={selectedAcademyId ?? ''}
-                  onChange={(e) => {
-                    const next = e.target.value || null;
-                    setSelectedAcademyId(next);
-                    if (typeof window !== 'undefined' && next) {
-                      window.localStorage.setItem('selectedAcademyId', next);
-                    }
-                  }}
-                  className="border border-gray-300 rounded-md px-2 py-1 text-[11px] bg-white max-w-[160px] truncate"
-                >
-                  {academyOptions.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
             <FooterAvatarButton
               avatarUrl={avatarUrl}
               initials={initials}
