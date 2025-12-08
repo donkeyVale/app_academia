@@ -381,7 +381,27 @@ export default function ReportsPage() {
           .from("students")
           .select("id,user_id,level,notes");
         if (sErr) throw sErr;
-        const studentsRaw = (studs ?? []) as { id: string; user_id: string | null; level: string | null; notes: string | null }[];
+        let studentsRaw = (studs ?? []) as { id: string; user_id: string | null; level: string | null; notes: string | null }[];
+
+        // Filtrar alumnos por academia seleccionada usando student_plans.academy_id
+        if (selectedAcademyId) {
+          const { data: spData, error: spErr } = await supabase
+            .from("student_plans")
+            .select("student_id,academy_id")
+            .eq("academy_id", selectedAcademyId);
+          if (spErr) throw spErr;
+          const allowedStudentIds = new Set<string>(
+            ((spData ?? []) as { student_id: string | null; academy_id: string | null }[])
+              .map((r) => r.student_id)
+              .filter((id): id is string => !!id)
+          );
+          studentsRaw = studentsRaw.filter((s) => allowedStudentIds.has(s.id));
+        } else {
+          // Sin academia seleccionada: no mostramos alumnos en el selector
+          setAttendanceStudents([]);
+          return;
+        }
+
         const userIds = Array.from(
           new Set(
             studentsRaw
