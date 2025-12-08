@@ -134,6 +134,33 @@ export default function SettingsPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-start gap-2">
+            <Bell className="h-5 w-5 text-[#3cadaf] flex-shrink-0" />
+            <div className="space-y-0.5">
+              <h1 className="text-2xl font-semibold text-[#31435d]">Configuración</h1>
+              <p className="text-sm text-gray-600">Cargando tu configuración...</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-end flex-1">
+            <div className="h-16 w-32 relative opacity-60">
+              <Image
+                src="/icons/logoHome.png"
+                alt="Agendo"
+                fill
+                className="object-contain"
+                priority
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4">
       <div className="flex items-start justify-between gap-4">
