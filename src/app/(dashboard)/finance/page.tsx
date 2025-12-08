@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import PlansClient from './PlansClient';
 import { CreditCard } from 'lucide-react';
 import { createClientBrowser } from '@/lib/supabase';
+import { formatPyg } from '@/lib/formatters';
 
 type Role = 'super_admin' | 'admin' | 'coach' | 'student' | null;
 
@@ -13,6 +14,7 @@ type StudentFinanceSummary = {
   planName: string | null;
   totalClasses: number | null;
   remainingClasses: number | null;
+  planTotal: number | null;
 };
 
 type StudentPayment = {
@@ -117,7 +119,7 @@ export default function FinancePage() {
         // Último plan del alumno para la academia seleccionada, con join al plan
         const { data: spData, error: spErr } = await supabase
           .from('student_plans')
-          .select('id, remaining_classes, academy_id, plans(name,classes_included)')
+          .select('id, remaining_classes, academy_id, base_price, final_price, plans(name,classes_included)')
           .eq('student_id', studentId)
           .eq('academy_id', selectedAcademyId)
           .order('purchased_at', { ascending: false })
@@ -144,10 +146,15 @@ export default function FinancePage() {
           const effectiveRemaining = baseRemaining != null ? Math.max(0, baseRemaining - usedCount) : null;
           const totalClasses = (row.plans?.classes_included as number | null) ?? baseRemaining;
 
+          const basePrice = (row.base_price as number | null) ?? null;
+          const finalPrice = (row.final_price as number | null) ?? null;
+          const planTotal = finalPrice ?? basePrice ?? null;
+
           setSummary({
             planName: (row.plans?.name as string | null) ?? null,
             totalClasses,
             remainingClasses: effectiveRemaining,
+            planTotal,
           });
         }
 
@@ -254,6 +261,12 @@ export default function FinancePage() {
 
   // Vista de "Mi cuenta" para alumno (rol student)
   if (role === 'student') {
+    const planTotal = summary?.planTotal ?? null;
+    const totalPaid = payments.reduce(
+      (acc, p) => (p.status === 'pagado' ? acc + (p.amount ?? 0) : acc),
+      0,
+    );
+
     return (
       <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4">
         <div className="flex items-start justify-between gap-4">
@@ -279,17 +292,96 @@ export default function FinancePage() {
               </div>
             </Link>
           </div>
+          </div>
+
+        {/* Card de pagos recientes, replicando estilo de StudentsPage */}
+        <div className="border rounded-lg bg-white shadow-sm border-t-4 border-[#3cadaf]">
+          <div className="px-4 py-3 border-b bg-gray-50 rounded-t-lg flex items-center justify-between">
+            <p className="text-sm font-semibold text-[#31435d]">Tus pagos recientes</p>
+            <div className="text-[11px] text-gray-600">
+              {planTotal != null ? (
+                <>
+                  <span className="font-semibold text-[#31435d]">Pagado:</span>{' '}
+                  {formatPyg(totalPaid)} / {formatPyg(planTotal)} PYG
+                </>
+              ) : (
+                <span>Sin monto total definido para el plan.</span>
+              )}
+            </div>
+          </div>
+          <div className="px-4 py-3 text-sm">
+            {loading ? (
+              <p className="text-gray-600">Cargando pagos...</p>
+            ) : payments.length === 0 ? (
+              <p className="text-gray-600">Todavía no registramos pagos a tu nombre.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[320px] text-xs border-collapse">
+                  <thead>
+                    <tr className="border-b bg-gray-50 text-gray-600">
+                      <th className="py-2 px-2 text-left font-medium">Fecha</th>
+                      <th className="py-2 px-2 text-left font-medium">Método</th>
+                      <th className="py-2 px-2 text-right font-medium">Monto</th>
+                      <th className="py-2 px-2 text-center font-medium">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payments.map((p) => {
+                      const d = new Date(p.payment_date);
+                      const yyyy = d.getFullYear();
+                      const mm = String(d.getMonth() + 1).padStart(2, '0');
+                      const dd = String(d.getDate()).padStart(2, '0');
+                      return (
+                        <tr key={p.id} className="border-b last:border-b-0">
+                          <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
+                          <td className="py-1.5 px-2 capitalize">{p.method}</td>
+                          <td className="py-1.5 px-2 text-right">
+                            {formatPyg(p.amount)} {p.currency}
+                          </td>
+                          <td className="py-1.5 px-2 text-center">
+                            <span
+                              className={
+                                'inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold ' +
+                                (p.status === 'pagado'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                  : 'bg-amber-50 text-amber-700 border border-amber-100')
+                              }
+                            >
+                              {p.status}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="border rounded-lg bg-white shadow-sm p-4">
-            <h2 className="text-lg font-semibold text-[#31435d] mb-2">Resumen de tu cuenta</h2>
+        {/* Card de resumen de cuenta, replicando estilo general de StudentsPage */}
+        <div className="border rounded-lg bg-white shadow-sm border-t-4 border-[#3cadaf]">
+          <div className="px-4 py-3 border-b bg-gray-50 rounded-t-lg flex items-center justify-between">
+            <p className="text-sm font-semibold text-[#31435d]">Resumen de tu cuenta</p>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                className="inline-flex items-center rounded-full bg-[#3cadaf] hover:bg-[#31435d] text-white text-xs font-semibold px-3 py-1.5 transition-colors disabled:opacity-60"
+                // Sin funcionalidad por ahora; se implementará cuando se integren pagos online
+                disabled={loading}
+              >
+                Pagar ahora
+              </button>
+            </div>
+          </div>
+          <div className="px-4 py-3 text-sm">
             {loading ? (
-              <p className="text-sm text-gray-600">Cargando...</p>
+              <p className="text-gray-600">Cargando resumen...</p>
             ) : error ? (
               <p className="text-sm text-red-600">{error}</p>
             ) : !summary ? (
-              <p className="text-sm text-gray-600">
+              <p className="text-gray-600">
                 No encontramos un plan activo para la academia seleccionada.
               </p>
             ) : (
@@ -304,32 +396,6 @@ export default function FinancePage() {
                   <span className="font-semibold">Clases restantes:</span> {summary.remainingClasses ?? '-'}
                 </p>
               </div>
-            )}
-          </div>
-
-          <div className="border rounded-lg bg-white shadow-sm p-4">
-            <h2 className="text-lg font-semibold text-[#31435d] mb-2">Tus pagos recientes</h2>
-            {loading ? (
-              <p className="text-sm text-gray-600">Cargando...</p>
-            ) : payments.length === 0 ? (
-              <p className="text-sm text-gray-600">
-                No registramos pagos recientes en la academia seleccionada.
-              </p>
-            ) : (
-              <ul className="text-sm space-y-1">
-                {payments.map((p) => (
-                  <li key={p.id} className="flex items-center justify-between">
-                    <div>
-                      <div className="font-medium text-[#31435d]">
-                        {p.amount} {p.currency}
-                      </div>
-                      <div className="text-xs text-gray-600 capitalize">
-                        {new Date(p.payment_date).toLocaleDateString()} • {p.method} • {p.status}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
             )}
           </div>
         </div>
