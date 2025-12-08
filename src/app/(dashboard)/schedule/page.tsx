@@ -1036,16 +1036,30 @@ export default function SchedulePage() {
   const studentPastClasses = useMemo(() => {
     if (role !== 'student' || !studentId) return [];
     const now = new Date();
+
+    // Mapa rápido de court_id -> location_id para poder filtrar por academia
+    const courtLocationMap = new Map<string, string | null>();
+    courts.forEach((c) => {
+      courtLocationMap.set(c.id, c.location_id);
+    });
+
     return classes
       .filter((cls) => {
         const startTs = new Date(cls.date).getTime();
         // Consideramos "pasada" cualquier clase que ya haya comenzado
         if (startTs >= now.getTime()) return false;
+
+        // Filtrar por academia seleccionada si aplica
+        if (selectedAcademyId && academyLocationIds.size > 0) {
+          const courtLocId = cls.court_id ? courtLocationMap.get(cls.court_id) ?? null : null;
+          if (!courtLocId || !academyLocationIds.has(courtLocId)) return false;
+        }
+
         const studentsForClass = studentsByClass[cls.id] ?? [];
         return studentsForClass.includes(studentId);
       })
       .sort((a, b) => b.date.localeCompare(a.date));
-  }, [classes, studentsByClass, role, studentId]);
+  }, [classes, studentsByClass, role, studentId, selectedAcademyId, academyLocationIds, courts]);
 
   // Modal simple para ver los alumnos de una clase
   const [studentsModalClass, setStudentsModalClass] = useState<ClassSession | null>(null);
