@@ -132,6 +132,7 @@ export default function HomePage() {
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [academyOptions, setAcademyOptions] = useState<{ id: string; name: string }[]>([]);
   const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
+  const [hasAcademies, setHasAcademies] = useState<boolean | null>(null);
   const [academyLocationIds, setAcademyLocationIds] = useState<Set<string>>(new Set());
   const [activePlansCount, setActivePlansCount] = useState(0);
   const [studentsWithPlanCount, setStudentsWithPlanCount] = useState(0);
@@ -196,7 +197,10 @@ export default function HomePage() {
             .select('academy_id')
             .eq('user_id', userId);
 
-          if (!uaErr && uaRows) {
+          if (uaErr) {
+            console.error('Error cargando academias del usuario en Home', uaErr);
+            setHasAcademies(false);
+          } else if (uaRows) {
             const academyIds = Array.from(
               new Set(
                 (uaRows as { academy_id: string | null }[])
@@ -206,6 +210,7 @@ export default function HomePage() {
             );
 
             if (academyIds.length > 0) {
+              setHasAcademies(true);
               const { data: acadRows, error: acadErr } = await supabase
                 .from('academies')
                 .select('id,name')
@@ -231,8 +236,7 @@ export default function HomePage() {
                 }
               }
             } else {
-              setAcademyOptions([]);
-              setSelectedAcademyId(null);
+              setHasAcademies(false);
             }
           }
         } catch {
@@ -277,6 +281,16 @@ export default function HomePage() {
 
         if (role === 'admin' || role === 'super_admin' || role === null) {
           // Dashboard para admin / super_admin (y fallback cuando aún no se cargó role)
+
+          // Si el usuario no tiene academias asignadas, mostramos todo en 0
+          if (hasAcademies === false) {
+            setActivePlansCount(0);
+            setStudentsWithPlanCount(0);
+            setTodayClassesCount(0);
+            setCoachesCount(0);
+            setStudentsCount(0);
+            return;
+          }
 
           // 1) Planes activos y alumnos con plan (filtrados por academia si aplica)
           let spQuery = supabase
@@ -516,7 +530,7 @@ export default function HomePage() {
     })();
 
     return () => { active = false; };
-  }, [supabase, role, selectedAcademyId, academyLocationIds]);
+  }, [supabase, role, selectedAcademyId, academyLocationIds, hasAcademies]);
 
   // Cargar locations vinculadas a la academia seleccionada (para filtrar métricas por sede)
   useEffect(() => {
@@ -662,6 +676,16 @@ export default function HomePage() {
           <AgendoLogo />
         </div>
       </div>
+
+      {isAdminRole && hasAcademies === false && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex items-start gap-2">
+          <span className="mt-0.5">⚠️</span>
+          <p>
+            No tenés ninguna academia asignada. Pedí a un super admin que te asigne al menos una academia
+            para ver las métricas. Mientras tanto, todos los contadores se muestran en 0.
+          </p>
+        </div>
+      )}
 
       {(!role || isAdminRole) && (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
