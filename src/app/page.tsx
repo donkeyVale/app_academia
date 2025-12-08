@@ -396,17 +396,34 @@ export default function HomePage() {
             setCoachWeekClasses(0);
             setCoachActiveStudents(0);
           } else {
-            // Clases de hoy para este coach
-            const { count: todayCount, error: todayErr } = await supabase
-              .from('class_sessions')
-              .select('id', { count: 'exact', head: true })
-              .eq('coach_id', coachId)
-              .gte('date', start.toISOString())
-              .lte('date', end.toISOString());
-            if (todayErr) throw todayErr;
+            const hasLocationFilter = selectedAcademyId && academyLocationIds.size > 0;
+
+            // Clases de hoy para este coach, filtradas por locations de la academia seleccionada si aplica
+            let todayCount: number | null = null;
+            if (hasLocationFilter) {
+              const locationIds = Array.from(academyLocationIds);
+              const { count, error } = await supabase
+                .from('class_sessions')
+                .select('id, courts!inner(location_id)', { count: 'exact', head: true })
+                .eq('coach_id', coachId)
+                .gte('date', start.toISOString())
+                .lte('date', end.toISOString())
+                .in('courts.location_id', locationIds);
+              if (error) throw error;
+              todayCount = count;
+            } else {
+              const { count, error } = await supabase
+                .from('class_sessions')
+                .select('id', { count: 'exact', head: true })
+                .eq('coach_id', coachId)
+                .gte('date', start.toISOString())
+                .lte('date', end.toISOString());
+              if (error) throw error;
+              todayCount = count;
+            }
             setCoachTodayClasses(todayCount ?? 0);
 
-            // Clases de esta semana (Lunes-Domingo) para este coach
+            // Clases de esta semana (Lunes-Domingo) para este coach, filtradas por locations
             const weekStart = new Date(today);
             const dayOfWeek = weekStart.getDay(); // 0=Domingo
             const diffToMonday = (dayOfWeek + 6) % 7; // 0->6,1->0,...
@@ -416,25 +433,56 @@ export default function HomePage() {
             weekEnd.setDate(weekEnd.getDate() + 6);
             weekEnd.setHours(23, 59, 59, 999);
 
-            const { count: weekCount, error: weekErr } = await supabase
-              .from('class_sessions')
-              .select('id', { count: 'exact', head: true })
-              .eq('coach_id', coachId)
-              .gte('date', weekStart.toISOString())
-              .lte('date', weekEnd.toISOString());
-            if (weekErr) throw weekErr;
+            let weekCount: number | null = null;
+            if (hasLocationFilter) {
+              const locationIds = Array.from(academyLocationIds);
+              const { count, error } = await supabase
+                .from('class_sessions')
+                .select('id, courts!inner(location_id)', { count: 'exact', head: true })
+                .eq('coach_id', coachId)
+                .gte('date', weekStart.toISOString())
+                .lte('date', weekEnd.toISOString())
+                .in('courts.location_id', locationIds);
+              if (error) throw error;
+              weekCount = count;
+            } else {
+              const { count, error } = await supabase
+                .from('class_sessions')
+                .select('id', { count: 'exact', head: true })
+                .eq('coach_id', coachId)
+                .gte('date', weekStart.toISOString())
+                .lte('date', weekEnd.toISOString());
+              if (error) throw error;
+              weekCount = count;
+            }
             setCoachWeekClasses(weekCount ?? 0);
 
-            // Alumnos activos: alumnos con reservas en clases futuras de este coach
+            // Alumnos activos: alumnos con reservas en clases futuras de este coach, filtradas por locations
             const futureFrom = new Date();
             const futureTo = new Date(futureFrom.getTime() + 14 * 24 * 60 * 60 * 1000);
-            const { data: futureClasses, error: futureErr } = await supabase
-              .from('class_sessions')
-              .select('id,date')
-              .eq('coach_id', coachId)
-              .gte('date', futureFrom.toISOString())
-              .lte('date', futureTo.toISOString());
-            if (futureErr) throw futureErr;
+
+            let futureClasses: { id: string }[] | null = null;
+            if (hasLocationFilter) {
+              const locationIds = Array.from(academyLocationIds);
+              const { data, error } = await supabase
+                .from('class_sessions')
+                .select('id,date,courts!inner(location_id)')
+                .eq('coach_id', coachId)
+                .gte('date', futureFrom.toISOString())
+                .lte('date', futureTo.toISOString())
+                .in('courts.location_id', locationIds);
+              if (error) throw error;
+              futureClasses = data as { id: string }[] | null;
+            } else {
+              const { data, error } = await supabase
+                .from('class_sessions')
+                .select('id,date')
+                .eq('coach_id', coachId)
+                .gte('date', futureFrom.toISOString())
+                .lte('date', futureTo.toISOString());
+              if (error) throw error;
+              futureClasses = data as { id: string }[] | null;
+            }
 
             const classIds = (futureClasses ?? []).map((c) => c.id as string);
             if (!classIds.length) {
