@@ -267,13 +267,15 @@ export default function SchedulePage() {
           : allLocations;
       setLocations(filteredLocations);
 
-      // Load all courts (filtered client-side by location)
+      // Load all courts (filtered client-side by location, but we'll also use them to map clases -> sedes)
       const { data: courtsData, error: e1 } = await supabase
         .from('courts')
         .select('id,name,location_id')
         .order('name');
       if (e1) setError(e1.message);
-      setCourts((courtsData as any[])?.map((c) => ({ id: c.id, name: c.name, location_id: c.location_id })) ?? []);
+      const courtsArray: Court[] = (courtsData as any[])?.map((c) => ({ id: c.id, name: c.name, location_id: c.location_id })) ?? [];
+      setCourts(courtsArray);
+      const courtLocationMap = new Map(courtsArray.map((c) => [c.id, c.location_id]));
 
       // Load coaches and try to get names from profiles
       const { data: coachesData, error: e2 } = await supabase
@@ -281,7 +283,7 @@ export default function SchedulePage() {
         .select('id,user_id,specialty');
       if (e2) setError(e2.message);
 
-      let enriched: Coach[] = coachesData ?? [];
+      let enrichedCoaches: Coach[] = coachesData ?? [];
       if (coachesData && coachesData.length) {
         const userIds = coachesData.map((c) => c.user_id).filter(Boolean) as string[];
         if (userIds.length) {
@@ -290,10 +292,9 @@ export default function SchedulePage() {
             .select('id, full_name')
             .in('id', userIds);
           const nameMap = new Map((profilesData ?? []).map((p) => [p.id, p.full_name]));
-          enriched = coachesData.map((c) => ({ ...c, full_name: c.user_id ? nameMap.get(c.user_id) ?? null : null }));
+          enrichedCoaches = coachesData.map((c) => ({ ...c, full_name: c.user_id ? nameMap.get(c.user_id) ?? null : null }));
         }
       }
-      setCoaches(enriched);
 
       // Load students (for selection)
       const { data: studs, error: eS } = await supabase
@@ -335,7 +336,41 @@ export default function SchedulePage() {
         }
       }
 
-      setStudents(enrichedStudents);
+      // Si hay academia seleccionada, filtramos coaches y alumnos por user_academies
+      let finalCoaches = enrichedCoaches;
+      let finalStudents = enrichedStudents;
+      if (selectedAcademyId) {
+        const { data: uaRows } = await supabase
+          .from('user_academies')
+          .select('user_id, role')
+          .eq('academy_id', selectedAcademyId);
+
+        const coachUserIds = new Set(
+          ((uaRows as { user_id: string | null; role: string }[] | null) ?? [])
+            .filter((r) => r.role === 'coach' && r.user_id)
+            .map((r) => r.user_id as string)
+        );
+        const studentUserIds = new Set(
+          ((uaRows as { user_id: string | null; role: string }[] | null) ?? [])
+            .filter((r) => r.role === 'student' && r.user_id)
+            .map((r) => r.user_id as string)
+        );
+
+        if (coachUserIds.size > 0) {
+          finalCoaches = enrichedCoaches.filter((c) => c.user_id && coachUserIds.has(c.user_id));
+        } else {
+          finalCoaches = [];
+        }
+
+        if (studentUserIds.size > 0) {
+          finalStudents = enrichedStudents.filter((s) => s.user_id && studentUserIds.has(s.user_id));
+        } else {
+          finalStudents = [];
+        }
+      }
+
+      setCoaches(finalCoaches);
+      setStudents(finalStudents);
 
       // Load classes in a safe window (from last 24h to next 90 days) para poder ver varias clases recurrentes futuras
       const now = new Date();
@@ -349,7 +384,17 @@ export default function SchedulePage() {
         .order('date', { ascending: true })
         .limit(500);
       if (e3) setError(e3.message);
-      setClasses(clsData ?? []);
+
+      let finalClasses: ClassSession[] = (clsData as ClassSession[]) ?? [];
+      if (selectedAcademyId && academyLocationIds.size > 0 && finalClasses.length > 0) {
+        finalClasses = finalClasses.filter((cls) => {
+          if (!cls.court_id) return false;
+          const locId = courtLocationMap.get(cls.court_id) ?? null;
+          return !!locId && academyLocationIds.has(locId);
+        });
+      }
+
+      setClasses(finalClasses);
       // Fetch bookings for these classes to compute alumnos count y mapear alumnos por clase
       if ((clsData ?? []).length) {
         const classIds = (clsData ?? []).map((c) => c.id);
@@ -376,7 +421,7 @@ export default function SchedulePage() {
       }
       setLoading(false);
     })();
-  }, [supabase]);
+  }, [supabase, selectedAcademyId, academyLocationIds]);
 
   // Compute available time slots for selected court and day (60 min slots)
   useEffect(() => {
