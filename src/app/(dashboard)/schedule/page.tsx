@@ -124,6 +124,7 @@ export default function SchedulePage() {
   const [courts, setCourts] = useState<Court[]>([]);
   const [coaches, setCoaches] = useState<Coach[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [allStudentsForLabels, setAllStudentsForLabels] = useState<Student[]>([]);
   const [classes, setClasses] = useState<ClassSession[]>([]);
   const [bookingsCount, setBookingsCount] = useState<Record<string, number>>({});
   const [studentsByClass, setStudentsByClass] = useState<Record<string, string[]>>({});
@@ -339,19 +340,30 @@ export default function SchedulePage() {
         }
       }
 
-      // Si hay academia seleccionada, filtramos SOLO coaches por user_academies.
-      // Los alumnos no se filtran acá para que siempre podamos resolver sus nombres
-      // en los labels (studentsMap), incluso si la academia seleccionada cambió.
+      // Siempre guardamos todos los alumnos enriquecidos para poder resolver nombres
+      // en studentsMap, independientemente de la academia seleccionada.
+      setAllStudentsForLabels(enrichedStudents);
+
+      // Si hay academia seleccionada, filtramos coaches y alumnos por user_academies.
       let finalCoaches = enrichedCoaches;
+      let finalStudents = enrichedStudents;
       if (selectedAcademyId) {
         const { data: uaRows } = await supabase
           .from('user_academies')
           .select('user_id, role')
           .eq('academy_id', selectedAcademyId);
 
+        const rows = (uaRows as { user_id: string | null; role: string }[] | null) ?? [];
+
         const coachUserIds = new Set(
-          ((uaRows as { user_id: string | null; role: string }[] | null) ?? [])
+          rows
             .filter((r) => r.role === 'coach' && r.user_id)
+            .map((r) => r.user_id as string)
+        );
+
+        const studentUserIds = new Set(
+          rows
+            .filter((r) => r.role === 'student' && r.user_id)
             .map((r) => r.user_id as string)
         );
 
@@ -360,10 +372,16 @@ export default function SchedulePage() {
         } else {
           finalCoaches = [];
         }
+
+        if (studentUserIds.size > 0) {
+          finalStudents = enrichedStudents.filter((s) => s.user_id && studentUserIds.has(s.user_id));
+        } else {
+          finalStudents = [];
+        }
       }
 
       setCoaches(finalCoaches);
-      setStudents(enrichedStudents);
+      setStudents(finalStudents);
 
       // Load classes in a safe window (from last 24h to next 90 days) para poder ver varias clases recurrentes futuras
       const now = new Date();
@@ -680,7 +698,10 @@ export default function SchedulePage() {
   const locationsMap = useMemo(() => Object.fromEntries(locations.map((x) => [x.id, x] as const)), [locations]);
   const courtsMap = useMemo(() => Object.fromEntries(courts.map((x) => [x.id, x] as const)), [courts]);
   const coachesMap = useMemo(() => Object.fromEntries(coaches.map((x) => [x.id, x] as const)), [coaches]);
-  const studentsMap = useMemo(() => Object.fromEntries(students.map((x) => [x.id, x] as const)), [students]);
+  const studentsMap = useMemo(
+    () => Object.fromEntries(allStudentsForLabels.map((x) => [x.id, x] as const)),
+    [allStudentsForLabels]
+  );
   const getStudentLabel = (sid: string) => {
     const s = studentsMap[sid] as Student | undefined;
     if (s?.full_name) return s.full_name;
