@@ -535,13 +535,25 @@ export default function PlansClient() {
     setReportLoading(true);
     setError(null);
     try {
-      // Obtener último plan asignado al alumno
-      const { data: spData, error: spErr } = await supabase
+      // Obtener último plan asignado al alumno dentro de la academia seleccionada (si aplica)
+      let selectedAcademyId: string | null = null;
+      if (typeof window !== 'undefined') {
+        const stored = window.localStorage.getItem('selectedAcademyId');
+        selectedAcademyId = stored && stored.trim() ? stored : null;
+      }
+
+      let spQuery = supabase
         .from('student_plans')
         .select('id, remaining_classes, purchased_at, plans(name,classes_included)')
         .eq('student_id', reportStudentId)
         .order('purchased_at', { ascending: false })
         .limit(1);
+
+      if (selectedAcademyId) {
+        spQuery = spQuery.eq('academy_id', selectedAcademyId);
+      }
+
+      const { data: spData, error: spErr } = await spQuery;
       if (spErr) throw spErr;
 
       if (!spData || spData.length === 0) {
