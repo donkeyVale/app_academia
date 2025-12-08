@@ -108,6 +108,7 @@ export default function UsersPage() {
   const [userRoles, setUserRoles] = useState<UserRolesRow[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [forbidden, setForbidden] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
 
   // UI: secciones plegables
   const [showCreateUser, setShowCreateUser] = useState(false);
@@ -146,15 +147,15 @@ export default function UsersPage() {
         .eq('id', userId)
         .maybeSingle();
 
-      const role = (profile?.role as string | null) ?? null;
-      const isAdminLike = role === 'admin' || role === 'super_admin';
+      const currentRole = (profile?.role as string | null) ?? null;
+      setRole(currentRole);
+      const isAdminLike = currentRole === 'admin' || currentRole === 'super_admin';
       if (!isAdminLike) {
         setForbidden(true);
         setLoadingList(false);
         return;
       }
 
-      // Cargar lista de usuarios + roles
       const [profilesRes, rolesRes] = await Promise.all([
         supabase.from('profiles').select('id, full_name, role'),
         supabase.from('user_roles').select('user_id, role'),
@@ -168,8 +169,48 @@ export default function UsersPage() {
         return;
       }
 
-      setUsers((profilesRes.data ?? []) as UserRow[]);
-      setUserRoles((rolesRes.data ?? []) as UserRolesRow[]);
+      const rawUsers = (profilesRes.data ?? []) as UserRow[];
+      const rawUserRoles = (rolesRes.data ?? []) as UserRolesRow[];
+
+      let finalUsers = rawUsers;
+      let finalUserRoles = rawUserRoles;
+
+      if (currentRole === 'admin') {
+        let selectedAcademyId: string | null = null;
+        if (typeof window !== 'undefined') {
+          const stored = window.localStorage.getItem('selectedAcademyId');
+          selectedAcademyId = stored && stored.trim() ? stored : null;
+        }
+
+        if (!selectedAcademyId) {
+          finalUsers = [];
+          finalUserRoles = [];
+        } else {
+          const { data: uaRows, error: uaErr } = await supabase
+            .from('user_academies')
+            .select('user_id, academy_id')
+            .eq('academy_id', selectedAcademyId);
+
+          if (uaErr) {
+            setError('Error cargando usuarios por academia.');
+            setLoadingList(false);
+            return;
+          }
+
+          const rows = (uaRows as { user_id: string | null; academy_id: string | null }[] | null) ?? [];
+          const allowedUserIds = new Set(
+            rows
+              .map((r) => r.user_id)
+              .filter((id): id is string => !!id)
+          );
+
+          finalUsers = rawUsers.filter((u) => allowedUserIds.has(u.id));
+          finalUserRoles = rawUserRoles.filter((r) => allowedUserIds.has(r.user_id));
+        }
+      }
+
+      setUsers(finalUsers);
+      setUserRoles(finalUserRoles);
       setLoadingList(false);
     })();
 
@@ -285,8 +326,42 @@ export default function UsersPage() {
       return;
     }
 
-    setUsers((profilesRes.data ?? []) as UserRow[]);
-    setUserRoles((rolesRes.data ?? []) as UserRolesRow[]);
+    const rawUsers = (profilesRes.data ?? []) as UserRow[];
+    const rawUserRoles = (rolesRes.data ?? []) as UserRolesRow[];
+
+    let finalUsers = rawUsers;
+    let finalUserRoles = rawUserRoles;
+
+    if (role === 'admin') {
+      let selectedAcademyId: string | null = null;
+      if (typeof window !== 'undefined') {
+        const stored = window.localStorage.getItem('selectedAcademyId');
+        selectedAcademyId = stored && stored.trim() ? stored : null;
+      }
+
+      if (!selectedAcademyId) {
+        finalUsers = [];
+        finalUserRoles = [];
+      } else {
+        const { data: uaRows } = await supabase
+          .from('user_academies')
+          .select('user_id, academy_id')
+          .eq('academy_id', selectedAcademyId);
+
+        const rows = (uaRows as { user_id: string | null; academy_id: string | null }[] | null) ?? [];
+        const allowedUserIds = new Set(
+          rows
+            .map((r) => r.user_id)
+            .filter((id): id is string => !!id)
+        );
+
+        finalUsers = rawUsers.filter((u) => allowedUserIds.has(u.id));
+        finalUserRoles = rawUserRoles.filter((r) => allowedUserIds.has(r.user_id));
+      }
+    }
+
+    setUsers(finalUsers);
+    setUserRoles(finalUserRoles);
   };
 
   const openUserDetail = async (userId: string) => {
@@ -396,6 +471,9 @@ export default function UsersPage() {
     }
   };
 
+  const isSuperAdmin = role === 'super_admin';
+  const isAdminReadOnly = role === 'admin';
+
   if (forbidden) {
     return (
       <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4">
@@ -452,21 +530,22 @@ export default function UsersPage() {
         </div>
       </div>
 
-      <div className="border rounded-lg bg-white shadow-sm">
-        <button
-          type="button"
-          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
-          onClick={() => setShowCreateUser((v) => !v)}
-        >
-          <span className="inline-flex items-center gap-2">
-            <UserPlus className="w-4 h-4 text-emerald-500" />
-            <span>Crear y gestionar usuarios</span>
-          </span>
-          <span className="text-xs text-gray-500">{showCreateUser ? '▼' : '▲'}</span>
-        </button>
-        {showCreateUser && (
-          <div className="p-4 space-y-3">
-            <form onSubmit={handleSubmit} className="space-y-3 max-w-xl">
+      {isSuperAdmin && (
+        <div className="border rounded-lg bg-white shadow-sm">
+          <button
+            type="button"
+            className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+            onClick={() => setShowCreateUser((v) => !v)}
+          >
+            <span className="inline-flex items-center gap-2">
+              <UserPlus className="w-4 h-4 text-emerald-500" />
+              <span>Crear y gestionar usuarios</span>
+            </span>
+            <span className="text-xs text-gray-500">{showCreateUser ? '▼' : '▲'}</span>
+          </button>
+          {showCreateUser && (
+            <div className="p-4 space-y-3">
+              <form onSubmit={handleSubmit} className="space-y-3 max-w-xl">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-sm mb-1">Nombre</label>
@@ -555,10 +634,11 @@ export default function UsersPage() {
           >
             {submitting ? 'Creando usuario...' : 'Crear usuario'}
           </button>
-            </form>
-          </div>
-        )}
-      </div>
+              </form>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="border rounded-lg bg-white shadow-sm">
         <button
@@ -628,7 +708,10 @@ export default function UsersPage() {
               {detailLoading ? (
                 <p className="text-sm text-gray-600">Cargando usuario...</p>
               ) : (
-                <form onSubmit={handleUpdateUser} className="space-y-3">
+                <form
+                  onSubmit={isAdminReadOnly ? (e) => e.preventDefault() : handleUpdateUser}
+                  className="space-y-3"
+                >
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm mb-1">Nombre</label>
@@ -637,6 +720,7 @@ export default function UsersPage() {
                         value={detailFirstName}
                         onChange={(e) => setDetailFirstName(e.target.value)}
                         required
+                        disabled={isAdminReadOnly}
                       />
                     </div>
                     <div>
@@ -646,6 +730,7 @@ export default function UsersPage() {
                         value={detailLastName}
                         onChange={(e) => setDetailLastName(e.target.value)}
                         required
+                        disabled={isAdminReadOnly}
                       />
                     </div>
                   </div>
@@ -658,6 +743,7 @@ export default function UsersPage() {
                         value={detailNationalId}
                         onChange={(e) => setDetailNationalId(e.target.value)}
                         required
+                        disabled={isAdminReadOnly}
                       />
                     </div>
                     <div>
@@ -667,6 +753,7 @@ export default function UsersPage() {
                         value={detailPhone}
                         onChange={(e) => setDetailPhone(e.target.value)}
                         required
+                        disabled={isAdminReadOnly}
                       />
                     </div>
                   </div>
@@ -680,6 +767,7 @@ export default function UsersPage() {
                         value={detailEmail}
                         onChange={(e) => setDetailEmail(e.target.value)}
                         required
+                        disabled={isAdminReadOnly}
                       />
                     </div>
                     <div>
@@ -697,6 +785,7 @@ export default function UsersPage() {
                             type="checkbox"
                             checked={detailRoles.includes(role)}
                             onChange={() => toggleDetailRole(role)}
+                            disabled={isAdminReadOnly}
                           />
                           <span>{role}</span>
                         </label>
@@ -705,21 +794,29 @@ export default function UsersPage() {
                   </div>
 
                   <div className="flex justify-between items-center gap-2 pt-2 border-t mt-2">
-                    <button
-                      type="button"
-                      className="px-3 py-2 border rounded text-xs text-red-600 border-red-200 hover:bg-red-50"
-                      onClick={handleDeleteUser}
-                      disabled={detailDeleting || detailSubmitting}
-                    >
-                      {detailDeleting ? 'Eliminando...' : 'Eliminar usuario'}
-                    </button>
-                    <button
-                      type="submit"
-                      className="px-3 py-2 bg-[#3cadaf] hover:bg-[#31435d] text-white rounded text-xs disabled:opacity-50"
-                      disabled={detailSubmitting || detailDeleting}
-                    >
-                      {detailSubmitting ? 'Guardando cambios...' : 'Guardar cambios'}
-                    </button>
+                    {isAdminReadOnly ? (
+                      <p className="text-xs text-gray-600">
+                        Solo el super administrador puede editar o eliminar usuarios.
+                      </p>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className="px-3 py-2 border rounded text-xs text-red-600 border-red-200 hover:bg-red-50"
+                          onClick={handleDeleteUser}
+                          disabled={detailDeleting || detailSubmitting}
+                        >
+                          {detailDeleting ? 'Eliminando...' : 'Eliminar usuario'}
+                        </button>
+                        <button
+                          type="submit"
+                          className="px-3 py-2 bg-[#3cadaf] hover:bg-[#31435d] text-white rounded text-xs disabled:opacity-50"
+                          disabled={detailSubmitting || detailDeleting}
+                        >
+                          {detailSubmitting ? 'Guardando cambios...' : 'Guardar cambios'}
+                        </button>
+                      </>
+                    )}
                   </div>
                 </form>
               )}
