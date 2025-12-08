@@ -198,8 +198,13 @@ export default function HomePage() {
             .eq('user_id', userId);
 
           if (uaErr) {
-            console.error('Error cargando academias del usuario en Home', uaErr);
+            // Si hay error al leer user_academies, asumimos que no hay academias visibles para este usuario
             setHasAcademies(false);
+            setAcademyOptions([]);
+            setSelectedAcademyId(null);
+            if (typeof window !== 'undefined') {
+              window.localStorage.removeItem('selectedAcademyId');
+            }
           } else if (uaRows) {
             const academyIds = Array.from(
               new Set(
