@@ -6,6 +6,7 @@ import React from "react";
 
 interface FooterNavProps {
   isAdmin: boolean;
+  isStudent?: boolean;
   canSeeReports?: boolean;
   canSeeFinance?: boolean;
   canSeeSettings?: boolean;
@@ -13,7 +14,7 @@ interface FooterNavProps {
   rightSlot: React.ReactNode;
 }
 
-export function FooterNav({ isAdmin, canSeeReports, canSeeFinance, canSeeSettings, studentsLabel, rightSlot }: FooterNavProps) {
+export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, canSeeSettings, studentsLabel, rightSlot }: FooterNavProps) {
   const showReports = canSeeReports !== false;
   const showFinance = canSeeFinance !== false;
   const showSettings = canSeeSettings === true;
@@ -38,7 +39,7 @@ export function FooterNav({ isAdmin, canSeeReports, canSeeFinance, canSeeSetting
             <span>Agenda</span>
           </Link>
           <Link
-            href="/students"
+            href={isStudent ? "/finance" : "/students"}
             className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
           >
             <Users className="w-4 h-4 text-[#22c55e]" />

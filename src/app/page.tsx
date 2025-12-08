@@ -995,6 +995,7 @@ export default function HomePage() {
 
       <FooterNav
         isAdmin={isAdmin}
+        isStudent={role === 'student'}
         canSeeReports={role === 'admin' || role === 'super_admin'}
         canSeeFinance={role === 'admin' || role === 'super_admin'}
         canSeeSettings={role === 'admin' || role === 'coach' || role === 'student' || role === 'super_admin'}
