@@ -132,6 +132,8 @@ export default function SchedulePage() {
   const [error, setError] = useState<string | null>(null);
   const [role, setRole] = useState<'super_admin' | 'admin' | 'coach' | 'student' | null>(null);
   const [studentId, setStudentId] = useState<string | null>(null);
+  const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
+  const [academyLocationIds, setAcademyLocationIds] = useState<Set<string>>(new Set());
 
   // Form state
   const [day, setDay] = useState<string>(''); // yyyy-mm-dd
@@ -211,6 +213,43 @@ export default function SchedulePage() {
     })();
   }, [supabase]);
 
+  // Cargar academia seleccionada desde localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = window.localStorage.getItem('selectedAcademyId');
+    setSelectedAcademyId(stored && stored.trim() ? stored : null);
+  }, []);
+
+  // Cargar locations vinculadas a la academia seleccionada
+  useEffect(() => {
+    if (!selectedAcademyId) {
+      setAcademyLocationIds(new Set());
+      return;
+    }
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('academy_locations')
+          .select('location_id')
+          .eq('academy_id', selectedAcademyId);
+        if (error) {
+          console.error('Error cargando academy_locations en Agenda', error);
+          setAcademyLocationIds(new Set());
+          return;
+        }
+        const ids = new Set(
+          (data as { location_id: string | null }[] | null ?? [])
+            .map((row) => row.location_id)
+            .filter((id): id is string => !!id)
+        );
+        setAcademyLocationIds(ids);
+      } catch (e) {
+        console.error('Error cargando academy_locations en Agenda', e);
+        setAcademyLocationIds(new Set());
+      }
+    })();
+  }, [selectedAcademyId, supabase]);
+
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -221,7 +260,12 @@ export default function SchedulePage() {
         .select('id,name')
         .order('name');
       if (eLoc) setError(eLoc.message);
-      setLocations(locs ?? []);
+      const allLocations = (locs ?? []) as Location[];
+      const filteredLocations =
+        selectedAcademyId && academyLocationIds.size > 0
+          ? allLocations.filter((l) => academyLocationIds.has(l.id))
+          : allLocations;
+      setLocations(filteredLocations);
 
       // Load all courts (filtered client-side by location)
       const { data: courtsData, error: e1 } = await supabase
