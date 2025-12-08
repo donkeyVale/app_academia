@@ -359,6 +359,13 @@ export default function PlansClient() {
         const stored = window.localStorage.getItem('selectedAcademyId');
         selectedAcademyId = stored && stored.trim() ? stored : null;
       }
+      if (!selectedAcademyId) {
+        const msg = 'Debes seleccionar una academia antes de crear un plan.';
+        setError(msg);
+        toast.error(msg);
+        setSaving(false);
+        return;
+      }
 
       const { error: insErr } = await supabase.from('plans').insert({
         name: planName.trim(),
@@ -528,25 +535,13 @@ export default function PlansClient() {
     setReportLoading(true);
     setError(null);
     try {
-      // Obtener último plan asignado al alumno dentro de la academia seleccionada (si aplica)
-      let selectedAcademyId: string | null = null;
-      if (typeof window !== 'undefined') {
-        const stored = window.localStorage.getItem('selectedAcademyId');
-        selectedAcademyId = stored && stored.trim() ? stored : null;
-      }
-
-      let spQuery = supabase
+      // Obtener último plan asignado al alumno
+      const { data: spData, error: spErr } = await supabase
         .from('student_plans')
         .select('id, remaining_classes, purchased_at, plans(name,classes_included)')
         .eq('student_id', reportStudentId)
         .order('purchased_at', { ascending: false })
         .limit(1);
-
-      if (selectedAcademyId) {
-        spQuery = spQuery.eq('academy_id', selectedAcademyId);
-      }
-
-      const { data: spData, error: spErr } = await spQuery;
       if (spErr) throw spErr;
 
       if (!spData || spData.length === 0) {
@@ -827,7 +822,6 @@ export default function PlansClient() {
   return (
     <div className="space-y-6">
 
-      {/* Sección: Planes y precios */}
       <div className="border rounded-lg bg-white shadow-sm">
         <button
           type="button"
@@ -874,6 +868,7 @@ export default function PlansClient() {
                   />
                 </div>
               </div>
+              {error && <p className="text-sm text-red-600">{error}</p>}
               <button
                 className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50"
                 disabled={saving}
@@ -889,188 +884,688 @@ export default function PlansClient() {
                   {plans.map((p) => {
                     const activeStudents = studentPlans.filter((sp) => sp.plan_id === p.id && sp.remaining_classes > 0).length;
                     return (
-                      <li key={p.id} className="border rounded-lg p-3 bg-white">
-                        {editingPlanId === p.id ? (
-                          <form onSubmit={onUpdatePlan} className="grid gap-2">
+                    <li key={p.id} className="border rounded-lg p-3 bg-white">
+                      {editingPlanId === p.id ? (
+                        <form onSubmit={onUpdatePlan} className="grid gap-2">
+                          <div>
+                            <label className="block text-xs mb-1">Nombre</label>
+                            <input
+                              type="text"
+                              className="border rounded p-2 w-full"
+                              value={editPlanName}
+                              onChange={(e) => setEditPlanName(e.target.value)}
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
                             <div>
-                              <label className="block text-xs mb-1">Nombre</label>
+                              <label className="block text-xs mb-1">Clases</label>
                               <input
-                                type="text"
+                                type="number"
+                                min={1}
                                 className="border rounded p-2 w-full"
-                                value={editPlanName}
-                                onChange={(e) => setEditPlanName(e.target.value)}
+                                value={editPlanClasses}
+                                onChange={(e) => setEditPlanClasses(e.target.value)}
                               />
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <div>
-                                <label className="block text-xs mb-1">Clases</label>
-                                <input
-                                  type="number"
-                                  min={1}
-                                  className="border rounded p-2 w-full"
-                                  value={editPlanClasses}
-                                  onChange={(e) => setEditPlanClasses(e.target.value)}
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs mb-1">Precio (PYG)</label>
-                                <input
-                                  type="number"
-                                  min={1}
-                                  className="border rounded p-2 w-full"
-                                  value={editPlanPrice}
-                                  onChange={(e) => setEditPlanPrice(e.target.value)}
-                                />
-                              </div>
-                            </div>
-                            <div className="flex gap-2 justify-end">
-                              <button
-                                type="button"
-                                className="text-xs underline"
-                                onClick={() => setEditingPlanId(null)}
-                              >
-                                Cancelar
-                              </button>
-                              <button
-                                type="submit"
-                                className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-3 py-1 text-xs disabled:opacity-50"
-                                disabled={saving}
-                              >
-                                {saving ? 'Guardando...' : 'Guardar cambios'}
-                              </button>
-                            </div>
-                          </form>
-                        ) : (
-                          <div className="flex items-center justify-between gap-2">
                             <div>
-                              <div className="font-medium text-[#31435d]">{p.name}</div>
-                              <div className="text-xs text-gray-600">
-                                {p.classes_included} clases • {formatPyg(p.price_cents)} {p.currency}
-                              </div>
-                              <div className="text-xs text-gray-500 mt-1">
-                                {activeStudents > 0
-                                  ? `En uso por ${activeStudents} alumno${activeStudents > 1 ? 's' : ''}`
-                                  : 'Sin alumnos activos'}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <button
-                                type="button"
-                                className="text-xs px-3 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50"
-                                onClick={() => onDeletePlan(p)}
-                              >
-                                Eliminar
-                              </button>
-                              <button
-                                type="button"
-                                className="text-xs px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
-                                onClick={() => startEditPlan(p)}
-                              >
-                                Editar
-                              </button>
+                              <label className="block text-xs mb-1">Precio (PYG)</label>
+                              <input
+                                type="number"
+                                min={1}
+                                className="border rounded p-2 w-full"
+                                value={editPlanPrice}
+                                onChange={(e) => setEditPlanPrice(e.target.value)}
+                              />
                             </div>
                           </div>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Pagos recientes */}
-      <div className="border rounded-lg bg-white shadow-sm">
-        <button
-          type="button"
-          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
-          onClick={() => setShowPaymentsSection((v) => !v)}
-        >
-          <span className="inline-flex items-center gap-2">
-            <Receipt className="w-4 h-4 text-sky-500" />
-            <span>Pagos recientes y registro</span>
-          </span>
-          <span className="text-xs text-gray-500">{showPaymentsSection ? '▼' : '▲'}</span>
-        </button>
-        {showPaymentsSection && (
-          <div className="p-4 space-y-4">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-lg font-semibold">Pagos recientes</h2>
-              <button
-                type="button"
-                className="text-xs px-3 py-2 rounded bg-[#3cadaf] hover:bg-[#31435d] text-white"
-                onClick={() => {
-                  setPaymentModalOpen(true);
-                  setError(null);
-                }}
-              >
-                Registrar pago
-              </button>
-            </div>
-            {payments.length === 0 ? (
-              <p className="text-sm text-gray-600">Aún no hay pagos registrados.</p>
-            ) : (
-              <ul className="text-sm space-y-2">
-                {payments.map((p) => {
-                  const studentInfo = students.find((s) => s.id === p.student_id);
-                  const displayName = studentInfo?.full_name ?? studentInfo?.notes ?? studentInfo?.level ?? p.student_id;
-                  const sp = studentPlans.find((sp) => sp.id === p.student_plan_id);
-                  const planName = sp?.plans?.name ?? sp?.plan_id ?? '';
-                  return (
-                    <li
-                      key={p.id}
-                      className="py-2 px-3 border rounded-lg bg-white flex flex-col md:flex-row md:items-center md:justify-between gap-1"
-                    >
-                      <div>
-                        <div className="font-medium text-[#31435d]">{displayName}</div>
-                        <div className="text-xs text-gray-600">
-                          <span className="font-semibold">Plan:</span> {planName || 'Sin nombre'} {' • '}
-                          <span className="font-semibold">Monto:</span> {formatPyg(p.amount)} {p.currency} {' • '}
-                          <span className="font-semibold">Método:</span> {p.method}
+                          <div className="flex gap-2 justify-end">
+                            <button
+                              type="button"
+                              className="text-xs underline"
+                              onClick={() => setEditingPlanId(null)}
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="submit"
+                              className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-3 py-1 text-xs disabled:opacity-50"
+                              disabled={saving}
+                            >
+                              {saving ? 'Guardando...' : 'Guardar cambios'}
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <div className="font-medium text-[#31435d]">{p.name}</div>
+                            <div className="text-xs text-gray-600">
+                              {p.classes_included} clases • {formatPyg(p.price_cents)} {p.currency}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {activeStudents > 0
+                                ? `En uso por ${activeStudents} alumno${activeStudents > 1 ? 's' : ''}`
+                                : 'Sin alumnos activos'}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              className="text-xs px-3 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50"
+                              onClick={() => onDeletePlan(p)}
+                            >
+                              Eliminar
+                            </button>
+                            <button
+                              type="button"
+                              className="text-xs px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+                              onClick={() => startEditPlan(p)}
+                            >
+                              Editar
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                      <div className="text-xs text-gray-500 text-right">
-                        <div>{new Date(p.payment_date).toLocaleDateString()}</div>
-                        <div className="capitalize">Estado: {p.status}</div>
-                      </div>
+                      )}
                     </li>
                   );
                 })}
               </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+
+    <div className="border rounded-lg bg-white shadow-sm">
+      <button
+        type="button"
+        className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+        onClick={() => setShowPaymentsSection((v) => !v)}
+      >
+        <span className="inline-flex items-center gap-2">
+          <Receipt className="w-4 h-4 text-sky-500" />
+          <span>Pagos recientes y registro</span>
+        </span>
+        <span className="text-xs text-gray-500">{showPaymentsSection ? '▼' : '▲'}</span>
+      </button>
+      {showPaymentsSection && (
+        <div className="p-4 space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold">Pagos recientes</h2>
+            <button
+              type="button"
+              className="text-xs px-3 py-2 rounded bg-[#3cadaf] hover:bg-[#31435d] text-white"
+              onClick={() => {
+                setPaymentModalOpen(true);
+                setError(null);
+              }}
+            >
+              Registrar pago
+            </button>
+          </div>
+          {payments.length === 0 ? (
+            <p className="text-sm text-gray-600">Aún no hay pagos registrados.</p>
+          ) : (
+            <ul className="text-sm space-y-2">
+              {payments.map((p) => {
+                const studentInfo = students.find((s) => s.id === p.student_id);
+                const displayName = studentInfo?.full_name ?? studentInfo?.notes ?? studentInfo?.level ?? p.student_id;
+                const sp = studentPlans.find((sp) => sp.id === p.student_plan_id);
+                const planName = sp?.plans?.name ?? sp?.plan_id ?? '';
+                return (
+                  <li key={p.id} className="py-2 px-3 border rounded-lg bg-white flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+                    <div>
+                      <div className="font-medium text-[#31435d]">{displayName}</div>
+                      <div className="text-xs text-gray-600">
+                        <span className="font-semibold">Plan:</span> {planName || 'Sin nombre'}
+                        {' • '}
+                        <span className="font-semibold">Monto:</span> {formatPyg(p.amount)} {p.currency}
+                        {' • '}
+                        <span className="font-semibold">Método:</span> {p.method}
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500 text-right">
+                      <div>{new Date(p.payment_date).toLocaleDateString()}</div>
+                      <div className="capitalize">Estado: {p.status}</div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+
+    <div className="border rounded-lg bg-white shadow-sm">
+      <button
+        type="button"
+        className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+        onClick={() => setShowAssignPlan((v) => !v)}
+      >
+        <span className="inline-flex items-center gap-2">
+          <Users className="w-4 h-4 text-violet-500" />
+          <span>Planes asignados y saldos</span>
+        </span>
+        <span className="text-xs text-gray-500">{showAssignPlan ? '▼' : '▲'}</span>
+      </button>
+      {showAssignPlan && (
+        <div className="space-y-4 p-4">
+          <h2 className="text-lg font-semibold mb-2">Asignar plan a alumno</h2>
+          <form onSubmit={onAssignPlan} className="grid gap-3 max-w-xl">
+            <div>
+              <label className="block text-sm mb-1">Alumno</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  className="border rounded px-3 w-full h-10 text-base md:text-sm"
+                  placeholder="Escribe para buscar alumno"
+                  value={assignStudentQuery}
+                  onChange={(e) => {
+                    setAssignStudentQuery(e.target.value);
+                    setAssignStudentOpen(true);
+                  }}
+                  onFocus={() => {
+                    if (assignStudentQuery.trim().length > 0) setAssignStudentOpen(true);
+                  }}
+                />
+                {assignStudentOpen && assignStudentQuery.trim().length > 0 && (
+                  <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border bg-white shadow-sm text-sm">
+                    {students
+                      .filter((s) => {
+                        const term = assignStudentQuery.toLowerCase();
+                        const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
+                        return displayName.includes(term);
+                      })
+                      .slice(0, 20)
+                      .map((s) => {
+                        const displayName = s.full_name ?? s.notes ?? s.level ?? s.id;
+                        return (
+                          <li
+                            key={s.id}
+                            className="cursor-pointer px-3 py-1.5 hover:bg-gray-100"
+                            onClick={() => {
+                              setSelectedStudentId(s.id);
+                              setAssignStudentQuery(displayName || '');
+                              setAssignStudentOpen(false);
+                            }}
+                          >
+                            {displayName}
+                          </li>
+                        );
+                      })}
+                    {students.filter((s) => {
+                      const term = assignStudentQuery.toLowerCase();
+                      const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
+                      return displayName.includes(term);
+                    }).length === 0 && (
+                      <li className="px-3 py-1.5 text-gray-500">Sin resultados</li>
+                    )}
+                  </ul>
+                )}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm mb-1">Plan</label>
+              <select
+                className="border rounded p-2 w-full"
+                value={selectedPlanId}
+                onChange={(e) => {
+                  const planId = e.target.value;
+                  setSelectedPlanId(planId);
+                  const plan = plans.find((p) => p.id === planId);
+                  if (plan) setRemainingClassesInput(String(plan.classes_included));
+                }}
+              >
+                <option value="">Selecciona un plan</option>
+                {plans.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.classes_included} clases)
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-sm mb-1">Precio base del plan</label>
+                <div className="border rounded px-3 py-2 text-sm bg-gray-50">
+                  {(() => {
+                    const plan = plans.find((p) => p.id === selectedPlanId);
+                    return plan ? `${plan.price_cents} ${plan.currency}` : '-';
+                  })()}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Tipo de descuento</label>
+                <select
+                  className="border rounded p-2 w-full text-base md:text-sm"
+                  value={discountType}
+                  onChange={(e) => setDiscountType(e.target.value as 'none' | 'percent' | 'amount')}
+                >
+                  <option value="none">Sin descuento</option>
+                  <option value="percent">Porcentaje (%)</option>
+                  <option value="amount">Monto fijo</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Valor del descuento</label>
+                <input
+                  type="number"
+                  min={0}
+                  className="border rounded p-2 w-full text-base md:text-sm"
+                  value={discountValue}
+                  onChange={(e) => setDiscountValue(e.target.value)}
+                  disabled={discountType === 'none'}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm mb-1">Precio final del plan para este alumno</label>
+              <div className="border rounded px-3 py-2 text-sm bg-gray-50">
+                {(() => {
+                  const plan = plans.find((p) => p.id === selectedPlanId);
+                  if (!plan || !plan.price_cents) return '-';
+                  const basePrice = plan.price_cents;
+                  const discountNum = Number(discountValue || 0);
+                  let finalPrice = basePrice;
+                  if (discountType === 'percent' && discountNum > 0) {
+                    finalPrice = Math.max(0, basePrice - (basePrice * discountNum) / 100);
+                  } else if (discountType === 'amount' && discountNum > 0) {
+                    finalPrice = Math.max(0, basePrice - discountNum);
+                  }
+                  return `${finalPrice} ${plan.currency}`;
+                })()}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm mb-1">Clases restantes iniciales</label>
+              <input
+                type="number"
+                min={1}
+                className="border rounded p-2 w-full"
+                value={remainingClassesInput}
+                onChange={(e) => setRemainingClassesInput(e.target.value)}
+              />
+            </div>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <button
+              className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50"
+              disabled={saving}
+            >
+              {saving ? 'Asignando...' : 'Asignar plan'}
+            </button>
+          </form>
+
+          <div>
+            <h2 className="text-lg font-semibold mb-2">Planes asignados recientes</h2>
+            {loading ? (
+              <p className="text-sm text-gray-600">Cargando...</p>
+            ) : studentPlans.filter((sp) => sp.remaining_classes > 0).length === 0 ? (
+              <p className="text-sm text-gray-600">Aún no hay planes asignados con clases pendientes.</p>
+            ) : (
+              <>
+                <div className="mb-2">
+                  <label className="block text-xs mb-1 text-gray-600">Buscar por alumno o plan</label>
+                  <input
+                    type="text"
+                    className="border rounded px-3 w-full h-10 text-base md:text-sm"
+                    placeholder="Ej.: Juan Pérez o Plan Adultos"
+                    value={recentPlansSearch}
+                    onChange={(e) => setRecentPlansSearch(e.target.value)}
+                  />
+                </div>
+                <ul className="text-sm space-y-2">
+                  {studentPlans
+                    .filter((sp) => sp.remaining_classes > 0)
+                    .filter((sp) => {
+                      if (!recentPlansSearch.trim()) return true;
+                      const term = recentPlansSearch.toLowerCase();
+                      const studentInfo = students.find((s) => s.id === sp.student_id);
+                      const displayName = (studentInfo?.full_name ?? studentInfo?.notes ?? studentInfo?.level ?? sp.student_id).toLowerCase();
+                      const planName = (sp.plans?.name ?? sp.plan_id ?? '').toLowerCase();
+                      return displayName.includes(term) || planName.includes(term);
+                    })
+                    .slice(0, 5)
+                    .map((sp) => {
+                      const studentInfo = students.find((s) => s.id === sp.student_id);
+                      const displayName = studentInfo?.full_name ?? studentInfo?.notes ?? studentInfo?.level ?? sp.student_id;
+                      const basePrice = sp.base_price ?? null;
+                      const finalPrice = sp.final_price ?? basePrice;
+                      const totalPaid = paymentsByPlan[sp.id] ?? 0;
+                      const balance = finalPrice != null ? Math.max(0, finalPrice - totalPaid) : null;
+                      return (
+                        <li key={sp.id} className="py-2 px-3 border rounded-lg bg-white flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+                          <div>
+                            <div className="font-medium text-[#31435d]">{displayName}</div>
+                            <div className="text-xs text-gray-600">
+                              <span className="font-semibold">Plan:</span> {sp.plans?.name ?? sp.plan_id}
+                              {' • '}
+                              <span className="font-semibold">Incluye:</span> {sp.plans?.classes_included ?? '?'} clases
+                              {' • '}
+                              <span className="font-semibold">Restantes:</span> {sp.remaining_classes}
+                            </div>
+                            {finalPrice != null && (
+                              <div className="text-xs mt-1">
+                                <span className="font-semibold text-gray-600">Total plan:</span> {formatPyg(finalPrice)} PYG
+                                {' • '}
+                                <span className="font-semibold text-gray-600">Pagado:</span> {formatPyg(totalPaid)} PYG
+                                {' • '}
+                                <span
+                                  className={
+                                    balance === 0
+                                      ? 'font-semibold text-green-600'
+                                      : 'font-semibold text-amber-600'
+                                  }
+                                >
+                                  {balance === 0 ? 'Al día' : `Saldo: ${formatPyg(balance)} PYG`}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            <span className="font-semibold">Asignado:</span> {new Date(sp.purchased_at).toLocaleString()}
+                          </div>
+                        </li>
+                      );
+                    })}
+                </ul>
+                {!recentPlansSearch.trim() && (
+                  <p className="mt-2 text-xs text-gray-500">Mostrando los 5 planes más recientes con clases pendientes.</p>
+                )}
+              </>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+    </div>
 
-      {/* Asignar plan y saldos */}
-      <div className="border rounded-lg bg-white shadow-sm">
-        <button
-          type="button"
-          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
-          onClick={() => setShowAssignPlan((v) => !v)}
-        >
-          <span className="inline-flex items-center gap-2">
-            <Users className="w-4 h-4 text-violet-500" />
-            <span>Planes asignados y saldos</span>
-          </span>
-          <span className="text-xs text-gray-500">{showAssignPlan ? '▼' : '▲'}</span>
-        </button>
-        {showAssignPlan && (
-          <div className="space-y-4 p-4">
-            <h2 className="text-lg font-semibold mb-2">Asignar plan a alumno</h2>
-            <form onSubmit={onAssignPlan} className="grid gap-3 max-w-xl">
-              {/* selector de alumno y plan */}
-              {/* ...estructura ya definida más arriba en el patch... */}
-            </form>
-            {/* listado de planes asignados recientes */}
+    <div className="border rounded-lg bg-white shadow-sm">
+      <button
+        type="button"
+        className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+        onClick={() => setShowStudentSummary((v) => !v)}
+      >
+        <span className="inline-flex items-center gap-2">
+          <ClipboardList className="w-4 h-4 text-amber-500" />
+          <span>Resumen de uso por alumno</span>
+        </span>
+        <span className="text-xs text-gray-500">{showStudentSummary ? '▼' : '▲'}</span>
+      </button>
+      {showStudentSummary && (
+        <div className="p-4 space-y-4">
+          <h2 className="text-lg font-semibold mb-2">Resumen por alumno</h2>
+          <form onSubmit={onLoadReport} className="grid gap-3 max-w-xl mb-4">
+            <div>
+              <label className="block text-sm mb-1">Alumno</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  className="border rounded px-3 w-full h-10 text-base md:text-sm"
+                  placeholder="Escribe para buscar alumno"
+                  value={reportStudentSearch}
+                  onChange={(e) => {
+                    setReportStudentSearch(e.target.value);
+                    setReportStudentOpen(true);
+                  }}
+                  onFocus={() => {
+                    if (reportStudentSearch.trim().length > 0) setReportStudentOpen(true);
+                  }}
+                />
+                {reportStudentOpen && reportStudentSearch.trim().length > 0 && (
+                  <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border bg-white shadow-sm text-sm">
+                    {students
+                      .filter((s) => {
+                        const term = reportStudentSearch.toLowerCase();
+                        const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
+                        return displayName.includes(term);
+                      })
+                      .slice(0, 20)
+                      .map((s) => {
+                        const displayName = s.full_name ?? s.notes ?? s.level ?? s.id;
+                        return (
+                          <li
+                            key={s.id}
+                            className="cursor-pointer px-3 py-1.5 hover:bg-gray-100"
+                            onClick={() => {
+                              setReportStudentId(s.id);
+                              setReportStudentSearch(displayName || '');
+                              setReportStudentOpen(false);
+                            }}
+                          >
+                            {displayName}
+                          </li>
+                        );
+                      })}
+                    {students.filter((s) => {
+                      const term = reportStudentSearch.toLowerCase();
+                      const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
+                      return displayName.includes(term);
+                    }).length === 0 && (
+                      <li className="px-3 py-1.5 text-gray-500">Sin resultados</li>
+                    )}
+                  </ul>
+                )}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm mb-1">Desde</label>
+                <DatePickerField value={reportFrom} onChange={setReportFrom} />
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Hasta</label>
+                <DatePickerField value={reportTo} onChange={setReportTo} />
+              </div>
+            </div>
+            <button
+              className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50"
+              disabled={reportLoading}
+            >
+              {reportLoading ? 'Cargando...' : 'Ver resumen'}
+            </button>
+          </form>
+
+          {reportSummary && (
+            <div className="mb-4 text-sm">
+              <p><strong>Plan:</strong> {reportSummary.planName ?? 'Sin nombre'}</p>
+              <p><strong>Clases del plan:</strong> {reportSummary.totalClasses}</p>
+              <p><strong>Usadas:</strong> {reportSummary.usedClasses}</p>
+              <p><strong>Disponibles:</strong> {reportSummary.remainingClasses}</p>
+            </div>
+          )}
+
+          {reportHistory.length > 0 && (
+            <ul className="text-sm divide-y">
+              {reportHistory.map((row) => (
+                <li key={row.classId} className="py-2 flex flex-col md:flex-row md:items-center md:justify-between gap-1">
+                  <div>
+                    <span className="font-medium">{new Date(row.date).toLocaleString()}</span>
+                    {' • '}Estado: {row.present ? 'Presente' : 'Ausente'}
+                    {' • '}Consumió plan: {row.consumedPlan ? 'Sí' : 'No'}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+
+    {paymentModalOpen && (
+      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+        <div className="bg-white w-full max-w-md rounded-lg shadow-lg flex flex-col max-h-[90vh]">
+          <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b">
+            <h2 className="text-lg font-semibold text-[#31435d]">Registrar pago</h2>
           </div>
-        )}
+          <form onSubmit={onCreatePayment} className="px-4 py-3 overflow-y-auto text-sm space-y-3">
+            <div>
+              <label className="block text-sm mb-1">Alumno</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  className="border rounded px-3 w-full h-10 text-base md:text-sm"
+                  placeholder="Escribe para buscar alumno"
+                  value={paymentStudentSearch}
+                  onChange={(e) => {
+                    setPaymentStudentSearch(e.target.value);
+                    setPaymentStudentOpen(true);
+                  }}
+                  onFocus={() => {
+                    if (paymentStudentSearch.trim().length > 0) setPaymentStudentOpen(true);
+                  }}
+                />
+                {paymentStudentOpen && paymentStudentSearch.trim().length > 0 && (
+                  <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border bg-white shadow-sm text-sm">
+                    {students
+                      .filter((s) => {
+                        const term = paymentStudentSearch.toLowerCase();
+                        const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
+                        return displayName.includes(term);
+                      })
+                      .slice(0, 20)
+                      .map((s) => {
+                        const displayName = s.full_name ?? s.notes ?? s.level ?? s.id;
+                        return (
+                          <li
+                            key={s.id}
+                            className="cursor-pointer px-3 py-1.5 hover:bg-gray-100"
+                            onClick={() => {
+                              setPaymentStudentId(s.id);
+                              setPaymentStudentPlanId('');
+                              setPaymentStudentSearch(displayName || '');
+                              setPaymentStudentOpen(false);
+                            }}
+                          >
+                            {displayName}
+                          </li>
+                        );
+                      })}
+                    {students.filter((s) => {
+                      const term = paymentStudentSearch.toLowerCase();
+                      const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
+                      return displayName.includes(term);
+                    }).length === 0 && (
+                      <li className="px-3 py-1.5 text-gray-500">Sin resultados</li>
+                    )}
+                  </ul>
+                )}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm mb-1">Plan del alumno</label>
+              <select
+                className="border rounded p-2 w-full text-base md:text-sm"
+                value={paymentStudentPlanId}
+                onChange={(e) => setPaymentStudentPlanId(e.target.value)}
+              >
+                <option value="">Selecciona un plan asignado</option>
+                {studentPlans
+                  .filter((sp) => sp.student_id === paymentStudentId)
+                  .map((sp) => (
+                    <option key={sp.id} value={sp.id}>
+                      {(sp.plans?.name ?? sp.plan_id) + ` • Restantes: ${sp.remaining_classes}`}
+                    </option>
+                  ))}
+              </select>
+            </div>
+            {paymentStudentPlanId && (
+              <div className="text-xs text-gray-600 bg-gray-50 border rounded px-3 py-2">
+                {(() => {
+                  const sp = studentPlans.find((sp) => sp.id === paymentStudentPlanId);
+                  if (!sp) return null;
+                  const basePrice = sp.base_price ?? null;
+                  const finalPrice = sp.final_price ?? basePrice;
+                  if (finalPrice == null) return 'Este plan no tiene un precio configurado.';
+                  const totalPaid = paymentsByPlan[sp.id] ?? 0;
+                  const balance = Math.max(0, finalPrice - totalPaid);
+                  return (
+                    <span>
+                      Total plan: {formatPyg(finalPrice)} PYG • Pagado: {formatPyg(totalPaid)} PYG •{' '}
+                      {balance === 0 ? (
+                        <span className="text-green-600 font-semibold">Al día</span>
+                      ) : (
+                        <span className="text-amber-600 font-semibold">Saldo pendiente: {formatPyg(balance)} PYG</span>
+                      )}
+                    </span>
+                  );
+                })()}
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm mb-1">Monto (PYG)</label>
+                <input
+                  type="number"
+                  min={1}
+                  className="border rounded p-2 w-full text-base md:text-sm"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Fecha de pago</label>
+                <DatePickerField value={paymentDate} onChange={setPaymentDate} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm mb-1">Método</label>
+                <select
+                  className="border rounded p-2 w-full text-base md:text-sm"
+                  value={paymentMethod}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                >
+                  <option value="efectivo">Efectivo</option>
+                  <option value="transferencia">Transferencia</option>
+                  <option value="tarjeta">Tarjeta</option>
+                  <option value="mercadopago">MercadoPago</option>
+                  <option value="otro">Otro</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Estado</label>
+                <select
+                  className="border rounded p-2 w-full text-base md:text-sm"
+                  value={paymentStatus}
+                  onChange={(e) => setPaymentStatus(e.target.value as 'pagado' | 'pendiente')}
+                >
+                  <option value="pagado">Pagado</option>
+                  <option value="pendiente">Pendiente</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm mb-1">Notas (opcional)</label>
+              <textarea
+                className="border rounded p-2 w-full text-base md:text-sm min-h-[60px]"
+                value={paymentNotes}
+                onChange={(e) => setPaymentNotes(e.target.value)}
+              />
+            </div>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <div className="flex justify-end gap-2 py-2 border-t mt-2 pt-3">
+              <button
+                type="button"
+                className="px-3 py-2 border rounded text-xs"
+                onClick={() => {
+                  setPaymentModalOpen(false);
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="px-3 py-2 bg-[#3cadaf] hover:bg-[#31435d] text-white rounded text-xs disabled:opacity-50"
+                disabled={saving}
+              >
+                {saving ? 'Guardando...' : 'Registrar pago'}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-
-      {/* Resumen por alumno y modal de pago ya definidos arriba */}
-
+    )}
     </div>
   );
 }
+//en blanco, otro mas
