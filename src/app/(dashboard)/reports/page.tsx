@@ -256,6 +256,10 @@ export default function ReportsPage() {
     attendanceLocation: boolean;
   }>({ income: false, attendanceStudent: false, attendanceCoach: false, attendanceLocation: false });
 
+  // Multi-academia
+  const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
+  const [academyLocationIds, setAcademyLocationIds] = useState<Set<string>>(new Set());
+
   const exportToExcel = async (
     fileName: string,
     sheetName: string,
@@ -336,6 +340,38 @@ export default function ReportsPage() {
     setFromDate(firstDay);
     setToDate(lastDay);
   }, []);
+
+  // Cargar academia seleccionada y sedes asociadas
+  useEffect(() => {
+    (async () => {
+      let academyId: string | null = null;
+      if (typeof window !== "undefined") {
+        const stored = window.localStorage.getItem("selectedAcademyId");
+        academyId = stored && stored.trim() ? stored : null;
+      }
+      setSelectedAcademyId(academyId);
+
+      if (!academyId) {
+        setAcademyLocationIds(new Set());
+        return;
+      }
+
+      const { data: alData, error: alErr } = await supabase
+        .from("academy_locations")
+        .select("academy_id,location_id")
+        .eq("academy_id", academyId);
+      if (alErr) {
+        setAcademyLocationIds(new Set());
+        return;
+      }
+      const ids = new Set<string>(
+        ((alData ?? []) as { location_id: string | null }[])
+          .map((r) => r.location_id)
+          .filter((id): id is string => !!id)
+      );
+      setAcademyLocationIds(ids);
+    })();
+  }, [supabase]);
 
   // Cargar alumnos y catálogos para reportes de asistencia
   useEffect(() => {
@@ -425,9 +461,16 @@ export default function ReportsPage() {
   useEffect(() => {
     (async () => {
       try {
+        if (!selectedAcademyId || academyLocationIds.size === 0) {
+          setLocationOptions([]);
+          setCourtOptions([]);
+          return;
+        }
+
         const { data: locData, error: locErr } = await supabase
           .from("locations")
-          .select("id,name");
+          .select("id,name")
+          .in("id", Array.from(academyLocationIds));
         if (locErr) throw locErr;
 
         const locOptions: LocationOption[] = (locData ?? []).map((l: any) => ({
@@ -439,7 +482,8 @@ export default function ReportsPage() {
 
         const { data: courtsData, error: ctErr } = await supabase
           .from("courts")
-          .select("id,name,location_id");
+          .select("id,name,location_id")
+          .in("location_id", Array.from(academyLocationIds));
         if (ctErr) throw ctErr;
 
         const ctOptions: CourtOption[] = (courtsData ?? []).map((c: any) => ({
@@ -454,12 +498,20 @@ export default function ReportsPage() {
         setError(msg);
       }
     })();
-  }, [supabase]);
+  }, [supabase, selectedAcademyId, academyLocationIds]);
 
   const loadReport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fromDate || !toDate) {
       setError("Selecciona un rango de fechas");
+      return;
+    }
+    if (!selectedAcademyId) {
+      setRows([]);
+      setTotalAmount(0);
+      setStudentSummary([]);
+      setPlanSummary([]);
+      setError("Selecciona una academia para ver este reporte");
       return;
     }
     setLoading(true);
@@ -476,7 +528,7 @@ export default function ReportsPage() {
 
       if (payErr) throw payErr;
 
-      const payments = (paymentsData ?? []) as {
+      const paymentsRaw = (paymentsData ?? []) as {
         id: string;
         student_id: string;
         student_plan_id: string;
@@ -487,9 +539,31 @@ export default function ReportsPage() {
         status: string;
       }[];
 
+      if (paymentsRaw.length === 0) {
+        setRows([]);
+        setTotalAmount(0);
+        return;
+      }
+
+      // Filtrar pagos por academia usando student_plans.academy_id
+      const studentPlanIdsAll = Array.from(new Set(paymentsRaw.map((p) => p.student_plan_id)));
+      const { data: spAcademyData, error: spAcademyErr } = await supabase
+        .from("student_plans")
+        .select("id,academy_id")
+        .in("id", studentPlanIdsAll);
+      if (spAcademyErr) throw spAcademyErr;
+      const allowedPlanIds = new Set<string>(
+        ((spAcademyData ?? []) as { id: string; academy_id: string | null }[])
+          .filter((row) => row.academy_id === selectedAcademyId)
+          .map((row) => row.id)
+      );
+
+      const payments = paymentsRaw.filter((p) => allowedPlanIds.has(p.student_plan_id));
       if (payments.length === 0) {
         setRows([]);
         setTotalAmount(0);
+        setStudentSummary([]);
+        setPlanSummary([]);
         return;
       }
 
@@ -617,6 +691,12 @@ export default function ReportsPage() {
       setError("Selecciona un rango de fechas para asistencia");
       return;
     }
+    if (!selectedAcademyId || academyLocationIds.size === 0) {
+      setAttendanceRows([]);
+      setAttendanceSummary({ total: 0, present: 0, absent: 0 });
+      return;
+    }
+
     setAttendanceLoading(true);
     setError(null);
     try {
@@ -628,18 +708,18 @@ export default function ReportsPage() {
         .lte("class_sessions.date", attendanceTo);
       if (attErr) throw attErr;
 
-      const rowsRaw = (attData ?? []) as any[];
-      if (rowsRaw.length === 0) {
+      const rowsRawAll = (attData ?? []) as any[];
+      if (rowsRawAll.length === 0) {
         setAttendanceRows([]);
         setAttendanceSummary({ total: 0, present: 0, absent: 0 });
         return;
       }
 
       const coachIds = Array.from(
-        new Set(rowsRaw.map((r) => r.class_sessions?.coach_id).filter((id: string | null): id is string => !!id))
+        new Set(rowsRawAll.map((r) => r.class_sessions?.coach_id).filter((id: string | null): id is string => !!id))
       );
       const courtIds = Array.from(
-        new Set(rowsRaw.map((r) => r.class_sessions?.court_id).filter((id: string | null): id is string => !!id))
+        new Set(rowsRawAll.map((r) => r.class_sessions?.court_id).filter((id: string | null): id is string => !!id))
       );
 
       let coachMap: Record<string, string | null> = {};
@@ -717,6 +797,20 @@ export default function ReportsPage() {
         );
       }
 
+      // Filtrar por sedes de la academia seleccionada
+      const rowsRaw = rowsRawAll.filter((r) => {
+        const cls = r.class_sessions;
+        const courtInfo = cls?.court_id ? courtMap[cls.court_id] : undefined;
+        const locId = courtInfo?.location_id ?? null;
+        return locId && academyLocationIds.has(locId);
+      });
+
+      if (rowsRaw.length === 0) {
+        setAttendanceRows([]);
+        setAttendanceSummary({ total: 0, present: 0, absent: 0 });
+        return;
+      }
+
       const mapped: AttendanceStudentRow[] = rowsRaw.map((r) => {
         const cls = r.class_sessions;
         const courtInfo = cls?.court_id ? courtMap[cls.court_id] : undefined;
@@ -758,6 +852,12 @@ export default function ReportsPage() {
       setError("Selecciona un rango de fechas para asistencia por profesor");
       return;
     }
+    if (!selectedAcademyId || academyLocationIds.size === 0) {
+      setCoachRows([]);
+      setCoachSummary({ totalClasses: 0, present: 0, absent: 0 });
+      return;
+    }
+
     setCoachLoading(true);
     setError(null);
     try {
@@ -769,24 +869,24 @@ export default function ReportsPage() {
         .lte("date", coachTo);
       if (clsErr) throw clsErr;
 
-      const classes = (clsData ?? []) as { id: string; date: string; court_id: string | null }[];
-      if (classes.length === 0) {
+      const classesAll = (clsData ?? []) as { id: string; date: string; court_id: string | null }[];
+      if (classesAll.length === 0) {
         setCoachRows([]);
         setCoachSummary({ totalClasses: 0, present: 0, absent: 0 });
         return;
       }
 
-      const classIds = classes.map((c) => c.id);
+      const classIdsAll = classesAll.map((c) => c.id);
       const { data: attData, error: attErr } = await supabase
         .from("attendance")
         .select("class_id,present")
-        .in("class_id", classIds);
+        .in("class_id", classIdsAll);
       if (attErr) throw attErr;
 
       const attendance = (attData ?? []) as { class_id: string; present: boolean | null }[];
 
       const courtIds = Array.from(
-        new Set(classes.map((c) => c.court_id).filter((id): id is string => !!id))
+        new Set(classesAll.map((c) => c.court_id).filter((id): id is string => !!id))
       );
       let courtMap: Record<string, { court_name: string | null; location_id: string | null }> = {};
       if (courtIds.length > 0) {
@@ -844,6 +944,19 @@ export default function ReportsPage() {
           byClass[key].absent += 1;
         }
       });
+
+      // Filtrar clases por sedes de la academia seleccionada
+      const classes = classesAll.filter((c) => {
+        const courtInfo = c.court_id ? courtMap[c.court_id] : undefined;
+        const locId = courtInfo?.location_id ?? null;
+        return locId && academyLocationIds.has(locId);
+      });
+
+      if (classes.length === 0) {
+        setCoachRows([]);
+        setCoachSummary({ totalClasses: 0, present: 0, absent: 0 });
+        return;
+      }
 
       const rows: CoachClassRow[] = classes.map((c) => {
         const counts = byClass[c.id] ?? { present: 0, absent: 0 };
