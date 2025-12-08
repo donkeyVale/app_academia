@@ -351,59 +351,29 @@ export default function HomePage() {
 
           setTodayClassesCount(todayCount);
 
-          // 3) Profesores / Alumnos: si hay academia seleccionada, contamos por user_academies
+          // 3) Profesores / Alumnos: contamos directamente desde user_academies por rol
           if (selectedAcademyId) {
-            const { data: uaRows, error: uaErr } = await supabase
-              .from('user_academies')
-              .select('user_id')
-              .eq('academy_id', selectedAcademyId);
-            if (uaErr) throw uaErr;
-
-            const userIds = Array.from(
-              new Set(
-                ((uaRows as { user_id: string | null }[] | null) ?? [])
-                  .map((r) => r.user_id)
-                  .filter((id): id is string => !!id)
-              )
-            );
-
-            if (userIds.length === 0) {
-              setCoachesCount(0);
-              setStudentsCount(0);
-            } else {
-              const [{ count: coachCount, error: coachErr }, { count: studCount, error: studErr }] = await Promise.all([
-                supabase
-                  .from('coaches')
-                  .select('id', { count: 'exact', head: true })
-                  .in('user_id', userIds),
-                supabase
-                  .from('students')
-                  .select('id', { count: 'exact', head: true })
-                  .in('user_id', userIds),
-              ]);
-
-              if (coachErr) throw coachErr;
-              if (studErr) throw studErr;
-
-              setCoachesCount(coachCount ?? 0);
-              setStudentsCount(studCount ?? 0);
-            }
-          } else {
-            // Sin academia seleccionada: totales globales
-            const [{ count: coachCount, error: coachErr }, { count: studCount, error: studErr }] = await Promise.all([
+            const [coachLikeRes, studRes] = await Promise.all([
               supabase
-                .from('coaches')
-                .select('id', { count: 'exact', head: true }),
+                .from('user_academies')
+                .select('id', { count: 'exact', head: true })
+                .eq('academy_id', selectedAcademyId)
+                .in('role', ['coach', 'admin']),
               supabase
-                .from('students')
-                .select('id', { count: 'exact', head: true }),
+                .from('user_academies')
+                .select('id', { count: 'exact', head: true })
+                .eq('academy_id', selectedAcademyId)
+                .eq('role', 'student'),
             ]);
 
-            if (coachErr) throw coachErr;
-            if (studErr) throw studErr;
+            if (coachLikeRes.error) throw coachLikeRes.error;
+            if (studRes.error) throw studRes.error;
 
-            setCoachesCount(coachCount ?? 0);
-            setStudentsCount(studCount ?? 0);
+            setCoachesCount(coachLikeRes.count ?? 0);
+            setStudentsCount(studRes.count ?? 0);
+          } else {
+            setCoachesCount(0);
+            setStudentsCount(0);
           }
         } else if (role === 'coach' && userId) {
           // Dashboard específico para coach
