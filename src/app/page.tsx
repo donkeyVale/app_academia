@@ -293,8 +293,8 @@ export default function HomePage() {
         if (role === 'admin' || role === 'super_admin') {
           // Dashboard para admin / super_admin (y fallback cuando aún no se cargó role)
 
-          // Si el usuario no tiene academias asignadas, mostramos todo en 0
-          if (hasAcademies === false) {
+          // Si el usuario no tiene academias asignadas (o aún no se resolvió), mostramos todo en 0
+          if (hasAcademies !== true) {
             setActivePlansCount(0);
             setStudentsWithPlanCount(0);
             setTodayClassesCount(0);
