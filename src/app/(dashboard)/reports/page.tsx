@@ -711,12 +711,6 @@ export default function ReportsPage() {
       setError("Selecciona un rango de fechas para asistencia");
       return;
     }
-    if (!selectedAcademyId || academyLocationIds.size === 0) {
-      setAttendanceRows([]);
-      setAttendanceSummary({ total: 0, present: 0, absent: 0 });
-      return;
-    }
-
     setAttendanceLoading(true);
     setError(null);
     try {
@@ -817,19 +811,7 @@ export default function ReportsPage() {
         );
       }
 
-      // Filtrar por sedes de la academia seleccionada
-      const rowsRaw = rowsRawAll.filter((r) => {
-        const cls = r.class_sessions;
-        const courtInfo = cls?.court_id ? courtMap[cls.court_id] : undefined;
-        const locId = courtInfo?.location_id ?? null;
-        return locId && academyLocationIds.has(locId);
-      });
-
-      if (rowsRaw.length === 0) {
-        setAttendanceRows([]);
-        setAttendanceSummary({ total: 0, present: 0, absent: 0 });
-        return;
-      }
+      const rowsRaw = rowsRawAll;
 
       const mapped: AttendanceStudentRow[] = rowsRaw.map((r) => {
         const cls = r.class_sessions;
@@ -872,12 +854,6 @@ export default function ReportsPage() {
       setError("Selecciona un rango de fechas para asistencia por profesor");
       return;
     }
-    if (!selectedAcademyId || academyLocationIds.size === 0) {
-      setCoachRows([]);
-      setCoachSummary({ totalClasses: 0, present: 0, absent: 0 });
-      return;
-    }
-
     setCoachLoading(true);
     setError(null);
     try {
@@ -965,18 +941,7 @@ export default function ReportsPage() {
         }
       });
 
-      // Filtrar clases por sedes de la academia seleccionada
-      const classes = classesAll.filter((c) => {
-        const courtInfo = c.court_id ? courtMap[c.court_id] : undefined;
-        const locId = courtInfo?.location_id ?? null;
-        return locId && academyLocationIds.has(locId);
-      });
-
-      if (classes.length === 0) {
-        setCoachRows([]);
-        setCoachSummary({ totalClasses: 0, present: 0, absent: 0 });
-        return;
-      }
+      const classes = classesAll;
 
       const rows: CoachClassRow[] = classes.map((c) => {
         const counts = byClass[c.id] ?? { present: 0, absent: 0 };
