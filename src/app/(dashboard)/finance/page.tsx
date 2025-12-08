@@ -42,7 +42,7 @@ export default function FinancePage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyItems, setHistoryItems] = useState<
-    { id: string; date: string; courtName: string | null; coachName: string | null }[]
+    { id: string; date: string; courtName: string | null; coachName: string | null; note: string | null }[]
   >([]);
 
   const roleResolved = role === 'super_admin' || role === 'admin' || role === 'coach' || role === 'student';
@@ -519,7 +519,7 @@ export default function FinancePage() {
                           }
                         }
 
-                        const items = classSessions.map((cls) => {
+                        const baseItems = classSessions.map((cls) => {
                           const court = cls.court_id ? courtsMap[cls.court_id] : undefined;
                           const coach = cls.coach_id ? coachesMap[cls.coach_id] : undefined;
                           const coachName = coach?.user_id
@@ -530,8 +530,37 @@ export default function FinancePage() {
                             date: cls.date,
                             courtName: court?.name ?? null,
                             coachName,
+                            note: null as string | null,
                           };
                         });
+
+                        // Cargar notas de clase para este alumno y estas clases (solo lectura)
+                        const classIds = baseItems.map((i) => i.id);
+                        let notesByClass: Record<string, string | null> = {};
+                        if (classIds.length) {
+                          const { data: notesData, error: notesErr } = await supabase
+                            .from('class_notes')
+                            .select('class_id,note')
+                            .eq('student_id', studentId)
+                            .in('class_id', classIds);
+
+                          if (!notesErr) {
+                            notesByClass = (notesData ?? []).reduce<Record<string, string | null>>(
+                              (acc, n: any) => {
+                                const cid = n.class_id as string;
+                                // Nos quedamos con la primera nota si hay varias
+                                if (!acc[cid]) acc[cid] = (n.note as string) ?? null;
+                                return acc;
+                              },
+                              {},
+                            );
+                          }
+                        }
+
+                        const items = baseItems.map((it) => ({
+                          ...it,
+                          note: notesByClass[it.id] ?? null,
+                        }));
 
                         items.sort((a, b) => b.date.localeCompare(a.date));
                         setHistoryItems(items);
@@ -600,14 +629,32 @@ export default function FinancePage() {
                           const hh = String(d.getHours()).padStart(2, '0');
                           const min = String(d.getMinutes()).padStart(2, '0');
 
-                          return (
-                            <tr key={item.id} className="border-b last:border-b-0">
-                              <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
-                              <td className="py-1.5 px-2">{`${hh}:${min}`}</td>
-                              <td className="py-1.5 px-2">{item.courtName ?? '-'}</td>
-                              <td className="py-1.5 px-2">{item.coachName ?? '-'}</td>
-                            </tr>
-                          );
+                          return [
+                            (
+                              <tr key={`${item.id}-row`} className="border-b last:border-b-0">
+                                <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
+                                <td className="py-1.5 px-2">{`${hh}:${min}`}</td>
+                                <td className="py-1.5 px-2">{item.courtName ?? '-'}</td>
+                                <td className="py-1.5 px-2">{item.coachName ?? '-'}</td>
+                              </tr>
+                            ),
+                            (
+                              <tr key={`${item.id}-note`} className="border-b last:border-b-0">
+                                <td colSpan={4} className="py-1.5 px-2 bg-gray-50/40">
+                                  {item.note ? (
+                                    <p className="text-[12px] text-gray-700">
+                                      <span className="font-semibold">Nota:</span>{' '}
+                                      <span className="font-semibold">{item.note}</span>
+                                    </p>
+                                  ) : (
+                                    <p className="text-[12px] text-gray-500">
+                                      Esta clase no tiene notas cargadas.
+                                    </p>
+                                  )}
+                                </td>
+                              </tr>
+                            ),
+                          ];
                         })}
                       </tbody>
                     </table>
