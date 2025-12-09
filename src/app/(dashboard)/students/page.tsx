@@ -135,12 +135,13 @@ export default function StudentsPage() {
 
         const isAdminLike = roleFromProfile === 'admin' || roleFromProfile === 'super_admin';
         let selectedAcademyId: string | null = null;
-        if (isAdminLike && typeof window !== 'undefined') {
+        if ((isAdminLike || roleFromProfile === 'coach') && typeof window !== 'undefined') {
           const stored = window.localStorage.getItem('selectedAcademyId');
           selectedAcademyId = stored && stored.trim() ? stored : null;
         }
 
-        if (isAdminLike) {
+        // Para admin/super_admin y coach: alumnos y planes se limitan a la academia seleccionada
+        if (isAdminLike || roleFromProfile === 'coach') {
           if (!selectedAcademyId) {
             effectiveStudents = [];
             effectiveRawPlans = [];
@@ -160,9 +161,7 @@ export default function StudentsPage() {
 
             effectiveStudents = studentsData.filter((s) => s.user_id && studentUserIds.has(s.user_id));
 
-            if (selectedAcademyId) {
-              effectiveRawPlans = effectiveRawPlans.filter((p) => p.academy_id === selectedAcademyId);
-            }
+            effectiveRawPlans = effectiveRawPlans.filter((p) => p.academy_id === selectedAcademyId);
           }
         }
 
@@ -309,17 +308,52 @@ export default function StudentsPage() {
           }
 
           if (coachId) {
+            // Leer academia seleccionada para el coach desde localStorage
+            let coachSelectedAcademyId: string | null = null;
+            if (typeof window !== 'undefined') {
+              const stored = window.localStorage.getItem('selectedAcademyId');
+              coachSelectedAcademyId = stored && stored.trim() ? stored : null;
+            }
+
+            let locationIds: string[] | null = null;
+            if (coachSelectedAcademyId) {
+              const { data: locRows, error: locErr } = await supabase
+                .from('academy_locations')
+                .select('location_id')
+                .eq('academy_id', coachSelectedAcademyId);
+              if (locErr) throw locErr;
+              locationIds = ((locRows as { location_id: string | null }[] | null) ?? [])
+                .map((row) => row.location_id)
+                .filter((id): id is string => !!id);
+            }
+
             const futureFrom = new Date();
             const futureTo = new Date(futureFrom.getTime() + 14 * 24 * 60 * 60 * 1000);
-            const { data: futureClasses, error: futureErr } = await supabase
-              .from('class_sessions')
-              .select('id,date')
-              .eq('coach_id', coachId)
-              .gte('date', futureFrom.toISOString())
-              .lte('date', futureTo.toISOString());
-            if (futureErr) throw futureErr;
 
-            const classes = futureClasses ?? [];
+            let classes: { id: string; date: string }[] = [];
+            if (locationIds && locationIds.length > 0) {
+              // Clases futuras del coach solo en las sedes de la academia seleccionada
+              const { data: futureClasses, error: futureErr } = await supabase
+                .from('class_sessions')
+                .select('id,date,courts!inner(location_id)')
+                .eq('coach_id', coachId)
+                .gte('date', futureFrom.toISOString())
+                .lte('date', futureTo.toISOString())
+                .in('courts.location_id', locationIds);
+              if (futureErr) throw futureErr;
+              classes = (futureClasses ?? []) as { id: string; date: string }[];
+            } else {
+              // Sin academia seleccionada (o sin sedes vinculadas): fallback a todas las clases del coach
+              const { data: futureClasses, error: futureErr } = await supabase
+                .from('class_sessions')
+                .select('id,date')
+                .eq('coach_id', coachId)
+                .gte('date', futureFrom.toISOString())
+                .lte('date', futureTo.toISOString());
+              if (futureErr) throw futureErr;
+              classes = (futureClasses ?? []) as { id: string; date: string }[];
+            }
+
             if (classes.length > 0) {
               const classIdMap: Record<string, string> = {};
               classes.forEach((c: any) => {
