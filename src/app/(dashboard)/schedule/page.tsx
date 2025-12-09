@@ -671,6 +671,87 @@ export default function SchedulePage() {
         }
       }
 
+      // Crear la clase principal
+      const { data: inserted, error: insErr } = await supabase
+        .from('class_sessions')
+        .insert({
+          date: iso,
+          court_id: courtId,
+          coach_id: coachId,
+          capacity: derivedCapacity,
+          type: derivedType,
+          // price_cents y currency pueden tener defaults en la DB; si no, se agregan luego.
+        })
+        .select('*')
+        .maybeSingle();
+
+      if (insErr) {
+        const msg = insErr.message || 'No se pudo crear la clase.';
+        toast.error(msg);
+        setSaving(false);
+        return;
+      }
+      if (!inserted) {
+        const msg = 'No se pudo crear la clase (verifica permisos RLS para INSERT).';
+        toast.error(msg);
+        setSaving(false);
+        return;
+      }
+
+      const createdClassId = (inserted as any).id as string;
+
+      // Crear bookings para todos los alumnos seleccionados
+      const bookingRows = selectedStudents.map((sid) => ({
+        class_id: createdClassId,
+        student_id: sid,
+        status: 'reserved',
+      }));
+
+      const { error: bookingsErr } = await supabase.from('bookings').insert(bookingRows);
+      if (bookingsErr) {
+        const msg = bookingsErr.message || 'La clase se creó, pero hubo un problema al registrar las reservas.';
+        toast.error(msg);
+        setSaving(false);
+        return;
+      }
+
+      // Crear usos de plan para cada alumno usando planForStudent validado arriba
+      for (const sid of selectedStudents) {
+        const planId = planForStudent[sid];
+        if (!planId) continue;
+        try {
+          await supabase.from('plan_usages').upsert(
+            {
+              student_plan_id: planId,
+              class_id: createdClassId,
+              student_id: sid,
+            },
+            { onConflict: 'student_id,class_id' }
+          );
+        } catch {
+          // no bloquear la creación por errores de plan (el saldo ya fue validado)
+        }
+      }
+
+      // Log de auditoría similar a update/delete
+      await logAudit('create', 'class_session', createdClassId, {
+        date: iso,
+        court_id: courtId,
+        coach_id: coachId,
+        capacity: derivedCapacity,
+        type: derivedType,
+        students: [...selectedStudents],
+      });
+
+      // Actualizar estado en memoria para que la UI refleje la nueva clase sin recargar
+      const newClass = inserted as unknown as ClassSession;
+      setClasses((prev) => [...prev, newClass].sort((a, b) => a.date.localeCompare(b.date)));
+      setBookingsCount((prev) => ({ ...prev, [createdClassId]: selectedStudents.length }));
+      setStudentsByClass((prev) => ({
+        ...prev,
+        [createdClassId]: [...selectedStudents],
+      }));
+
       setDay('');
       setTime('');
       setLocationId('');
