@@ -140,8 +140,8 @@ export default function StudentsPage() {
           selectedAcademyId = stored && stored.trim() ? stored : null;
         }
 
-        // Para admin/super_admin y coach: alumnos y planes se limitan a la academia seleccionada
-        if (isAdminLike || roleFromProfile === 'coach') {
+        // Para admin/super_admin: alumnos y planes se limitan estrictamente a la academia seleccionada
+        if (isAdminLike) {
           if (!selectedAcademyId) {
             effectiveStudents = [];
             effectiveRawPlans = [];
@@ -162,6 +162,26 @@ export default function StudentsPage() {
             effectiveStudents = studentsData.filter((s) => s.user_id && studentUserIds.has(s.user_id));
 
             effectiveRawPlans = effectiveRawPlans.filter((p) => p.academy_id === selectedAcademyId);
+          }
+        }
+
+        // Para coach: la grilla de alumnos también debe respetar la academia seleccionada,
+        // pero sin depender de user_academies. Usamos los planes: alumnos que tienen
+        // al menos un plan con academy_id = selectedAcademyId.
+        if (roleFromProfile === 'coach' && selectedAcademyId) {
+          const coachAcademyStudentIds = new Set(
+            effectiveRawPlans
+              .filter((p: any) => p.academy_id === selectedAcademyId)
+              .map((p: any) => p.student_id as string)
+          );
+
+          if (coachAcademyStudentIds.size > 0) {
+            effectiveStudents = effectiveStudents.filter((s) => coachAcademyStudentIds.has(s.id));
+            effectiveRawPlans = effectiveRawPlans.filter((p: any) => p.academy_id === selectedAcademyId);
+          } else {
+            // Si no hay ningún plan asociado a esa academia, mostramos lista vacía para coach.
+            effectiveStudents = [];
+            effectiveRawPlans = [];
           }
         }
 
