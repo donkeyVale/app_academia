@@ -352,7 +352,7 @@ export default function LocationsAdminPage() {
               </div>
               <div className="px-4 py-4 text-sm space-y-3">
                 {!selectedLocation && (
-                  <p className="text-gray-600">Seleccioná una sede de la lista de la izquierda.</p>
+                  <p className="text-gray-600">Seleccioná una sede de la lista.</p>
                 )}
 
                 {selectedLocation && (
