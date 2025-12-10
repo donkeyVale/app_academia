@@ -789,7 +789,7 @@ export default function UsersPage() {
                   La fecha debe estar en formato <strong>DD/MM/YYYY</strong>. El campo{' '}
                   <strong>academias</strong> acepta uno o varios IDs de academia separados por punto y coma (;).
                 </p>
-                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-start">
                   <div className="flex flex-col gap-1">
                     <input
                       type="file"
