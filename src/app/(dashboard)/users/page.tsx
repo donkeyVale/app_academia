@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
-import { Users, UserPlus, ListChecks, Calendar as CalendarIcon } from 'lucide-react';
+import { Users, UserPlus, ListChecks, Calendar as CalendarIcon, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -789,7 +789,7 @@ export default function UsersPage() {
                   La fecha debe estar en formato <strong>DD/MM/YYYY</strong>. El campo{' '}
                   <strong>academias</strong> acepta uno o varios IDs de academia separados por punto y coma (;).
                 </p>
-                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
                   <div className="flex flex-col gap-1">
                     <input
                       type="file"
@@ -828,12 +828,28 @@ export default function UsersPage() {
                   </Button>
                 </div>
 
-                {importSummary && (
-                  <div className="text-xs text-gray-700">
-                    <p>
-                      Total filas procesadas: <strong>{importSummary.total}</strong>. Usuarios creados:{' '}
-                      <strong>{importSummary.ok}</strong>. Errores: <strong>{importSummary.error}</strong>.
-                    </p>
+                {(importSummary || importResults.length > 0) && (
+                  <div className="flex items-center justify-between gap-3 text-xs text-gray-700">
+                    {importSummary && (
+                      <p>
+                        Total filas procesadas: <strong>{importSummary.total}</strong>. Usuarios creados:{' '}
+                        <strong>{importSummary.ok}</strong>. Errores: <strong>{importSummary.error}</strong>.
+                      </p>
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-[11px] ml-auto flex items-center gap-1"
+                      onClick={() => {
+                        setImportResults([]);
+                        setImportSummary(null);
+                        setImportFile(null);
+                      }}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Limpiar resultados
+                    </Button>
                   </div>
                 )}
 
