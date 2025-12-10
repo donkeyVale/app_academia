@@ -241,11 +241,25 @@ export default function SettingsPage() {
               <label className="text-xs font-medium text-gray-700">Academia</label>
               <select
                 value={selectedAcademyId ?? ""}
-                onChange={(e) => {
+                onChange={async (e) => {
                   const next = e.target.value || null;
                   setSelectedAcademyId(next);
                   if (typeof window !== "undefined" && next) {
                     window.localStorage.setItem("selectedAcademyId", next);
+                  }
+
+                  // Guardar academia por defecto a nivel de usuario
+                  try {
+                    const { data } = await supabase.auth.getUser();
+                    const user = data.user;
+                    if (!user || !next) return;
+
+                    await supabase
+                      .from("profiles")
+                      .update({ default_academy_id: next })
+                      .eq("id", user.id);
+                  } catch (err) {
+                    console.error("No se pudo actualizar default_academy_id", err);
                   }
                 }}
                 className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#3cadaf] focus:border-[#3cadaf] bg-white"

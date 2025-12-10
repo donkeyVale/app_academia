@@ -175,7 +175,7 @@ export default function HomePage() {
       if (userId) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('full_name, role')
+          .select('full_name, role, default_academy_id')
           .eq('id', userId)
           .maybeSingle();
         if (profile?.full_name) {
@@ -234,7 +234,18 @@ export default function HomePage() {
                   stored = window.localStorage.getItem('selectedAcademyId');
                 }
                 const validIds = options.map((o) => o.id);
-                const initial = stored && validIds.includes(stored) ? stored : validIds[0] ?? null;
+
+                const profileDefault = (profile as any)?.default_academy_id as string | null | undefined;
+
+                let initial: string | null = null;
+                if (profileDefault && validIds.includes(profileDefault)) {
+                  initial = profileDefault;
+                } else if (stored && validIds.includes(stored)) {
+                  initial = stored;
+                } else {
+                  initial = validIds[0] ?? null;
+                }
+
                 setSelectedAcademyId(initial);
                 if (initial && typeof window !== 'undefined') {
                   window.localStorage.setItem('selectedAcademyId', initial);
