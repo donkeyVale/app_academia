@@ -109,6 +109,8 @@ export default function UsersPage() {
   const [loadingList, setLoadingList] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [role, setRole] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
 
   // UI: secciones plegables
   const [showCreateUser, setShowCreateUser] = useState(false);
@@ -128,6 +130,8 @@ export default function UsersPage() {
   const [detailEmail, setDetailEmail] = useState('');
   const [detailBirthDate, setDetailBirthDate] = useState('');
   const [detailRoles, setDetailRoles] = useState<Role[]>([]);
+  const [detailCoachFee, setDetailCoachFee] = useState('');
+  const [detailCoachFeeSaving, setDetailCoachFeeSaving] = useState(false);
 
   // Importación masiva desde CSV
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -150,6 +154,16 @@ export default function UsersPage() {
         setLoadingList(false);
         return;
       }
+
+      setCurrentUserId(userId);
+
+      // Academia seleccionada (multi-academia)
+      let storedAcademyId: string | null = null;
+      if (typeof window !== 'undefined') {
+        const stored = window.localStorage.getItem('selectedAcademyId');
+        storedAcademyId = stored && stored.trim() ? stored : null;
+      }
+      setSelectedAcademyId(storedAcademyId);
 
       const { data: profile } = await supabase
         .from('profiles')
@@ -186,20 +200,14 @@ export default function UsersPage() {
       let finalUserRoles = rawUserRoles;
 
       if (currentRole === 'admin') {
-        let selectedAcademyId: string | null = null;
-        if (typeof window !== 'undefined') {
-          const stored = window.localStorage.getItem('selectedAcademyId');
-          selectedAcademyId = stored && stored.trim() ? stored : null;
-        }
-
-        if (!selectedAcademyId) {
+        if (!storedAcademyId) {
           finalUsers = [];
           finalUserRoles = [];
         } else {
           const { data: uaRows, error: uaErr } = await supabase
             .from('user_academies')
             .select('user_id, academy_id')
-            .eq('academy_id', selectedAcademyId);
+            .eq('academy_id', storedAcademyId);
 
           if (uaErr) {
             setError('Error cargando usuarios por academia.');
@@ -502,6 +510,7 @@ export default function UsersPage() {
     setDetailError(null);
     setDetailSubmitting(false);
     setDetailDeleting(false);
+    setDetailCoachFee('');
     try {
       const res = await fetch('/api/admin/get-user', {
         method: 'POST',
@@ -526,6 +535,32 @@ export default function UsersPage() {
       const roles: string[] = (u.roles as string[] | undefined) ?? [];
       const validRoles = roles.filter((r) => (ROLES as readonly string[]).includes(r)) as Role[];
       setDetailRoles(validRoles.length ? validRoles : ['student']);
+
+      // Cargar tarifa por clase si es coach y hay academia seleccionada
+      if (validRoles.includes('coach') && currentUserId && selectedAcademyId) {
+        try {
+          const feeRes = await fetch('/api/admin/get-coach-fee', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              currentUserId,
+              userId: u.id,
+              academyId: selectedAcademyId,
+            }),
+          });
+          const feeJson = await feeRes.json();
+          if (feeRes.ok) {
+            const fee = feeJson?.feePerClass as number | null | undefined;
+            setDetailCoachFee(fee != null ? String(fee) : '');
+          } else if (feeJson?.error) {
+            toast.error(feeJson.error);
+          }
+        } catch (e: any) {
+          // Si falla la carga de tarifa, solo mostramos el error como toast
+          const msg = e?.message ?? 'No se pudo cargar la tarifa del profesor.';
+          toast.error(msg);
+        }
+      }
     } catch (e: any) {
       setDetailError(e?.message ?? 'Error inesperado cargando el usuario.');
     } finally {
@@ -600,6 +635,51 @@ export default function UsersPage() {
       toast.error(message);
     } finally {
       setDetailDeleting(false);
+    }
+  };
+
+  const handleUpdateCoachFee = async () => {
+    if (!detailUserId || !currentUserId || !selectedAcademyId) {
+      toast.error('No se puede guardar la tarifa: falta información de usuario o academia.');
+      return;
+    }
+
+    const raw = detailCoachFee.replace(',', '.').trim();
+    if (!raw) {
+      toast.error('Ingresá una tarifa por clase.');
+      return;
+    }
+
+    const fee = Number(raw);
+    if (!Number.isFinite(fee) || fee < 0) {
+      toast.error('La tarifa por clase debe ser un número válido mayor o igual a 0.');
+      return;
+    }
+
+    setDetailCoachFeeSaving(true);
+    try {
+      const res = await fetch('/api/admin/update-coach-fee', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentUserId,
+          userId: detailUserId,
+          academyId: selectedAcademyId,
+          feePerClass: fee,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        const message = json?.error ?? 'No se pudo guardar la tarifa del profesor.';
+        toast.error(message);
+        return;
+      }
+      toast.success('Tarifa por clase guardada correctamente.');
+    } catch (e: any) {
+      const message = e?.message ?? 'Error inesperado guardando la tarifa del profesor.';
+      toast.error(message);
+    } finally {
+      setDetailCoachFeeSaving(false);
     }
   };
 
@@ -1039,6 +1119,35 @@ export default function UsersPage() {
                       ))}
                     </div>
                   </div>
+
+                  {detailRoles.includes('coach') && (
+                    <div>
+                      <label className="block text-sm mb-1">
+                        Tarifa por clase (Gs) – academia actual
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          className="border rounded px-3 w-full h-10 text-base md:text-sm"
+                          value={detailCoachFee}
+                          onChange={(e) => setDetailCoachFee(e.target.value)}
+                          min={0}
+                        />
+                        <button
+                          type="button"
+                          className="px-3 py-2 bg-[#3cadaf] hover:bg-[#31435d] text-white rounded text-xs disabled:opacity-50"
+                          onClick={handleUpdateCoachFee}
+                          disabled={detailCoachFeeSaving}
+                        >
+                          {detailCoachFeeSaving ? 'Guardando…' : 'Guardar tarifa'}
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Esta tarifa se aplica por cada clase/hora impartida por este profesor en la academia
+                        seleccionada.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="flex justify-between items-center gap-2 pt-2 border-t mt-2">
                     {isAdminReadOnly ? (
