@@ -188,11 +188,12 @@ export default function StudentsPage() {
 
             let validUserIdsForAcademy: Set<string> | null = null;
             if (!uaErrForCoach && uaRowsForCoach) {
-              validUserIdsForAcademy = new Set(
-                (uaRowsForCoach as { user_id: string | null }[])
-                  .map((r) => r.user_id)
-                  .filter((id): id is string => !!id)
-              );
+              const userIds = (uaRowsForCoach as { user_id: string | null }[])
+                .map((r) => r.user_id)
+                .filter((id): id is string => !!id);
+              if (userIds.length > 0) {
+                validUserIdsForAcademy = new Set(userIds);
+              }
             }
 
             effectiveStudents = effectiveStudents.filter((s) => {
