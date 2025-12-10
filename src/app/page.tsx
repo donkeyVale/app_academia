@@ -740,6 +740,25 @@ export default function HomePage() {
         </div>
       </div>
 
+      {academyOptions.length > 0 && selectedAcademyId && (
+        <div className="flex items-center justify-between gap-2 text-xs text-gray-600 bg-white border border-emerald-100 rounded-lg px-3 py-2 shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-100">
+              Academia activa
+            </span>
+            <span className="font-medium text-[#0f172a]">
+              {academyOptions.find((a) => a.id === selectedAcademyId)?.name ?? 'Sin academia'}
+            </span>
+          </div>
+          <Link
+            href="/settings"
+            className="text-[11px] font-medium text-emerald-700 hover:text-emerald-900 hover:underline whitespace-nowrap"
+          >
+            Cambiar en Configuración
+          </Link>
+        </div>
+      )}
+
       {isAdminRole && hasAcademies === false && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 flex items-start gap-2">
           <span className="mt-0.5">⚠️</span>
