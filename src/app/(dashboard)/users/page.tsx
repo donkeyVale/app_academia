@@ -129,6 +129,16 @@ export default function UsersPage() {
   const [detailBirthDate, setDetailBirthDate] = useState('');
   const [detailRoles, setDetailRoles] = useState<Role[]>([]);
 
+  // Importación masiva desde CSV
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importUploading, setImportUploading] = useState(false);
+  const [importResults, setImportResults] = useState<
+    { index: number; status: 'ok' | 'error'; message: string }[]
+  >([]);
+  const [importSummary, setImportSummary] = useState<{ total: number; ok: number; error: number } | null>(
+    null,
+  );
+
   useEffect(() => {
     let active = true;
     (async () => {
@@ -314,6 +324,128 @@ export default function UsersPage() {
     return userRoles
       .filter((r) => r.user_id === userId)
       .map((r) => r.role);
+  };
+
+  const parseCsvContent = (content: string) => {
+    const lines = content
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+
+    if (lines.length < 2) {
+      return { headers: [] as string[], rows: [] as Record<string, string>[] };
+    }
+
+    const headerLine = lines[0];
+    const headers = headerLine.split(',').map((h) => h.trim());
+
+    const rows: Record<string, string>[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i];
+      const values = line.split(',');
+      const row: Record<string, string> = {};
+      headers.forEach((h, idx) => {
+        row[h] = (values[idx] ?? '').trim();
+      });
+      rows.push(row);
+    }
+
+    return { headers, rows };
+  };
+
+  const handleImportCsv = async () => {
+    if (!importFile) {
+      toast.error('Seleccioná un archivo CSV primero.');
+      return;
+    }
+
+    setImportUploading(true);
+    setImportResults([]);
+    setImportSummary(null);
+
+    try {
+      const fileText = await importFile.text();
+      const { headers, rows } = parseCsvContent(fileText);
+
+      const requiredHeaders = [
+        'nombre',
+        'apellido',
+        'numero_de_documento',
+        'telefono',
+        'correo',
+        'fecha_de_nacimiento',
+        'role',
+        'academias',
+      ];
+
+      const missing = requiredHeaders.filter((h) => !headers.includes(h));
+      if (missing.length > 0) {
+        toast.error(
+          `El archivo CSV no tiene todas las columnas requeridas. Faltan: ${missing.join(', ')}.`,
+        );
+        setImportUploading(false);
+        return;
+      }
+
+      if (rows.length === 0) {
+        toast.error('El archivo CSV no tiene filas de datos.');
+        setImportUploading(false);
+        return;
+      }
+
+      const payloadRows = rows.map((r) => ({
+        nombre: r.nombre ?? '',
+        apellido: r.apellido ?? '',
+        numero_de_documento: r.numero_de_documento ?? '',
+        telefono: r.telefono ?? '',
+        correo: r.correo ?? '',
+        fecha_de_nacimiento: r.fecha_de_nacimiento ?? '',
+        role: r.role ?? '',
+        academias: r.academias ?? '',
+      }));
+
+      const res = await fetch('/api/admin/import-users', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ rows: payloadRows }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        const message = json?.error ?? 'Error procesando la importación.';
+        toast.error(message);
+        setImportUploading(false);
+        return;
+      }
+
+      const results = (json?.results ?? []) as {
+        index: number;
+        status: 'ok' | 'error';
+        message: string;
+      }[];
+
+      setImportResults(results);
+
+      const total = results.length;
+      const ok = results.filter((r) => r.status === 'ok').length;
+      const error = results.filter((r) => r.status === 'error').length;
+      setImportSummary({ total, ok, error });
+
+      if (ok > 0) {
+        toast.success(`Importación finalizada. Usuarios creados: ${ok}. Errores: ${error}.`);
+        await reloadUsersList();
+      } else {
+        toast.error('No se pudo crear ningún usuario. Revisá los errores por fila.');
+      }
+    } catch (e: any) {
+      const message = e?.message ?? 'Error inesperado procesando el archivo.';
+      toast.error(message);
+    } finally {
+      setImportUploading(false);
+    }
   };
 
   const reloadUsersList = async () => {
@@ -552,95 +684,169 @@ export default function UsersPage() {
           {showCreateUser && (
             <div className="p-4 space-y-3">
               <form onSubmit={handleSubmit} className="space-y-3 max-w-xl">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm mb-1">Nombre</label>
-              <input
-                className="border rounded px-3 w-full h-10 text-base md:text-sm"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm mb-1">Apellido</label>
-              <input
-                className="border rounded px-3 w-full h-10 text-base md:text-sm"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                required
-              />
-            </div>
-          </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm mb-1">Nombre</label>
+                    <input
+                      className="border rounded px-3 w-full h-10 text-base md:text-sm"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm mb-1">Apellido</label>
+                    <input
+                      className="border rounded px-3 w-full h-10 text-base md:text-sm"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm mb-1">N° de cédula</label>
-              <input
-                className="border rounded px-3 w-full h-10 text-base md:text-sm"
-                value={nationalId}
-                onChange={(e) => setNationalId(e.target.value)}
-                required
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                Esta será la contraseña inicial del usuario.
-              </p>
-            </div>
-            <div>
-              <label className="block text-sm mb-1">Teléfono (+595...)</label>
-              <input
-                className="border rounded px-3 w-full h-10 text-base md:text-sm"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                required
-              />
-            </div>
-          </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm mb-1">N° de cédula</label>
+                    <input
+                      className="border rounded px-3 w-full h-10 text-base md:text-sm"
+                      value={nationalId}
+                      onChange={(e) => setNationalId(e.target.value)}
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Esta será la contraseña inicial del usuario.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm mb-1">Teléfono (+595...)</label>
+                    <input
+                      className="border rounded px-3 w-full h-10 text-base md:text-sm"
+                      value={phone}
+                      onChange={(e) => setPhone(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm mb-1">Correo electrónico</label>
-              <input
-                type="email"
-                className="border rounded px-3 w-full h-10 text-base md:text-sm"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm mb-1">Fecha de nacimiento</label>
-              <DatePickerField value={birthDate} onChange={setBirthDate} />
-            </div>
-          </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm mb-1">Correo electrónico</label>
+                    <input
+                      type="email"
+                      className="border rounded px-3 w-full h-10 text-base md:text-sm"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm mb-1">Fecha de nacimiento</label>
+                    <DatePickerField value={birthDate} onChange={setBirthDate} />
+                  </div>
+                </div>
 
-          <div>
-            <label className="block text-sm mb-1">Roles</label>
-            <div className="flex flex-wrap gap-3 text-sm">
-              {ROLES.map((role) => (
-                <label key={role} className="inline-flex items-center gap-1">
-                  <input
-                    type="checkbox"
-                    checked={selectedRoles.includes(role)}
-                    onChange={() => toggleRole(role)}
-                  />
-                  <span>{role}</span>
-                </label>
-              ))}
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Podés asignar más de un rol. Si marcás "admin", el usuario tendrá acceso completo.
-            </p>
-          </div>
+                <div>
+                  <label className="block text-sm mb-1">Roles</label>
+                  <div className="flex flex-wrap gap-3 text-sm">
+                    {ROLES.map((role) => (
+                      <label key={role} className="inline-flex items-center gap-1">
+                        <input
+                          type="checkbox"
+                          checked={selectedRoles.includes(role)}
+                          onChange={() => toggleRole(role)}
+                        />
+                        <span>{role}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Podés asignar más de un rol. Si marcás "admin", el usuario tendrá acceso completo.
+                  </p>
+                </div>
 
-          <button
-            type="submit"
-            className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 text-sm disabled:opacity-50"
-            disabled={submitting}
-          >
-            {submitting ? 'Creando usuario...' : 'Crear usuario'}
-          </button>
+                <button
+                  type="submit"
+                  className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 text-sm disabled:opacity-50"
+                  disabled={submitting}
+                >
+                  {submitting ? 'Creando usuario...' : 'Crear usuario'}
+                </button>
               </form>
+
+              <div className="mt-6 border-t pt-4 space-y-3 max-w-xl">
+                <h3 className="text-sm font-semibold text-[#31435d] flex items-center gap-2">
+                  <CalendarIcon className="w-4 h-4 text-emerald-500" />
+                  Importar usuarios desde CSV
+                </h3>
+                <p className="text-xs text-gray-600">
+                  Subí un archivo CSV exportado desde Google Sheets con los siguientes encabezados en la primera
+                  fila: <strong>nombre</strong>, <strong>apellido</strong>, <strong>numero_de_documento</strong>,{' '}
+                  <strong>telefono</strong>, <strong>correo</strong>, <strong>fecha_de_nacimiento</strong>,{' '}
+                  <strong>role</strong>, <strong>academias</strong>.
+                </p>
+                <p className="text-xs text-gray-600">
+                  La fecha debe estar en formato <strong>DD/MM/YYYY</strong>. El campo{' '}
+                  <strong>academias</strong> acepta uno o varios IDs de academia separados por punto y coma (;).
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] ?? null;
+                      setImportFile(file);
+                    }}
+                    className="text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleImportCsv}
+                    disabled={importUploading || !importFile}
+                    className="bg-sky-500 hover:bg-sky-600 text-white rounded px-3 py-1.5 text-xs disabled:opacity-50"
+                  >
+                    {importUploading ? 'Procesando archivo...' : 'Procesar archivo'}
+                  </button>
+                </div>
+
+                {importSummary && (
+                  <div className="text-xs text-gray-700">
+                    <p>
+                      Total filas procesadas: <strong>{importSummary.total}</strong>. Usuarios creados:{' '}
+                      <strong>{importSummary.ok}</strong>. Errores: <strong>{importSummary.error}</strong>.
+                    </p>
+                  </div>
+                )}
+
+                {importResults.length > 0 && (
+                  <div className="max-h-64 overflow-auto border rounded mt-2">
+                    <table className="min-w-full text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 border-b">
+                          <th className="text-left py-1 px-2">Fila</th>
+                          <th className="text-left py-1 px-2">Estado</th>
+                          <th className="text-left py-1 px-2">Detalle</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {importResults.map((r) => (
+                          <tr key={r.index} className="border-b last:border-b-0">
+                            <td className="py-1 px-2 whitespace-nowrap">{r.index + 2}</td>
+                            <td className="py-1 px-2 whitespace-nowrap">
+                              {r.status === 'ok' ? (
+                                <span className="text-emerald-600 font-medium">OK</span>
+                              ) : (
+                                <span className="text-red-600 font-medium">Error</span>
+                              )}
+                            </td>
+                            <td className="py-1 px-2 text-gray-700">{r.message}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
