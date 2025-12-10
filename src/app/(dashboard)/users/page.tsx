@@ -789,24 +789,43 @@ export default function UsersPage() {
                   La fecha debe estar en formato <strong>DD/MM/YYYY</strong>. El campo{' '}
                   <strong>academias</strong> acepta uno o varios IDs de academia separados por punto y coma (;).
                 </p>
-                <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
-                  <input
-                    type="file"
-                    accept=".csv,text/csv"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0] ?? null;
-                      setImportFile(file);
-                    }}
-                    className="text-xs"
-                  />
-                  <button
+                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                  <div className="flex flex-col gap-1">
+                    <input
+                      type="file"
+                      accept=".csv,text/csv"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] ?? null;
+                        setImportFile(file);
+                      }}
+                      className="hidden"
+                      id="import-users-csv-input"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-3 text-xs flex items-center gap-2"
+                      onClick={() => {
+                        const input = document.getElementById('import-users-csv-input') as HTMLInputElement | null;
+                        input?.click();
+                      }}
+                    >
+                      Seleccionar archivo CSV
+                    </Button>
+                    <span className="text-[11px] text-gray-600 break-all">
+                      {importFile ? `Archivo seleccionado: ${importFile.name}` : 'Ningún archivo seleccionado'}
+                    </span>
+                  </div>
+                  <Button
                     type="button"
-                    onClick={handleImportCsv}
+                    size="sm"
+                    className="h-8 px-3 bg-sky-500 hover:bg-sky-600 text-white text-xs disabled:opacity-50"
                     disabled={importUploading || !importFile}
-                    className="bg-sky-500 hover:bg-sky-600 text-white rounded px-3 py-1.5 text-xs disabled:opacity-50"
+                    onClick={handleImportCsv}
                   >
                     {importUploading ? 'Procesando archivo...' : 'Procesar archivo'}
-                  </button>
+                  </Button>
                 </div>
 
                 {importSummary && (
