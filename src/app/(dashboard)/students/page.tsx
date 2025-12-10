@@ -165,9 +165,9 @@ export default function StudentsPage() {
           }
         }
 
-        // Para coach: la grilla de alumnos también debe respetar la academia seleccionada,
-        // pero sin depender de user_academies. Usamos los planes: alumnos que tienen
-        // al menos un plan con academy_id = selectedAcademyId.
+        // Para coach: la grilla de alumnos también debe respetar la academia seleccionada.
+        // 1) Tomamos alumnos que tienen al menos un plan con academy_id = selectedAcademyId.
+        // 2) Y además, que sigan asignados a esa academia vía user_academies (cuando tengan user vinculado).
         if (roleFromProfile === 'coach' && selectedAcademyId) {
           const coachAcademyStudentIds = new Set(
             effectiveRawPlans
@@ -176,8 +176,32 @@ export default function StudentsPage() {
           );
 
           if (coachAcademyStudentIds.size > 0) {
-            effectiveStudents = effectiveStudents.filter((s) => coachAcademyStudentIds.has(s.id));
+            // Limitar planes a la academia seleccionada
             effectiveRawPlans = effectiveRawPlans.filter((p: any) => p.academy_id === selectedAcademyId);
+
+            // Adicionalmente, respetar asignaciones actuales en user_academies
+            const { data: uaRowsForCoach, error: uaErrForCoach } = await supabase
+              .from('user_academies')
+              .select('user_id')
+              .eq('academy_id', selectedAcademyId)
+              .eq('role', 'student');
+
+            let validUserIdsForAcademy: Set<string> | null = null;
+            if (!uaErrForCoach && uaRowsForCoach) {
+              validUserIdsForAcademy = new Set(
+                (uaRowsForCoach as { user_id: string | null }[])
+                  .map((r) => r.user_id)
+                  .filter((id): id is string => !!id)
+              );
+            }
+
+            effectiveStudents = effectiveStudents.filter((s) => {
+              if (!coachAcademyStudentIds.has(s.id)) return false;
+              // Si no hay user vinculado o no pudimos leer user_academies, mantenemos el alumno.
+              if (!s.user_id || !validUserIdsForAcademy) return true;
+              // Si hay user vinculado, solo lo mostramos si sigue asignado a esta academia.
+              return validUserIdsForAcademy.has(s.user_id);
+            });
           } else {
             // Si no hay ningún plan asociado a esa academia, mostramos lista vacía para coach.
             effectiveStudents = [];
