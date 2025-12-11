@@ -1527,7 +1527,7 @@ export default function ReportsPage() {
                         labelStyle={{ fontSize: 11 }}
                         contentStyle={{ fontSize: 11 }}
                       />
-                      <Bar dataKey="total" fill="#3cadaf" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="total" fill="#16a34a" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -1854,7 +1854,7 @@ export default function ReportsPage() {
                             labelStyle={{ fontSize: 11 }}
                             contentStyle={{ fontSize: 11 }}
                           />
-                          <Bar dataKey="total" fill="#f97316" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="total" fill="#fb923c" radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -1885,10 +1885,10 @@ export default function ReportsPage() {
                           <Bar
                             dataKey="value"
                             radius={[4, 4, 0, 0]}
-                            fill="#3cadaf"
+                            fill="#3b82f6"
                           >
-                            <Cell key="ingresos" fill="#16a34a" />
-                            <Cell key="egresos" fill="#ef4444" />
+                            <Cell key="ingresos" fill="#22c55e" />
+                            <Cell key="egresos" fill="#f97316" />
                           </Bar>
                         </BarChart>
                       </ResponsiveContainer>
