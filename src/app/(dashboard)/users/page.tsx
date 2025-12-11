@@ -4,6 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
+import { formatPyg } from '@/lib/formatters';
 import { Users, UserPlus, ListChecks, Calendar as CalendarIcon, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
@@ -551,7 +552,7 @@ export default function UsersPage() {
           const feeJson = await feeRes.json();
           if (feeRes.ok) {
             const fee = feeJson?.feePerClass as number | null | undefined;
-            setDetailCoachFee(fee != null ? String(fee) : '');
+            setDetailCoachFee(fee != null ? formatPyg(fee) : '');
           } else if (feeJson?.error) {
             toast.error(feeJson.error);
           }
@@ -644,7 +645,7 @@ export default function UsersPage() {
       return;
     }
 
-    const raw = detailCoachFee.replace(',', '.').trim();
+    const raw = detailCoachFee.replace(/[\.\s]/g, '').replace(',', '.').trim();
     if (!raw) {
       toast.error('Ingresá una tarifa por clase.');
       return;
@@ -1127,11 +1128,20 @@ export default function UsersPage() {
                       </label>
                       <div className="flex items-center gap-2">
                         <input
-                          type="number"
+                          type="text"
                           className="border rounded px-3 w-full h-10 text-base md:text-sm"
                           value={detailCoachFee}
                           onChange={(e) => setDetailCoachFee(e.target.value)}
-                          min={0}
+                          onBlur={() => {
+                            const clean = detailCoachFee.replace(/[^0-9]/g, '');
+                            if (!clean) {
+                              setDetailCoachFee('');
+                              return;
+                            }
+                            const num = Number(clean);
+                            if (!Number.isFinite(num) || num < 0) return;
+                            setDetailCoachFee(formatPyg(num));
+                          }}
                         />
                         <button
                           type="button"
