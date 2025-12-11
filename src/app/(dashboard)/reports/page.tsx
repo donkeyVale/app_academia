@@ -1734,10 +1734,7 @@ export default function ReportsPage() {
               </form>
 
               {(coachExpenses.length > 0 || coachExpensesLoading) && (
-                <div className="border rounded-lg bg-white p-3 space-y-2 text-sm">
-                  <p className="text-xs text-gray-500">
-                    Los egresos se calculan como <strong>clases impartidas × tarifa por clase</strong> por profesor.
-                  </p>
+                <div className="border rounded-lg bg-white p-3 space-y-4 text-sm">
                   <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
                     <div>
                       <p className="text-xs text-gray-600">Total egresos a profesores</p>
@@ -1754,6 +1751,77 @@ export default function ReportsPage() {
                       </p>
                     </div>
                   </div>
+
+                  <p className="text-xs text-gray-500">
+                    Los egresos se calculan como <strong>clases impartidas × tarifa por clase</strong> por profesor.
+                  </p>
+
+                  {/* Gráfico de egresos por profesor */}
+                  {coachExpenses.length > 0 && (
+                    <div className="mt-2 h-56 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={coachExpenses.map((c) => ({
+                            coach: c.coach_name ?? c.coach_id,
+                            total: c.total_expense,
+                          }))}
+                          margin={{ top: 8, right: 16, left: 24, bottom: 40 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <XAxis
+                            dataKey="coach"
+                            tick={{ fontSize: 10 }}
+                            tickMargin={8}
+                            interval={0}
+                            angle={-30}
+                            textAnchor="end"
+                          />
+                          <YAxis tick={{ fontSize: 10 }} tickMargin={8} />
+                          <Tooltip
+                            formatter={(value: any) => [`${formatPyg(Number(value))} PYG`, "Egreso"]}
+                            labelStyle={{ fontSize: 11 }}
+                            contentStyle={{ fontSize: 11 }}
+                          />
+                          <Bar dataKey="total" fill="#f97316" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
+
+                  {/* Gráfico comparativo Ingresos vs Egresos */}
+                  {!coachExpensesLoading && (totalAmount > 0 || coachExpensesTotal > 0) && (
+                    <div className="mt-4 h-40 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          data={[
+                            { label: "Ingresos", value: totalAmount },
+                            { label: "Egresos", value: coachExpensesTotal },
+                          ]}
+                          margin={{ top: 8, right: 16, left: 24, bottom: 8 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                          <XAxis dataKey="label" tick={{ fontSize: 11 }} tickMargin={8} />
+                          <YAxis tick={{ fontSize: 10 }} tickMargin={8} />
+                          <Tooltip
+                            formatter={(value: any, name: any, props: any) => [
+                              `${formatPyg(Number(value))} PYG`,
+                              props?.payload?.label ?? "",
+                            ]}
+                            labelStyle={{ fontSize: 11 }}
+                            contentStyle={{ fontSize: 11 }}
+                          />
+                          <Bar
+                            dataKey="value"
+                            radius={[4, 4, 0, 0]}
+                            fill="#3cadaf"
+                          >
+                            <Cell key="ingresos" fill="#16a34a" />
+                            <Cell key="egresos" fill="#ef4444" />
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )}
                 </div>
               )}
 
