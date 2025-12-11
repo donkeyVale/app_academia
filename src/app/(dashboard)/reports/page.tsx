@@ -38,6 +38,7 @@ import {
   MapPin,
   Download,
   Eraser,
+  Banknote,
 } from "lucide-react";
 import {
   Select,
@@ -1697,7 +1698,7 @@ export default function ReportsPage() {
           onClick={() => setShowCoachExpenses((v) => !v)}
         >
           <span className="inline-flex items-center gap-2">
-            <UserCheck className="w-4 h-4 text-emerald-500" />
+            <Banknote className="w-4 h-4 text-[#3cadaf]" />
             Egresos por profesor y ganancia neta
           </span>
           <span className="text-xs text-gray-500">{showCoachExpenses ? "▼" : "▲"}</span>
