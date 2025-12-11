@@ -1686,6 +1686,110 @@ export default function ReportsPage() {
         </AnimatePresence>
       </div>
 
+      {/* Egresos por profesor y ganancia neta */}
+      <div className="border rounded-lg bg-white shadow-sm overflow-hidden">
+        <button
+          type="button"
+          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+          onClick={() => setShowCoachExpenses((v) => !v)}
+        >
+          <span className="inline-flex items-center gap-2">
+            <UserCheck className="w-4 h-4 text-emerald-500" />
+            Egresos por profesor y ganancia neta
+          </span>
+          <span className="text-xs text-gray-500">{showCoachExpenses ? "▼" : "▲"}</span>
+        </button>
+        <AnimatePresence initial={false}>
+          {showCoachExpenses && (
+            <motion.div
+              key="coach-expenses-content"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="p-4 space-y-4 origin-top"
+            >
+              <form onSubmit={loadCoachExpenses} className="space-y-3">
+                <p className="text-xs text-gray-600">
+                  Este reporte usa el mismo rango de fechas seleccionado en <strong>Ingresos</strong> y la
+                  academia activa en configuración.
+                </p>
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="flex flex-col text-xs text-gray-500">
+                    <span>
+                      Desde: <strong>{fromDate || "no definido"}</strong>
+                    </span>
+                    <span>
+                      Hasta: <strong>{toDate || "no definido"}</strong>
+                    </span>
+                  </div>
+                  <Button
+                    type="submit"
+                    className="ml-auto bg-[#3cadaf] hover:bg-[#31435d] text-white px-4 py-2 disabled:opacity-50 text-sm"
+                    disabled={coachExpensesLoading}
+                  >
+                    {coachExpensesLoading ? "Calculando..." : "Calcular egresos y ganancia"}
+                  </Button>
+                </div>
+              </form>
+
+              {(coachExpenses.length > 0 || coachExpensesLoading) && (
+                <div className="border rounded-lg bg-white p-3 space-y-2 text-sm">
+                  <p className="text-xs text-gray-500">
+                    Los egresos se calculan como <strong>clases impartidas × tarifa por clase</strong> por profesor.
+                  </p>
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                    <div>
+                      <p className="text-xs text-gray-600">Total egresos a profesores</p>
+                      <p className="text-lg font-semibold text-[#31435d]">
+                        {coachExpensesLoading ? "..." : `${formatPyg(coachExpensesTotal)} PYG`}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600">Ganancia neta (ingresos - egresos)</p>
+                      <p className="text-lg font-semibold text-[#31435d]">
+                        {coachExpensesLoading
+                          ? "..."
+                          : `${formatPyg(totalAmount - coachExpensesTotal)} PYG`}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {coachExpenses.length > 0 && (
+                <div className="overflow-x-auto mt-2">
+                  <table className="min-w-full text-xs md:text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 text-left">
+                        <th className="px-3 py-2 border-b">Profesor</th>
+                        <th className="px-3 py-2 border-b text-right">Clases impartidas</th>
+                        <th className="px-3 py-2 border-b text-right">Tarifa/clase</th>
+                        <th className="px-3 py-2 border-b text-right">Egreso total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {coachExpenses.map((c) => (
+                        <tr key={c.coach_id} className="border-b last:border-b-0">
+                          <td className="px-3 py-2 align-top">{c.coach_name ?? c.coach_id}</td>
+                          <td className="px-3 py-2 align-top text-right">{c.classes_count}</td>
+                          <td className="px-3 py-2 align-top text-right">
+                            {c.fee_per_class != null ? `${formatPyg(c.fee_per_class)} PYG` : "Sin tarifa"}
+                          </td>
+                          <td className="px-3 py-2 align-top text-right">
+                            {formatPyg(c.total_expense)} PYG
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
       {/* Resumen por alumno */}
       {studentSummary.length > 0 && (
         <div className="border rounded-lg bg-white shadow_sm">
