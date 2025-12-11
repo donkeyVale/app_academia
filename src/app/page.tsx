@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { FooterAvatarButton } from '@/components/footer-avatar-button';
 import { FooterNav } from '@/components/footer-nav';
 import { AgendoLogo } from '@/components/agendo-logo';
+import AdminHomeIncomeExpensesCard from '@/app/(dashboard)/AdminHomeIncomeExpensesCard';
 import { useRouter } from 'next/navigation';
 import { createClientBrowser } from '@/lib/supabase';
 import { motion } from 'framer-motion';
@@ -743,7 +744,7 @@ export default function HomePage() {
       {academyOptions.length > 0 && selectedAcademyId && (
         <div className="flex items-center justify-between gap-2 text-xs text-gray-600 bg-white border border-emerald-100 rounded-lg px-3 py-2 shadow-sm">
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-100">
+            <span className="inline-flex items-center justify-center text-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-100">
               Academia activa
             </span>
             <span className="font-medium text-[#0f172a]">
@@ -771,6 +772,8 @@ export default function HomePage() {
 
       {(!role || isAdminRole) && (
         <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+          <AdminHomeIncomeExpensesCard />
+
           <motion.button
             type="button"
             whileHover={{ y: -2, boxShadow: '0 10px 25px rgba(15,23,42,0.12)' }}
@@ -791,29 +794,6 @@ export default function HomePage() {
             </p>
             <p className="text-xs text-gray-600 mt-2 max-w-xs">
               Planes que tienen al menos un alumno con clases disponibles.
-            </p>
-          </motion.button>
-
-          <motion.button
-            type="button"
-            whileHover={{ y: -2, boxShadow: '0 10px 25px rgba(15,23,42,0.12)' }}
-            transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-            className="rounded-2xl p-4 bg-gradient-to-br from-lime-50 via-white to-emerald-50 shadow-sm border border-emerald-100/60 text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#22c55e]/60 focus:ring-offset-1"
-            onClick={() => router.push('/students')}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100/80 text-emerald-900 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide">
-                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/90">
-                  <Users className="w-3.5 h-3.5 text-[#22c55e]" />
-                </span>
-                <span>Alumnos con plan</span>
-              </div>
-            </div>
-            <p className="text-4xl font-bold text-[#0f172a] tracking-tight leading-tight">
-              {loading ? '...' : studentsWithPlanCount}
-            </p>
-            <p className="text-xs text-gray-600 mt-2 max-w-xs">
-              Alumnos que todavía tienen clases disponibles en algún plan.
             </p>
           </motion.button>
 

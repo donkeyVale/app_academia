@@ -1,5 +1,6 @@
 import { requireUser } from '@/lib/auth';
 import { LayoutDashboard } from 'lucide-react';
+import AdminHomeIncomeExpensesCard from './AdminHomeIncomeExpensesCard';
 
 export default async function HomePage() {
   const user = await requireUser();
@@ -12,6 +13,9 @@ export default async function HomePage() {
           <p className="text-sm text-gray-600">Usuario: {user.email}</p>
         </div>
       </div>
+
+      {/* Resumen rápido de ingresos/egresos para admins (últimos 30 días, multi-academia) */}
+      <AdminHomeIncomeExpensesCard />
     </section>
   );
 }
