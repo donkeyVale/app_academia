@@ -1527,7 +1527,8 @@ export default function ReportsPage() {
                         labelStyle={{ fontSize: 11 }}
                         contentStyle={{ fontSize: 11 }}
                       />
-                      <Bar dataKey="total" fill="#16a34a" radius={[4, 4, 0, 0]} />
+                      {/* Ingresos: color principal de la app */}
+                      <Bar dataKey="total" fill="#3cadaf" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -1854,7 +1855,8 @@ export default function ReportsPage() {
                             labelStyle={{ fontSize: 11 }}
                             contentStyle={{ fontSize: 11 }}
                           />
-                          <Bar dataKey="total" fill="#fb923c" radius={[4, 4, 0, 0]} />
+                          {/* Egresos: usar el color oscuro principal */}
+                          <Bar dataKey="total" fill="#31435d" radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
@@ -1882,13 +1884,14 @@ export default function ReportsPage() {
                             labelStyle={{ fontSize: 11 }}
                             contentStyle={{ fontSize: 11 }}
                           />
+                          {/* Comparativo: ingreso con color principal, egreso con color oscuro */}
                           <Bar
                             dataKey="value"
                             radius={[4, 4, 0, 0]}
-                            fill="#3b82f6"
+                            fill="#3cadaf"
                           >
-                            <Cell key="ingresos" fill="#22c55e" />
-                            <Cell key="egresos" fill="#f97316" />
+                            <Cell key="ingresos" fill="#3cadaf" />
+                            <Cell key="egresos" fill="#31435d" />
                           </Bar>
                         </BarChart>
                       </ResponsiveContainer>
