@@ -99,6 +99,14 @@ interface CoachClassRow {
   absent_count: number;
 }
 
+interface CoachExpenseRow {
+  coach_id: string;
+  coach_name: string | null;
+  classes_count: number;
+  fee_per_class: number | null;
+  total_expense: number;
+}
+
 interface LocationOption {
   id: string;
   label: string;
@@ -259,6 +267,12 @@ export default function ReportsPage() {
   // Multi-academia
   const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
   const [academyLocationIds, setAcademyLocationIds] = useState<Set<string>>(new Set());
+
+  // Egresos por profesor
+  const [showCoachExpenses, setShowCoachExpenses] = useState(false);
+  const [coachExpensesLoading, setCoachExpensesLoading] = useState(false);
+  const [coachExpenses, setCoachExpenses] = useState<CoachExpenseRow[]>([]);
+  const [coachExpensesTotal, setCoachExpensesTotal] = useState(0);
 
   const exportToExcel = async (
     fileName: string,
@@ -1274,6 +1288,141 @@ export default function ReportsPage() {
     }
   };
 
+  const loadCoachExpenses = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fromDate || !toDate) {
+      setError('Selecciona un rango de fechas para egresos.');
+      return;
+    }
+    if (!selectedAcademyId || academyLocationIds.size === 0) {
+      setError('Selecciona una academia para ver este reporte de egresos.');
+      return;
+    }
+
+    setCoachExpensesLoading(true);
+    setError(null);
+    try {
+      // 1) Obtener canchas asociadas a las sedes de la academia seleccionada
+      const { data: courtsData, error: courtsErr } = await supabase
+        .from('courts')
+        .select('id,location_id')
+        .in('location_id', Array.from(academyLocationIds));
+      if (courtsErr) throw courtsErr;
+
+      const courts = (courtsData ?? []) as { id: string; location_id: string | null }[];
+      if (courts.length === 0) {
+        setCoachExpenses([]);
+        setCoachExpensesTotal(0);
+        return;
+      }
+
+      const allowedCourtIds = courts.map((c) => c.id);
+
+      // 2) Obtener clases en esas canchas y rango de fechas con profesor asignado
+      const { data: clsData, error: clsErr } = await supabase
+        .from('class_sessions')
+        .select('id,date,coach_id,court_id')
+        .gte('date', fromDate)
+        .lte('date', toDate)
+        .in('court_id', allowedCourtIds)
+        .not('coach_id', 'is', null);
+      if (clsErr) throw clsErr;
+
+      const classes = (clsData ?? []) as { id: string; date: string; coach_id: string | null; court_id: string | null }[];
+      if (classes.length === 0) {
+        setCoachExpenses([]);
+        setCoachExpensesTotal(0);
+        return;
+      }
+
+      const coachIds = Array.from(
+        new Set(classes.map((c) => c.coach_id).filter((id): id is string => !!id)),
+      );
+      if (coachIds.length === 0) {
+        setCoachExpenses([]);
+        setCoachExpensesTotal(0);
+        return;
+      }
+
+      // 3) Mapear nombres de profesores
+      const { data: coachesData, error: coachesErr } = await supabase
+        .from('coaches')
+        .select('id,user_id')
+        .in('id', coachIds);
+      if (coachesErr) throw coachesErr;
+      const coachesRaw = (coachesData ?? []) as { id: string; user_id: string | null }[];
+
+      const coachUserIds = Array.from(
+        new Set(coachesRaw.map((c) => c.user_id).filter((id): id is string => !!id)),
+      );
+      let profilesMap: Record<string, string | null> = {};
+      if (coachUserIds.length > 0) {
+        const { data: profilesData, error: profilesErr } = await supabase
+          .from('profiles')
+          .select('id,full_name')
+          .in('id', coachUserIds);
+        if (profilesErr) throw profilesErr;
+        profilesMap = (profilesData ?? []).reduce<Record<string, string | null>>(
+          (acc, p: any) => {
+            acc[p.id as string] = (p.full_name as string | null) ?? null;
+            return acc;
+          },
+          {},
+        );
+      }
+
+      const coachNameMap: Record<string, string | null> = {};
+      coachesRaw.forEach((c) => {
+        if (!coachIds.includes(c.id)) return;
+        coachNameMap[c.id] = c.user_id ? profilesMap[c.user_id ?? ''] ?? null : null;
+      });
+
+      // 4) Mapear tarifas por clase por profesor para la academia seleccionada
+      const { data: feesData, error: feesErr } = await supabase
+        .from('coach_academy_fees')
+        .select('coach_id,fee_per_class')
+        .eq('academy_id', selectedAcademyId)
+        .in('coach_id', coachIds);
+      if (feesErr) throw feesErr;
+
+      const feeMap: Record<string, number | null> = {};
+      (feesData ?? []).forEach((row: any) => {
+        feeMap[row.coach_id as string] = (row.fee_per_class as number | null) ?? null;
+      });
+
+      // 5) Agregar clases y calcular egresos
+      const byCoach: Record<string, CoachExpenseRow> = {};
+      classes.forEach((c) => {
+        const coachId = c.coach_id as string | null;
+        if (!coachId) return;
+        const fee = feeMap[coachId] ?? 0;
+        if (!byCoach[coachId]) {
+          byCoach[coachId] = {
+            coach_id: coachId,
+            coach_name: coachNameMap[coachId] ?? coachId,
+            classes_count: 0,
+            fee_per_class: feeMap[coachId] ?? null,
+            total_expense: 0,
+          };
+        }
+        byCoach[coachId].classes_count += 1;
+        byCoach[coachId].total_expense += fee || 0;
+      });
+
+      const rows = Object.values(byCoach).sort((a, b) => b.total_expense - a.total_expense);
+      const total = rows.reduce((acc, r) => acc + r.total_expense, 0);
+      setCoachExpenses(rows);
+      setCoachExpensesTotal(total);
+    } catch (e: any) {
+      const msg = e?.message ?? 'Error cargando egresos por profesor.';
+      setError(msg);
+      setCoachExpenses([]);
+      setCoachExpensesTotal(0);
+    } finally {
+      setCoachExpensesLoading(false);
+    }
+  };
+
   return (
     <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4 overflow-x-hidden">
       <div className="flex items-start justify-between gap-4">
@@ -1283,6 +1432,110 @@ export default function ReportsPage() {
             <h1 className="text-2xl font-semibold text-[#31435d]">Reportes</h1>
             <p className="text-sm text-gray-600">Consulta ingresos y uso de clases.</p>
           </div>
+
+      {/* Egresos por profesor y ganancia neta */}
+      <div className="border rounded-lg bg-white shadow-sm overflow-hidden">
+        <button
+          type="button"
+          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+          onClick={() => setShowCoachExpenses((v) => !v)}
+        >
+          <span className="inline-flex items-center gap-2">
+            <UserCheck className="w-4 h-4 text-emerald-500" />
+            Egresos por profesor y ganancia neta
+          </span>
+          <span className="text-xs text-gray-500">{showCoachExpenses ? '▼' : '▲'}</span>
+        </button>
+        <AnimatePresence initial={false}>
+          {showCoachExpenses && (
+            <motion.div
+              key="coach-expenses-content"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              className="p-4 space-y-4 origin-top"
+            >
+              <form onSubmit={loadCoachExpenses} className="space-y-3">
+                <p className="text-xs text-gray-600">
+                  Este reporte usa el mismo rango de fechas seleccionado en <strong>Ingresos</strong> y la
+                  academia activa en configuración.
+                </p>
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="flex flex-col text-xs text-gray-500">
+                    <span>
+                      Desde: <strong>{fromDate || 'no definido'}</strong>
+                    </span>
+                    <span>
+                      Hasta: <strong>{toDate || 'no definido'}</strong>
+                    </span>
+                  </div>
+                  <Button
+                    type="submit"
+                    className="ml-auto bg-[#3cadaf] hover:bg-[#31435d] text-white px-4 py-2 disabled:opacity-50 text-sm"
+                    disabled={coachExpensesLoading}
+                  >
+                    {coachExpensesLoading ? 'Calculando...' : 'Calcular egresos y ganancia'}
+                  </Button>
+                </div>
+              </form>
+
+              {(coachExpenses.length > 0 || coachExpensesLoading) && (
+                <div className="border rounded-lg bg-white p-3 space-y-2 text-sm">
+                  <p className="text-xs text-gray-500">
+                    Los egresos se calculan como <strong>clases impartidas × tarifa por clase</strong> por profesor.
+                  </p>
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                    <div>
+                      <p className="text-xs text-gray-600">Total egresos a profesores</p>
+                      <p className="text-lg font-semibold text-[#31435d]">
+                        {coachExpensesLoading ? '...' : `${formatPyg(coachExpensesTotal)} PYG`}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-600">Ganancia neta (ingresos - egresos)</p>
+                      <p className="text-lg font-semibold text-[#31435d]">
+                        {coachExpensesLoading
+                          ? '...'
+                          : `${formatPyg(totalAmount - coachExpensesTotal)} PYG`}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {coachExpenses.length > 0 && (
+                <div className="overflow-x-auto mt-2">
+                  <table className="min-w-full text-xs md:text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 text-left">
+                        <th className="px-3 py-2 border-b">Profesor</th>
+                        <th className="px-3 py-2 border-b text-right">Clases impartidas</th>
+                        <th className="px-3 py-2 border-b text-right">Tarifa/clase</th>
+                        <th className="px-3 py-2 border-b text-right">Egreso total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {coachExpenses.map((c) => (
+                        <tr key={c.coach_id} className="border-b last:border-b-0">
+                          <td className="px-3 py-2 align-top">{c.coach_name ?? c.coach_id}</td>
+                          <td className="px-3 py-2 align-top text-right">{c.classes_count}</td>
+                          <td className="px-3 py-2 align-top text-right">
+                            {c.fee_per_class != null ? `${formatPyg(c.fee_per_class)} PYG` : 'Sin tarifa'}
+                          </td>
+                          <td className="px-3 py-2 align-top text-right">
+                            {formatPyg(c.total_expense)} PYG
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
         </div>
         <div className="flex items-center justify-end flex-1">
           <Link href="/" className="flex items-center">
