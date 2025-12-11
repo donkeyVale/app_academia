@@ -259,10 +259,11 @@ export default function ReportsPage() {
 
   const [exportMenu, setExportMenu] = useState<{
     income: boolean;
+    expensesCoach: boolean;
     attendanceStudent: boolean;
     attendanceCoach: boolean;
     attendanceLocation: boolean;
-  }>({ income: false, attendanceStudent: false, attendanceCoach: false, attendanceLocation: false });
+  }>({ income: false, expensesCoach: false, attendanceStudent: false, attendanceCoach: false, attendanceLocation: false });
 
   // Multi-academia
   const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
@@ -1557,6 +1558,7 @@ export default function ReportsPage() {
                         onClick={() =>
                           setExportMenu((m) => ({
                             income: !m.income,
+                            expensesCoach: false,
                             attendanceStudent: false,
                             attendanceCoach: false,
                             attendanceLocation: false,
@@ -1742,13 +1744,83 @@ export default function ReportsPage() {
                         {coachExpensesLoading ? "..." : `${formatPyg(coachExpensesTotal)} PYG`}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-xs text-gray-600">Ganancia neta (ingresos - egresos)</p>
-                      <p className="text-lg font-semibold text-[#31435d]">
-                        {coachExpensesLoading
-                          ? "..."
-                          : `${formatPyg(totalAmount - coachExpensesTotal)} PYG`}
-                      </p>
+                    <div className="flex flex-col items-end gap-1 text-xs text-gray-500 relative">
+                      <div>
+                        <p className="text-xs text-gray-600">Ganancia neta (ingresos - egresos)</p>
+                        <p className="text-lg font-semibold text-[#31435d]">
+                          {coachExpensesLoading
+                            ? "..."
+                            : `${formatPyg(totalAmount - coachExpensesTotal)} PYG`}
+                        </p>
+                      </div>
+                      {coachExpenses.length > 0 && (
+                        <div className="relative mt-1">
+                          <button
+                            type="button"
+                            className="inline-flex items-center gap-1 px-3 py-1 border rounded bg-white hover:bg-gray-50 text-[11px] text-gray-700"
+                            onClick={() =>
+                              setExportMenu((m) => ({
+                                income: false,
+                                expensesCoach: !m.expensesCoach,
+                                attendanceStudent: false,
+                                attendanceCoach: false,
+                                attendanceLocation: false,
+                              }))
+                            }
+                          >
+                            <Download className="w-3 h-3" />
+                            Exportar
+                          </button>
+                          {exportMenu.expensesCoach && (
+                            <div className="absolute right-0 mt-1 w-40 border rounded bg-white shadow text-[11px] z-10">
+                              <button
+                                type="button"
+                                className="w-full px-3 py-1 text-left hover:bg-gray-50"
+                                onClick={() => {
+                                  exportToExcel(
+                                    `egresos-profesores-${fromDate || ""}-${toDate || ""}.xlsx`,
+                                    "Egresos por profesor",
+                                    coachExpenses.map((c) => ({
+                                      Profesor: c.coach_name ?? c.coach_id,
+                                      "Clases impartidas": c.classes_count,
+                                      "Tarifa por clase": c.fee_per_class ?? 0,
+                                      "Egreso total": c.total_expense,
+                                    })),
+                                  );
+                                  setExportMenu((m) => ({ ...m, expensesCoach: false }));
+                                }}
+                              >
+                                Excel (.xlsx)
+                              </button>
+                              <button
+                                type="button"
+                                className="w-full px-3 py-1 text-left hover:bg-gray-50"
+                                onClick={() => {
+                                  exportToPdf(
+                                    `egresos-profesores-${fromDate || ""}-${toDate || ""}.pdf`,
+                                    "Egresos por profesor",
+                                    [
+                                      "Profesor",
+                                      "Clases impartidas",
+                                      "Tarifa por clase",
+                                      "Egreso total",
+                                    ],
+                                    coachExpenses.map((c) => [
+                                      c.coach_name ?? c.coach_id,
+                                      String(c.classes_count),
+                                      String(c.fee_per_class ?? 0),
+                                      String(c.total_expense),
+                                    ]),
+                                  );
+                                  setExportMenu((m) => ({ ...m, expensesCoach: false }));
+                                }}
+                              >
+                                PDF (.pdf)
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -2126,6 +2198,7 @@ export default function ReportsPage() {
                         onClick={() =>
                           setExportMenu((m) => ({
                             income: false,
+                            expensesCoach: false,
                             attendanceStudent: !m.attendanceStudent,
                             attendanceCoach: false,
                             attendanceLocation: false,
@@ -2427,6 +2500,7 @@ export default function ReportsPage() {
                         onClick={() =>
                           setExportMenu((m) => ({
                             income: false,
+                            expensesCoach: false,
                             attendanceStudent: false,
                             attendanceCoach: !m.attendanceCoach,
                             attendanceLocation: false,
@@ -2728,6 +2802,7 @@ export default function ReportsPage() {
                         onClick={() =>
                           setExportMenu((m) => ({
                             income: false,
+                            expensesCoach: false,
                             attendanceStudent: false,
                             attendanceCoach: false,
                             attendanceLocation: !m.attendanceLocation,
