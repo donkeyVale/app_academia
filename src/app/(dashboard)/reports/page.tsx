@@ -275,6 +275,7 @@ export default function ReportsPage() {
   const [coachExpensesLoading, setCoachExpensesLoading] = useState(false);
   const [coachExpenses, setCoachExpenses] = useState<CoachExpenseRow[]>([]);
   const [coachExpensesTotal, setCoachExpensesTotal] = useState(0);
+  const [hasAutoRunFromPreset, setHasAutoRunFromPreset] = useState(false);
 
   const exportToExcel = async (
     fileName: string,
@@ -344,17 +345,45 @@ export default function ReportsPage() {
     }
   };
 
+  // Cargar rango inicial según preset y sección
   useEffect(() => {
-    // Por defecto: mes actual
-    const today = new Date();
-    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
-      .toISOString()
-      .slice(0, 10);
-    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0)
-      .toISOString()
-      .slice(0, 10);
-    setFromDate(firstDay);
-    setToDate(lastDay);
+    let preset: string | null = null;
+    let section: string | null = null;
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      preset = params.get("preset");
+      section = params.get("section");
+    }
+
+    if (preset === "last30") {
+      const today = new Date();
+      const toDateIso = today.toISOString().slice(0, 10);
+      const from = new Date(today);
+      from.setDate(from.getDate() - 29);
+      const fromDateIso = from.toISOString().slice(0, 10);
+
+      setFromDate(fromDateIso);
+      setToDate(toDateIso);
+
+      // Abrir acordeones de ingresos y egresos si venimos desde el dashboard
+      setShowIncome(true);
+      setShowCoachExpenses(true);
+    } else {
+      // Por defecto: mes actual
+      const today = new Date();
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1)
+        .toISOString()
+        .slice(0, 10);
+      const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0)
+        .toISOString()
+        .slice(0, 10);
+      setFromDate(firstDay);
+      setToDate(lastDay);
+    }
+
+    if (section === "income") {
+      setShowIncome(true);
+    }
   }, []);
 
   // Cargar academia seleccionada y sedes asociadas
@@ -553,8 +582,7 @@ export default function ReportsPage() {
     })();
   }, [supabase, selectedAcademyId, academyLocationIds]);
 
-  const loadReport = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const runIncomeReport = async () => {
     if (!fromDate || !toDate) {
       setError("Selecciona un rango de fechas");
       return;
@@ -708,7 +736,7 @@ export default function ReportsPage() {
       // 5) Resumen por plan
       const planAgg: Record<string, PlanSummaryRow> = {};
       mapped.forEach((r) => {
-        const key = r.plan_name ?? 'Sin nombre';
+        const key = r.plan_name ?? "Sin nombre";
         if (!planAgg[key]) {
           planAgg[key] = {
             plan_name: r.plan_name,
@@ -733,6 +761,26 @@ export default function ReportsPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    let preset: string | null = null;
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      preset = params.get("preset");
+    }
+
+    if (preset !== "last30") return;
+    if (hasAutoRunFromPreset) return;
+    if (!fromDate || !toDate) return;
+    if (!selectedAcademyId) return;
+    if (academyLocationIds.size === 0) return;
+
+    (async () => {
+      await runIncomeReport();
+      await runCoachExpensesReport();
+      setHasAutoRunFromPreset(true);
+    })();
+  }, [fromDate, toDate, selectedAcademyId, academyLocationIds, hasAutoRunFromPreset]);
 
   const loadAttendanceByStudent = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1287,6 +1335,140 @@ export default function ReportsPage() {
       setLocationSummary(null);
     } finally {
       setLocationLoading(false);
+    }
+  };
+
+  const loadReport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await runIncomeReport();
+  };
+
+  const runCoachExpensesReport = async () => {
+    if (!fromDate || !toDate) {
+      setError("Selecciona un rango de fechas para egresos.");
+      return;
+    }
+    if (!selectedAcademyId || academyLocationIds.size === 0) {
+      setError("Selecciona una academia para ver este reporte de egresos.");
+      return;
+    }
+
+    setCoachExpensesLoading(true);
+    setError(null);
+    try {
+      const { data: courtsData, error: courtsErr } = await supabase
+        .from("courts")
+        .select("id,location_id")
+        .in("location_id", Array.from(academyLocationIds));
+      if (courtsErr) throw courtsErr;
+
+      const courts = (courtsData ?? []) as { id: string; location_id: string | null }[];
+      if (courts.length === 0) {
+        setCoachExpenses([]);
+        setCoachExpensesTotal(0);
+        return;
+      }
+
+      const allowedCourtIds = courts.map((c) => c.id);
+
+      const { data: clsData, error: clsErr } = await supabase
+        .from("class_sessions")
+        .select("id,date,coach_id,court_id")
+        .gte("date", fromDate)
+        .lte("date", toDate)
+        .in("court_id", allowedCourtIds)
+        .not("coach_id", "is", null);
+      if (clsErr) throw clsErr;
+
+      const classes = (clsData ?? []) as { id: string; date: string; coach_id: string | null; court_id: string | null }[];
+      if (classes.length === 0) {
+        setCoachExpenses([]);
+        setCoachExpensesTotal(0);
+        return;
+      }
+
+      const coachIds = Array.from(
+        new Set(classes.map((c) => c.coach_id).filter((id): id is string => !!id)),
+      );
+      if (coachIds.length === 0) {
+        setCoachExpenses([]);
+        setCoachExpensesTotal(0);
+        return;
+      }
+
+      const { data: coachesData, error: coachesErr } = await supabase
+        .from("coaches")
+        .select("id,user_id")
+        .in("id", coachIds);
+      if (coachesErr) throw coachesErr;
+      const coachesRaw = (coachesData ?? []) as { id: string; user_id: string | null }[];
+
+      const coachUserIds = Array.from(
+        new Set(coachesRaw.map((c) => c.user_id).filter((id): id is string => !!id)),
+      );
+      let profilesMap: Record<string, string | null> = {};
+      if (coachUserIds.length > 0) {
+        const { data: profilesData, error: profilesErr } = await supabase
+          .from("profiles")
+          .select("id,full_name")
+          .in("id", coachUserIds);
+        if (profilesErr) throw profilesErr;
+        profilesMap = (profilesData ?? []).reduce<Record<string, string | null>>(
+          (acc, p: any) => {
+            acc[p.id as string] = (p.full_name as string | null) ?? null;
+            return acc;
+          },
+          {}
+        );
+      }
+
+      const coachNameMap: Record<string, string | null> = {};
+      coachesRaw.forEach((c) => {
+        if (!coachIds.includes(c.id)) return;
+        coachNameMap[c.id] = c.user_id ? profilesMap[c.user_id ?? ""] ?? null : null;
+      });
+
+      const { data: feesData, error: feesErr } = await supabase
+        .from("coach_academy_fees")
+        .select("coach_id,fee_per_class")
+        .eq("academy_id", selectedAcademyId)
+        .in("coach_id", coachIds);
+      if (feesErr) throw feesErr;
+
+      const feeMap: Record<string, number | null> = {};
+      (feesData ?? []).forEach((row: any) => {
+        feeMap[row.coach_id as string] = (row.fee_per_class as number | null) ?? null;
+      });
+
+      const agg: Record<string, CoachExpenseRow> = {};
+      classes.forEach((cls) => {
+        const coachId = cls.coach_id as string;
+        if (!coachId) return;
+        if (!agg[coachId]) {
+          const fee = feeMap[coachId] ?? null;
+          agg[coachId] = {
+            coach_id: coachId,
+            coach_name: coachNameMap[coachId] ?? null,
+            classes_count: 0,
+            fee_per_class: fee,
+            total_expense: 0,
+          };
+        }
+        agg[coachId].classes_count += 1;
+        const fee = agg[coachId].fee_per_class ?? 0;
+        agg[coachId].total_expense += fee;
+      });
+
+      const rowsAgg = Object.values(agg).sort((a, b) => (b.total_expense || 0) - (a.total_expense || 0));
+      setCoachExpenses(rowsAgg);
+      setCoachExpensesTotal(rowsAgg.reduce((acc, r) => acc + (r.total_expense || 0), 0));
+    } catch (e) {
+      const msg = (e as any)?.message || "Error cargando egresos por profesor";
+      setError(msg);
+      setCoachExpenses([]);
+      setCoachExpensesTotal(0);
+    } finally {
+      setCoachExpensesLoading(false);
     }
   };
 

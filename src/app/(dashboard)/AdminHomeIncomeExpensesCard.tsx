@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { createClientBrowser } from "@/lib/supabase";
 import { formatPyg } from "@/lib/formatters";
@@ -10,6 +11,7 @@ type Role = "super_admin" | "admin" | "coach" | "student" | null;
 
 export default function AdminHomeIncomeExpensesCard() {
   const supabase = createClientBrowser();
+  const router = useRouter();
 
   const [role, setRole] = useState<Role>(null);
   const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
@@ -208,7 +210,18 @@ export default function AdminHomeIncomeExpensesCard() {
     <motion.div
       whileHover={{ y: -2, boxShadow: "0 10px 25px rgba(15,23,42,0.12)" }}
       transition={{ type: "spring", stiffness: 260, damping: 20 }}
-      className="rounded-2xl p-4 bg-gradient-to-br from-emerald-50 via-white to-sky-50 shadow-sm border border-emerald-100/60 text-left"
+      className="rounded-2xl p-4 bg-gradient-to-br from-emerald-50 via-white to-sky-50 shadow-sm border border-emerald-100/60 text-left cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/60 focus:ring-offset-1"
+      role="button"
+      tabIndex={0}
+      onClick={() => {
+        router.push("/reports?preset=last30&section=income");
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          router.push("/reports?preset=last30&section=income");
+        }
+      }}
    >
       <div className="flex items-center justify-between mb-3">
         <div className="inline-flex items-center gap-2 rounded-full bg-emerald-100/80 text-emerald-900 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide">
@@ -217,11 +230,6 @@ export default function AdminHomeIncomeExpensesCard() {
           </span>
           <span>Ingresos vs egresos</span>
         </div>
-        {selectedAcademyId && fromDateLabel && toDateLabel && (
-          <span className="hidden md:inline text-[11px] text-gray-500">
-            Del {fromDateLabel} al {toDateLabel}
-          </span>
-        )}
       </div>
 
       {loading ? (
@@ -234,24 +242,20 @@ export default function AdminHomeIncomeExpensesCard() {
         </p>
       ) : (
         <div className="space-y-3">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
-            <div>
-              <p className="text-[11px] uppercase tracking-wide text-gray-500">Ganancia neta (30 días)</p>
-              <p
-                className={`text-3xl md:text-4xl font-bold tracking-tight leading-tight ${
-                  net >= 0 ? "text-emerald-700" : "text-red-600"
-                }`}
-              >
-                {formatPyg(net)} PYG
-              </p>
-            </div>
-            <div className="md:text-right text-xs text-gray-500">
-              <p>
-                {fromDateLabel && toDateLabel
-                  ? `Del ${fromDateLabel} al ${toDateLabel}`
-                  : "Rango últimos 30 días"}
-              </p>
-            </div>
+          <div className="flex flex-col gap-1">
+            <p className="text-[11px] uppercase tracking-wide text-gray-500">Ganancia neta (30 días)</p>
+            <p className="text-[11px] text-gray-500">
+              {fromDateLabel && toDateLabel
+                ? `Del ${fromDateLabel} al ${toDateLabel}`
+                : "Rango últimos 30 días"}
+            </p>
+            <p
+              className={`text-3xl md:text-4xl font-bold tracking-tight leading-tight ${
+                net >= 0 ? "text-emerald-700" : "text-red-600"
+              }`}
+            >
+              {formatPyg(net)} PYG
+            </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs md:text-sm">
@@ -262,7 +266,7 @@ export default function AdminHomeIncomeExpensesCard() {
               </p>
             </div>
             <div className="rounded-xl bg-white/70 border border-emerald-100 px-3 py-2">
-              <p className="text-[11px] uppercase tracking-wide text-gray-500">Egresos estimados</p>
+              <p className="text-[11px] uppercase tracking-wide text-gray-500">Egresos</p>
               <p className="text-base md:text-lg font-semibold text-[#0f172a]">
                 {formatPyg(expensesLast30)} PYG
               </p>
