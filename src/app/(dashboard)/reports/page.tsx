@@ -1744,7 +1744,7 @@ export default function ReportsPage() {
                         {coachExpensesLoading ? "..." : `${formatPyg(coachExpensesTotal)} PYG`}
                       </p>
                     </div>
-                    <div className="flex flex-col items-end gap-1 text-xs text-gray-500 relative">
+                    <div className="flex flex-col items-start md:items-end gap-1 text-xs text-gray-500 relative">
                       <div>
                         <p className="text-xs text-gray-600">Ganancia neta (ingresos - egresos)</p>
                         <p className="text-lg font-semibold text-[#31435d]">
