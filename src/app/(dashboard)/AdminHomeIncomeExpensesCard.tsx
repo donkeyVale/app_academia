@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { createClientBrowser } from "@/lib/supabase";
 import { formatPyg } from "@/lib/formatters";
-import { Banknote } from "lucide-react";
+import { Banknote, TrendingUp, TrendingDown } from "lucide-react";
 
 type Role = "super_admin" | "admin" | "coach" | "student" | null;
 
@@ -205,6 +205,7 @@ export default function AdminHomeIncomeExpensesCard() {
   }
 
   const net = incomeLast30 - expensesLast30;
+  const margin = incomeLast30 > 0 ? (net / incomeLast30) * 100 : null;
 
   return (
     <motion.div
@@ -256,18 +257,32 @@ export default function AdminHomeIncomeExpensesCard() {
             >
               {formatPyg(net)} PYG
             </p>
+            <p className="mt-1 text-[11px] flex items-center gap-1 text-gray-600">
+              {net >= 0 ? (
+                <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
+              ) : (
+                <TrendingDown className="w-3.5 h-3.5 text-red-500" />
+              )}
+              {margin !== null ? (
+                <span className={net >= 0 ? "text-emerald-700" : "text-red-600"}>
+                  Margen {margin.toFixed(1)}%
+                </span>
+              ) : (
+                <span>Sin ingresos</span>
+              )}
+            </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs md:text-sm">
             <div className="rounded-xl bg-white/70 border border-emerald-100 px-3 py-2">
               <p className="text-[11px] uppercase tracking-wide text-gray-500">Ingresos</p>
-              <p className="text-base md:text-lg font-semibold text-[#0f172a]">
+              <p className="text-sm sm:text-base md:text-lg font-semibold text-[#0f172a] leading-tight break-words text-right">
                 {formatPyg(incomeLast30)} PYG
               </p>
             </div>
             <div className="rounded-xl bg-white/70 border border-emerald-100 px-3 py-2">
               <p className="text-[11px] uppercase tracking-wide text-gray-500">Egresos</p>
-              <p className="text-base md:text-lg font-semibold text-[#0f172a]">
+              <p className="text-sm sm:text-base md:text-lg font-semibold text-[#0f172a] leading-tight break-words text-right">
                 {formatPyg(expensesLast30)} PYG
               </p>
             </div>
