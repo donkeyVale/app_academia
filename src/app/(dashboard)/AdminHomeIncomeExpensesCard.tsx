@@ -251,7 +251,7 @@ export default function AdminHomeIncomeExpensesCard() {
                 : "Rango últimos 30 días"}
             </p>
             <p
-              className={`text-3xl md:text-4xl font-bold tracking-tight leading-tight ${
+              className={`text-[clamp(1.75rem,3.5vw,2.25rem)] font-bold tracking-tight leading-tight ${
                 net >= 0 ? "text-emerald-700" : "text-red-600"
               } whitespace-nowrap tabular-nums`}
             >
@@ -276,13 +276,13 @@ export default function AdminHomeIncomeExpensesCard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs md:text-sm">
             <div className="rounded-xl bg-white/70 border border-emerald-100 px-3 py-2">
               <p className="text-[11px] uppercase tracking-wide text-gray-500">Ingresos</p>
-              <p className="text-sm sm:text-base md:text-lg font-semibold text-[#0f172a] leading-tight text-right whitespace-nowrap tabular-nums overflow-hidden text-ellipsis">
+              <p className="text-[clamp(0.85rem,2.2vw,1.125rem)] font-semibold text-[#0f172a] leading-tight text-right whitespace-nowrap tabular-nums">
                 {formatPyg(incomeLast30)} <span className="text-xs sm:text-sm font-semibold">PYG</span>
               </p>
             </div>
             <div className="rounded-xl bg-white/70 border border-emerald-100 px-3 py-2">
               <p className="text-[11px] uppercase tracking-wide text-gray-500">Egresos</p>
-              <p className="text-sm sm:text-base md:text-lg font-semibold text-[#0f172a] leading-tight text-right whitespace-nowrap tabular-nums overflow-hidden text-ellipsis">
+              <p className="text-[clamp(0.85rem,2.2vw,1.125rem)] font-semibold text-[#0f172a] leading-tight text-right whitespace-nowrap tabular-nums">
                 {formatPyg(expensesLast30)} <span className="text-xs sm:text-sm font-semibold">PYG</span>
               </p>
             </div>
