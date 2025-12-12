@@ -11,6 +11,19 @@ import { FooterNav } from '@/components/footer-nav';
 
 const iconColor = '#3cadaf';
 
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+
+  const rawData = typeof window !== 'undefined' ? window.atob(base64) : Buffer.from(base64, 'base64').toString('binary');
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
 const IconCalendar = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
     viewBox="0 0 24 24"
@@ -96,6 +109,53 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [role, setRole] = useState<AppRole>(null);
   const [academyOptions, setAcademyOptions] = useState<{ id: string; name: string }[]>([]);
   const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function setupPush() {
+      if (typeof window === 'undefined') return;
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!vapidPublicKey) {
+        return;
+      }
+
+      try {
+        const { data } = await supabase.auth.getUser();
+        const userId = data.user?.id as string | undefined;
+        if (!userId) return;
+
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') return;
+
+        let registration: ServiceWorkerRegistration;
+        try {
+          registration = await navigator.serviceWorker.ready;
+        } catch {
+          registration = await navigator.serviceWorker.register('/sw.js');
+        }
+
+        let subscription = await registration.pushManager.getSubscription();
+        if (!subscription) {
+          const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: convertedVapidKey as unknown as ArrayBuffer,
+          });
+        }
+
+        await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...subscription.toJSON(), userId, platform: 'web' }),
+        });
+      } catch (err) {
+        console.error('Error configurando notificaciones push', err);
+      }
+    }
+
+    setupPush();
+  }, [supabase]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();

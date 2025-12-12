@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
     try {
       if (dateIso) {
         const d = new Date(dateIso);
-        when = d.toLocaleString('es-PY', { dateStyle: 'short', timeStyle: 'short' });
+        when = d.toLocaleString('es-PY', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Asuncion' });
       }
     } catch {
       // ignorar errores de formato
@@ -126,6 +126,19 @@ export async function POST(req: NextRequest) {
           payload,
         ),
       ),
+    );
+
+    // Limpiar endpoints muertos (410/404) para mejorar confiabilidad
+    await Promise.allSettled(
+      results.map((r, idx) => {
+        if (r.status !== 'rejected') return Promise.resolve();
+        const reason: any = (r as any).reason;
+        const statusCode = Number(reason?.statusCode ?? reason?.status);
+        if (statusCode !== 404 && statusCode !== 410) return Promise.resolve();
+        const endpoint = (subs as any[])[idx]?.endpoint as string | undefined;
+        if (!endpoint) return Promise.resolve();
+        return supabaseAdmin.from('push_subscriptions').delete().eq('endpoint', endpoint);
+      }),
     );
 
     const ok = results.filter((r) => r.status === 'fulfilled').length;
