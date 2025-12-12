@@ -785,6 +785,30 @@ export default function PlansClient() {
       });
       if (insErr) throw insErr;
 
+      let academyIdForPush: string | null = null;
+      if (typeof window !== 'undefined') {
+        const stored = window.localStorage.getItem('selectedAcademyId');
+        academyIdForPush = stored && stored.trim() ? stored : null;
+      }
+
+      if (paymentStatus === 'pagado' && academyIdForPush) {
+        try {
+          await fetch('/api/push/payment-registered', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              academyId: academyIdForPush,
+              studentId: paymentStudentId,
+              amount: amountNum,
+              currency: 'PYG',
+              paymentDate: dateToUse,
+            }),
+          });
+        } catch (pushErr) {
+          console.error('Error enviando notificación push de pago registrado', pushErr);
+        }
+      }
+
       // actualizar totales de pago por plan en memoria para reflejar el saldo sin recargar
       if (paymentStatus === 'pagado') {
         setPaymentsByPlan((prev) => ({

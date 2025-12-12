@@ -752,6 +752,23 @@ export default function SchedulePage() {
         [createdClassId]: [...selectedStudents],
       }));
 
+      if (selectedAcademyId) {
+        try {
+          await fetch('/api/push/class-created', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              coachId,
+              studentIds: [...selectedStudents],
+              dateIso: iso,
+              academyId: selectedAcademyId,
+            }),
+          });
+        } catch (pushErr) {
+          console.error('Error enviando notificación de clase creada', pushErr);
+        }
+      }
+
       setDay('');
       setTime('');
       setLocationId('');
@@ -2358,6 +2375,7 @@ export default function SchedulePage() {
                                   coachId: cls.coach_id,
                                   studentIds: [studentId],
                                   dateIso: cls.date,
+                                  academyId: selectedAcademyId,
                                 }),
                               });
                             } catch (pushErr) {
@@ -2428,6 +2446,7 @@ export default function SchedulePage() {
                                     coachId: cls.coach_id,
                                     studentIds: studentsByClass[cls.id] ?? [],
                                     dateIso: cls.date,
+                                    academyId: selectedAcademyId,
                                   }),
                                 });
                               } catch (pushErr) {

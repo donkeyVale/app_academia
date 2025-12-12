@@ -6,7 +6,11 @@ import { supabaseAdmin } from '@/lib/supabase-service';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { coachId, studentIds, dateIso } = body || {};
+    const { coachId, studentIds, dateIso, academyId } = body || {};
+
+    if (!academyId || typeof academyId !== 'string') {
+      return NextResponse.json({ error: 'Falta academyId.' }, { status: 400 });
+    }
 
     if (!coachId && (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0)) {
       return NextResponse.json({ error: 'Sin destinatarios para la clase.' }, { status: 400 });
@@ -73,6 +77,31 @@ export async function POST(req: NextRequest) {
       // Si es true o null/undefined, dejamos pasar; solo filtramos cuando es false explícito
       if (enabled === false) continue;
       allowedUserIds.add((row as any).id as string);
+    }
+
+    // Multiacademia: filtrar solo usuarios asignados a la academia objetivo
+    if (allowedUserIds.size > 0) {
+      const { data: uaRows, error: uaErr } = await supabaseAdmin
+        .from('user_academies')
+        .select('user_id')
+        .eq('academy_id', academyId)
+        .in('user_id', Array.from(allowedUserIds));
+
+      if (uaErr) {
+        return NextResponse.json({ error: uaErr.message }, { status: 500 });
+      }
+
+      const academyUserIds = new Set<string>();
+      for (const row of (uaRows ?? []) as any[]) {
+        if (row.user_id) academyUserIds.add(row.user_id as string);
+      }
+
+      const filtered = new Set<string>();
+      for (const id of allowedUserIds) {
+        if (academyUserIds.has(id)) filtered.add(id);
+      }
+      allowedUserIds.clear();
+      for (const id of filtered) allowedUserIds.add(id);
     }
 
     if (allowedUserIds.size === 0) {
