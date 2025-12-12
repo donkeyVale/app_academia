@@ -250,14 +250,16 @@ export default function AdminHomeIncomeExpensesCard() {
                 ? `Del ${fromDateLabel} al ${toDateLabel}`
                 : "Rango últimos 30 días"}
             </p>
-            <p
-              className={`text-[clamp(1.75rem,3.5vw,2.25rem)] font-bold tracking-tight leading-tight ${
-                net >= 0 ? "text-emerald-700" : "text-red-600"
-              } whitespace-nowrap tabular-nums inline-flex items-baseline gap-1`}
-            >
-              <span>{formatPyg(net)}</span>
-              <span className="text-[0.7em] font-semibold">PYG</span>
-            </p>
+            <div className="flex flex-col">
+              <p
+                className={`text-[clamp(1.75rem,3.5vw,2.25rem)] font-bold tracking-tight leading-tight ${
+                  net >= 0 ? "text-emerald-700" : "text-red-600"
+                } tabular-nums`}
+              >
+                {formatPyg(net)}
+              </p>
+              <p className="text-[11px] text-gray-500 leading-none">PYG</p>
+            </div>
             <p className="mt-1 text-[10px] sm:text-[11px] flex flex-nowrap items-center gap-1 text-gray-600 whitespace-nowrap">
               {net >= 0 ? (
                 <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
@@ -277,17 +279,21 @@ export default function AdminHomeIncomeExpensesCard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs md:text-sm">
             <div className="rounded-xl bg-white/70 border border-emerald-100 px-3 py-2">
               <p className="text-[11px] uppercase tracking-wide text-gray-500">Ingresos</p>
-              <p className="text-[clamp(0.85rem,2.2vw,1.125rem)] font-semibold text-[#0f172a] leading-tight text-right whitespace-nowrap tabular-nums inline-flex items-baseline justify-end gap-1 w-full">
-                <span>{formatPyg(incomeLast30)}</span>
-                <span className="text-[0.75em] font-semibold">PYG</span>
-              </p>
+              <div className="flex flex-col items-end">
+                <p className="text-[clamp(0.85rem,2.2vw,1.125rem)] font-semibold text-[#0f172a] leading-tight tabular-nums">
+                  {formatPyg(incomeLast30)}
+                </p>
+                <p className="text-[11px] text-gray-500 leading-none">PYG</p>
+              </div>
             </div>
             <div className="rounded-xl bg-white/70 border border-emerald-100 px-3 py-2">
               <p className="text-[11px] uppercase tracking-wide text-gray-500">Egresos</p>
-              <p className="text-[clamp(0.85rem,2.2vw,1.125rem)] font-semibold text-[#0f172a] leading-tight text-right whitespace-nowrap tabular-nums inline-flex items-baseline justify-end gap-1 w-full">
-                <span>{formatPyg(expensesLast30)}</span>
-                <span className="text-[0.75em] font-semibold">PYG</span>
-              </p>
+              <div className="flex flex-col items-end">
+                <p className="text-[clamp(0.85rem,2.2vw,1.125rem)] font-semibold text-[#0f172a] leading-tight tabular-nums">
+                  {formatPyg(expensesLast30)}
+                </p>
+                <p className="text-[11px] text-gray-500 leading-none">PYG</p>
+              </div>
             </div>
           </div>
         </div>
