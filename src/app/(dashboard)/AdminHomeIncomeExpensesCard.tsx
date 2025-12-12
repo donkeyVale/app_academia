@@ -253,9 +253,10 @@ export default function AdminHomeIncomeExpensesCard() {
             <p
               className={`text-[clamp(1.75rem,3.5vw,2.25rem)] font-bold tracking-tight leading-tight ${
                 net >= 0 ? "text-emerald-700" : "text-red-600"
-              } whitespace-nowrap tabular-nums`}
+              } whitespace-nowrap tabular-nums inline-flex items-baseline gap-1`}
             >
-              <span>{formatPyg(net)}</span> <span className="text-base md:text-lg font-semibold">PYG</span>
+              <span>{formatPyg(net)}</span>
+              <span className="text-[0.7em] font-semibold">PYG</span>
             </p>
             <p className="mt-1 text-[10px] sm:text-[11px] flex flex-nowrap items-center gap-1 text-gray-600 whitespace-nowrap">
               {net >= 0 ? (
@@ -276,14 +277,16 @@ export default function AdminHomeIncomeExpensesCard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs md:text-sm">
             <div className="rounded-xl bg-white/70 border border-emerald-100 px-3 py-2">
               <p className="text-[11px] uppercase tracking-wide text-gray-500">Ingresos</p>
-              <p className="text-[clamp(0.85rem,2.2vw,1.125rem)] font-semibold text-[#0f172a] leading-tight text-right whitespace-nowrap tabular-nums">
-                {formatPyg(incomeLast30)} <span className="text-xs sm:text-sm font-semibold">PYG</span>
+              <p className="text-[clamp(0.85rem,2.2vw,1.125rem)] font-semibold text-[#0f172a] leading-tight text-right whitespace-nowrap tabular-nums inline-flex items-baseline justify-end gap-1 w-full">
+                <span>{formatPyg(incomeLast30)}</span>
+                <span className="text-[0.75em] font-semibold">PYG</span>
               </p>
             </div>
             <div className="rounded-xl bg-white/70 border border-emerald-100 px-3 py-2">
               <p className="text-[11px] uppercase tracking-wide text-gray-500">Egresos</p>
-              <p className="text-[clamp(0.85rem,2.2vw,1.125rem)] font-semibold text-[#0f172a] leading-tight text-right whitespace-nowrap tabular-nums">
-                {formatPyg(expensesLast30)} <span className="text-xs sm:text-sm font-semibold">PYG</span>
+              <p className="text-[clamp(0.85rem,2.2vw,1.125rem)] font-semibold text-[#0f172a] leading-tight text-right whitespace-nowrap tabular-nums inline-flex items-baseline justify-end gap-1 w-full">
+                <span>{formatPyg(expensesLast30)}</span>
+                <span className="text-[0.75em] font-semibold">PYG</span>
               </p>
             </div>
           </div>
