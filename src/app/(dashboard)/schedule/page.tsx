@@ -132,6 +132,7 @@ export default function SchedulePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [role, setRole] = useState<'super_admin' | 'admin' | 'coach' | 'student' | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [studentId, setStudentId] = useState<string | null>(null);
   const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
   const [academyLocationIds, setAcademyLocationIds] = useState<Set<string>>(new Set());
@@ -175,9 +176,12 @@ export default function SchedulePage() {
         const userId = data.user?.id as string | undefined;
         if (!userId) {
           setRole(null);
+          setCurrentUserId(null);
           setStudentId(null);
           return;
         }
+
+        setCurrentUserId(userId);
 
         const { data: profile, error: profErr } = await supabase
           .from('profiles')
@@ -758,6 +762,7 @@ export default function SchedulePage() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
+              classId: createdClassId,
               coachId,
               studentIds: [...selectedStudents],
               dateIso: iso,
@@ -2366,20 +2371,25 @@ export default function SchedulePage() {
                               toast.error('No se pudo cancelar la reserva en el servidor.');
                             }
 
-                            try {
-                              await fetch('/api/push/class-cancelled', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                  classId: cls.id,
-                                  coachId: cls.coach_id,
-                                  studentIds: [studentId],
-                                  dateIso: cls.date,
-                                  academyId: selectedAcademyId,
-                                }),
-                              });
-                            } catch (pushErr) {
-                              console.error('Error enviando notificación de cancelación de reserva', pushErr);
+                            if (selectedAcademyId && currentUserId) {
+                              try {
+                                await fetch('/api/push/class-cancelled', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({
+                                    classId: cls.id,
+                                    coachId: cls.coach_id,
+                                    studentIds: [studentId],
+                                    dateIso: cls.date,
+                                    academyId: selectedAcademyId,
+                                    cancelledByRole: 'student',
+                                    cancelledByStudentId: studentId,
+                                    cancelledByUserId: currentUserId,
+                                  }),
+                                });
+                              } catch (pushErr) {
+                                console.error('Error enviando notificación de cancelación de reserva', pushErr);
+                              }
                             }
 
                             toast.success('Reserva cancelada correctamente. Se devolvió 1 clase a tu plan.');
@@ -2437,20 +2447,25 @@ export default function SchedulePage() {
                                 delete n[cls.id];
                                 return n;
                               });
-                              try {
-                                await fetch('/api/push/class-cancelled', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({
-                                    classId: cls.id,
-                                    coachId: cls.coach_id,
-                                    studentIds: studentsByClass[cls.id] ?? [],
-                                    dateIso: cls.date,
-                                    academyId: selectedAcademyId,
-                                  }),
-                                });
-                              } catch (pushErr) {
-                                console.error('Error enviando notificación de clase cancelada', pushErr);
+                              if (selectedAcademyId && currentUserId && role) {
+                                try {
+                                  await fetch('/api/push/class-cancelled', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({
+                                      classId: cls.id,
+                                      coachId: cls.coach_id,
+                                      studentIds: studentsByClass[cls.id] ?? [],
+                                      dateIso: cls.date,
+                                      academyId: selectedAcademyId,
+                                      cancelledByRole: role,
+                                      cancelledByCoachId: role === 'coach' ? cls.coach_id : null,
+                                      cancelledByUserId: currentUserId,
+                                    }),
+                                  });
+                                } catch (pushErr) {
+                                  console.error('Error enviando notificación de clase cancelada', pushErr);
+                                }
                               }
                               toast.success('Clase cancelada correctamente y clases devueltas a los planes.');
                             }}
