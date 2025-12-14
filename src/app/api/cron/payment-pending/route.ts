@@ -5,6 +5,11 @@ function isUnauthorized(req: NextRequest) {
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
 
+  const querySecret = req.nextUrl.searchParams.get('secret');
+  if (querySecret) {
+    return querySecret !== secret;
+  }
+
   const auth = req.headers.get('authorization') || '';
   if (auth.startsWith('Bearer ')) {
     const token = auth.slice('Bearer '.length).trim();
