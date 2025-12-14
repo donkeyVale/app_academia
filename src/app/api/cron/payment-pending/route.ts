@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-service';
 
 function isUnauthorized(req: NextRequest) {
+  // Vercel Cron Jobs agregan este header en la request programada.
+  // Esto permite proteger el endpoint sin depender de query params o headers custom.
+  const vercelCron = req.headers.get('x-vercel-cron');
+  if (vercelCron && vercelCron !== '0' && vercelCron.toLowerCase() !== 'false') {
+    return false;
+  }
+
   const secret = process.env.CRON_SECRET;
   if (!secret) return false;
 
