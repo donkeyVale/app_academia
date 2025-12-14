@@ -723,17 +723,16 @@ export default function SchedulePage() {
       for (const sid of selectedStudents) {
         const planId = planForStudent[sid];
         if (!planId) continue;
-        try {
-          await supabase.from('plan_usages').upsert(
-            {
-              student_plan_id: planId,
-              class_id: createdClassId,
-              student_id: sid,
-            },
-            { onConflict: 'student_id,class_id' }
-          );
-        } catch {
-          // no bloquear la creación por errores de plan (el saldo ya fue validado)
+        const { error: usageUpsertErr } = await supabase.from('plan_usages').upsert(
+          {
+            student_plan_id: planId,
+            class_id: createdClassId,
+            student_id: sid,
+          },
+          { onConflict: 'student_id,class_id' }
+        );
+        if (usageUpsertErr) {
+          console.error('Error registrando plan_usages en Agenda (create)', usageUpsertErr.message);
         }
       }
 
@@ -1363,17 +1362,16 @@ export default function SchedulePage() {
         for (const sid of toAdd) {
           const planId = planForStudentEdit[sid];
           if (!planId) continue;
-          try {
-            await supabase.from('plan_usages').upsert(
-              {
-                student_plan_id: planId,
-                class_id: editing.id,
-                student_id: sid,
-              },
-              { onConflict: 'student_id,class_id' }
-            );
-          } catch {
-            // no bloquear la edición por errores de plan (el saldo ya fue validado)
+          const { error: usageUpsertErr } = await supabase.from('plan_usages').upsert(
+            {
+              student_plan_id: planId,
+              class_id: editing.id,
+              student_id: sid,
+            },
+            { onConflict: 'student_id,class_id' }
+          );
+          if (usageUpsertErr) {
+            console.error('Error registrando plan_usages en Agenda (edit)', usageUpsertErr.message);
           }
         }
       }
