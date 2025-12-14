@@ -804,6 +804,19 @@ export default function PlansClient() {
               paymentDate: dateToUse,
             }),
           });
+
+          await fetch('/api/push/payment-student', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              academyId: academyIdForPush,
+              studentId: paymentStudentId,
+              studentPlanId: paymentStudentPlanId,
+              amount: amountNum,
+              currency: 'PYG',
+              paymentDate: dateToUse,
+            }),
+          });
         } catch (pushErr) {
           console.error('Error enviando notificación push de pago registrado', pushErr);
         }
