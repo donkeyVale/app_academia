@@ -213,3 +213,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: e?.message ?? 'Error enviando notificaciones de pago pendiente' }, { status: 500 });
   }
 }
+//ajuste
