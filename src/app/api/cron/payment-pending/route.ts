@@ -35,6 +35,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const debug = req.nextUrl.searchParams.get('debug') === '1';
+    const force = req.nextUrl.searchParams.get('force') === '1';
+
     const now = new Date();
     const threshold = new Date(now.getTime() - 12 * 60 * 60 * 1000);
 
@@ -42,7 +45,7 @@ export async function POST(req: NextRequest) {
     const { data: plans, error: spErr } = await supabaseAdmin
       .from('student_plans')
       .select('id, student_id, academy_id, purchased_at')
-      .lte('purchased_at', threshold.toISOString());
+      .lte('purchased_at', force ? now.toISOString() : threshold.toISOString());
 
     if (spErr) {
       return NextResponse.json({ error: spErr.message }, { status: 500 });
@@ -50,7 +53,7 @@ export async function POST(req: NextRequest) {
 
     const rows = (plans ?? []) as any[];
     if (rows.length === 0) {
-      return NextResponse.json({ ok: true, checked: 0, notified: 0 });
+      return NextResponse.json({ ok: true, checked: 0, notified: 0, debug: debug ? { force } : undefined });
     }
 
     const planIds = rows.map((r) => r.id as string).filter(Boolean);
@@ -79,7 +82,19 @@ export async function POST(req: NextRequest) {
     });
 
     if (pending.length === 0) {
-      return NextResponse.json({ ok: true, checked: rows.length, notified: 0 });
+      return NextResponse.json({
+        ok: true,
+        checked: rows.length,
+        pending: 0,
+        notified: 0,
+        debug: debug
+          ? {
+              force,
+              candidates: rows.length,
+              candidatePlanIds: rows.slice(0, 20).map((r) => r.id),
+            }
+          : undefined,
+      });
     }
 
     // 4) Anti-spam: registrar notificación única por plan
@@ -87,12 +102,12 @@ export async function POST(req: NextRequest) {
     const eventType = 'payment_pending_12h';
 
     // Bulk insert (si ya existe por unique, lo ignoramos vía upsert)
+    const pendingWithAcademy = pending.filter((r) => r.academy_id);
+
     const { data: inserted, error: insErr } = await supabaseAdmin
       .from('notification_events')
       .upsert(
-        pending
-          .filter((r) => r.academy_id)
-          .map((r) => ({
+        pendingWithAcademy.map((r) => ({
             academy_id: r.academy_id,
             student_plan_id: r.id,
             student_id: r.student_id,
@@ -116,25 +131,70 @@ export async function POST(req: NextRequest) {
 
     // 5) Enviar push solo a los que se insertaron recién (evita repetir)
     const origin = req.nextUrl.origin;
+    const toNotify = pendingWithAcademy.filter((r) => insertedIds.has(r.id as string));
+
     const results = await Promise.allSettled(
-      pending
-        .filter((r) => insertedIds.has(r.id as string))
-        .map((r) =>
-          fetch(`${origin}/api/push/payment-pending`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              academyId: r.academy_id,
-              studentId: r.student_id,
-              studentPlanId: r.id,
-            }),
+      toNotify.map((r) =>
+        fetch(`${origin}/api/push/payment-pending`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            academyId: r.academy_id,
+            studentId: r.student_id,
+            studentPlanId: r.id,
           }),
-        ),
+        }),
+      ),
     );
 
-    const notified = results.filter((r) => r.status === 'fulfilled').length;
+    const okFetch = results.filter((r) => r.status === 'fulfilled').length;
 
-    return NextResponse.json({ ok: true, checked: rows.length, pending: pending.length, notified });
+    let pushResponses:
+      | {
+          studentPlanId: string;
+          status: number | null;
+          body: any;
+        }[]
+      | undefined;
+
+    if (debug) {
+      const settled = await Promise.all(
+        results.map(async (r, idx) => {
+          const studentPlanId = (toNotify[idx]?.id as string | undefined) ?? 'unknown';
+          if (r.status !== 'fulfilled') {
+            return { studentPlanId, status: null, body: { error: 'fetch_failed' } };
+          }
+          const res = r.value;
+          let json: any = null;
+          try {
+            json = await res.json();
+          } catch {
+            json = null;
+          }
+          return { studentPlanId, status: res.status, body: json };
+        }),
+      );
+      pushResponses = settled;
+    }
+
+    return NextResponse.json({
+      ok: true,
+      checked: rows.length,
+      pending: pending.length,
+      pendingMissingAcademy: pending.length - pendingWithAcademy.length,
+      inserted: insertedIds.size,
+      notifiedRequests: okFetch,
+      debug: debug
+        ? {
+            force,
+            candidates: rows.length,
+            candidatePlanIds: rows.slice(0, 20).map((r) => r.id),
+            pendingPlanIds: pending.slice(0, 20).map((r) => r.id),
+            insertedPlanIds: Array.from(insertedIds).slice(0, 20),
+            pushResponses,
+          }
+        : undefined,
+    });
   } catch (e: any) {
     console.error('Error en /api/cron/payment-pending', e);
     return NextResponse.json({ error: e?.message ?? 'Error ejecutando cron de pago pendiente' }, { status: 500 });
