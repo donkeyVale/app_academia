@@ -35,11 +35,16 @@ type StudentPlanRow = {
   id: string;
   student_id: string;
   plan_id: string | null;
+  academy_id?: string | null;
+  purchased_at?: string | null;
   remaining_classes: number;
   base_price?: number | null;
   final_price?: number | null;
   total_classes?: number | null;
   used_classes?: number | null;
+  total_paid?: number | null;
+  total_price?: number | null;
+  balance_pending?: number | null;
   plans?: { name: string | null } | null;
 };
 
@@ -75,7 +80,15 @@ export default function StudentsPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyItems, setHistoryItems] = useState<
-    { id: string; date: string; courtName: string | null; coachName: string | null }[]
+    {
+      id: string;
+      date: string;
+      courtName: string | null;
+      coachName: string | null;
+      studentPlanId: string | null;
+      planName: string | null;
+      planPurchasedAt: string | null;
+    }[]
   >([]);
   const [showOnlyMyStudents, setShowOnlyMyStudents] = useState(false);
   const [myStudentIds, setMyStudentIds] = useState<string[]>([]);
@@ -122,7 +135,7 @@ export default function StudentsPage() {
           supabase.from('students').select('id, user_id, level, notes'),
           supabase
             .from('student_plans')
-            .select('id, student_id, plan_id, remaining_classes, base_price, final_price, academy_id, plans(name)'),
+            .select('id, student_id, plan_id, remaining_classes, base_price, final_price, academy_id, purchased_at, plans(name)'),
         ]);
 
         if (studentsRes.error) throw studentsRes.error;
@@ -228,6 +241,7 @@ export default function StudentsPage() {
               }
             : null,
           academy_id: (p.academy_id as string | null) ?? null,
+          purchased_at: (p.purchased_at as string | null) ?? null,
         }));
 
         // Cargar perfiles para obtener el full_name de cada alumno (cuando tenga user vinculado)
@@ -273,24 +287,80 @@ export default function StudentsPage() {
           }, {});
         }
 
+        // Cargar pagos por plan para calcular saldo pendiente y elegir el plan activo
+        let paidByPlan: Record<string, number> = {};
+        if (plansData.length > 0) {
+          const studentPlanIds = plansData.map((p) => p.id);
+          const { data: payRows, error: payErr } = await supabase
+            .from('payments')
+            .select('student_plan_id, amount, status')
+            .in('student_plan_id', studentPlanIds);
+
+          if (payErr) throw payErr;
+
+          paidByPlan = (payRows ?? []).reduce<Record<string, number>>((acc, p: any) => {
+            const pid = p.student_plan_id as string | null | undefined;
+            if (!pid) return acc;
+            if (p.status !== 'pagado') return acc;
+            const amt = Number(p.amount ?? 0);
+            acc[pid] = (acc[pid] || 0) + (Number.isFinite(amt) ? amt : 0);
+            return acc;
+          }, {});
+        }
+
         // Construir mapas de planes
         const plansMap: Record<string, StudentPlanRow> = {};
+
+        const scorePlan = (plan: StudentPlanRow) => {
+          const used = usageCountsByPlan[plan.id] || 0;
+          const baseTotal = (plan.total_classes ?? plan.remaining_classes) ?? 0;
+          const effectiveRemaining = Math.max(0, baseTotal - used);
+          const totalPrice = Number(plan.final_price ?? plan.base_price ?? 0);
+          const totalPaid = paidByPlan[plan.id] || 0;
+          const balancePending = Math.max(0, totalPrice - totalPaid);
+          const purchasedAtMs = plan.purchased_at ? new Date(plan.purchased_at).getTime() : 0;
+          const isActive = effectiveRemaining > 0 || balancePending > 0;
+          return {
+            used,
+            baseTotal,
+            effectiveRemaining,
+            totalPrice: Number.isFinite(totalPrice) ? totalPrice : 0,
+            totalPaid,
+            balancePending,
+            purchasedAtMs,
+            isActive,
+          };
+        };
+
+        const isBetterPlan = (candidate: StudentPlanRow, existing: StudentPlanRow) => {
+          const c = scorePlan(candidate);
+          const e = scorePlan(existing);
+          if (c.isActive && !e.isActive) return true;
+          if (!c.isActive && e.isActive) return false;
+          if (c.purchasedAtMs !== e.purchasedAtMs) return c.purchasedAtMs > e.purchasedAtMs;
+          return false;
+        };
+
         for (const p of plansData) {
           const used = usageCountsByPlan[p.id] || 0;
           const baseTotal = (p.total_classes ?? p.remaining_classes) ?? 0;
           const effectiveRemaining = Math.max(0, baseTotal - used);
+          const totalPrice = Number(p.final_price ?? p.base_price ?? 0);
+          const totalPaid = paidByPlan[p.id] || 0;
+          const balancePending = Math.max(0, totalPrice - totalPaid);
           const withEffective: StudentPlanRow = {
             ...p,
             remaining_classes: effectiveRemaining,
             total_classes: baseTotal,
             used_classes: used,
+            total_price: Number.isFinite(totalPrice) ? totalPrice : 0,
+            total_paid: totalPaid,
+            balance_pending: balancePending,
           };
-
-          // Si hay varios registros de plan para el mismo alumno, priorizamos uno que tenga plan_id no nulo.
           const existing = plansMap[p.student_id];
           if (!existing) {
             plansMap[p.student_id] = withEffective;
-          } else if (!existing.plan_id && p.plan_id) {
+          } else if (isBetterPlan(withEffective, existing)) {
             plansMap[p.student_id] = withEffective;
           }
         }
@@ -470,27 +540,40 @@ export default function StudentsPage() {
       // Buscar clases efectivamente usadas (presentes) a través de plan_usages
       const { data: usagesData, error: usagesErr } = await supabase
         .from('plan_usages')
-        .select('class_id, class_sessions!inner(id,date,court_id,coach_id)')
+        .select('class_id, student_plan_id, class_sessions!inner(id,date,court_id,coach_id)')
         .eq('student_id', studentId)
         .limit(50);
 
       if (usagesErr) throw usagesErr;
 
-      const classSessionsRaw = (usagesData ?? [])
-        .map((u: any) => u.class_sessions as any)
-        .filter((c) => !!c);
+      const rawUsages = (usagesData ?? []) as any[];
+      const byClassId: Record<
+        string,
+        {
+          classId: string;
+          studentPlanId: string | null;
+          classSession: { id: string; date: string; court_id: string | null; coach_id: string | null };
+        }
+      > = {};
 
-      // Quitar duplicados por id
-      const byId: Record<string, any> = {};
-      classSessionsRaw.forEach((c: any) => {
-        if (!byId[c.id]) byId[c.id] = c;
+      rawUsages.forEach((u: any) => {
+        const cls = u.class_sessions as any;
+        const classId = (u.class_id as string | null) ?? (cls?.id as string | null);
+        if (!classId || !cls?.id) return;
+        if (byClassId[classId]) return;
+        byClassId[classId] = {
+          classId,
+          studentPlanId: (u.student_plan_id as string | null) ?? null,
+          classSession: {
+            id: cls.id as string,
+            date: cls.date as string,
+            court_id: (cls.court_id as string | null) ?? null,
+            coach_id: (cls.coach_id as string | null) ?? null,
+          },
+        };
       });
-      const classSessions = Object.values(byId) as {
-        id: string;
-        date: string;
-        court_id: string | null;
-        coach_id: string | null;
-      }[];
+
+      const classSessions = Object.values(byClassId);
 
       if (!classSessions.length) {
         setHistoryItems([]);
@@ -500,17 +583,47 @@ export default function StudentsPage() {
       const courtIds = Array.from(
         new Set(
           classSessions
-            .map((c) => c.court_id)
+            .map((c) => c.classSession.court_id)
             .filter((id): id is string => !!id)
         )
       );
       const coachIds = Array.from(
         new Set(
           classSessions
-            .map((c) => c.coach_id)
+            .map((c) => c.classSession.coach_id)
             .filter((id): id is string => !!id)
         )
       );
+
+      const planIds = Array.from(
+        new Set(
+          classSessions
+            .map((c) => c.studentPlanId)
+            .filter((id): id is string => !!id)
+        )
+      );
+
+      let planInfoById: Record<string, { name: string | null; purchased_at: string | null }> = {};
+      if (planIds.length) {
+        const { data: spRows, error: spErr } = await supabase
+          .from('student_plans')
+          .select('id, purchased_at, plans(name)')
+          .in('id', planIds);
+        if (spErr) throw spErr;
+
+        planInfoById = (spRows ?? []).reduce<Record<string, { name: string | null; purchased_at: string | null }>>(
+          (acc, row: any) => {
+            const pid = row.id as string;
+            const planName = ((row as any)?.plans?.name as string | undefined) ?? null;
+            acc[pid] = {
+              name: planName,
+              purchased_at: (row.purchased_at as string | null) ?? null,
+            };
+            return acc;
+          },
+          {},
+        );
+      }
 
       let courtsMap: Record<string, { id: string; name: string }> = {};
       let coachesMap: Record<string, { id: string; user_id: string | null }> = {};
@@ -564,14 +677,20 @@ export default function StudentsPage() {
       }
 
       const items = classSessions.map((cls) => {
-        const court = cls.court_id ? courtsMap[cls.court_id] : undefined;
-        const coach = cls.coach_id ? coachesMap[cls.coach_id] : undefined;
+        const courtId = cls.classSession.court_id;
+        const coachId = cls.classSession.coach_id;
+        const court = courtId ? courtsMap[courtId] : undefined;
+        const coach = coachId ? coachesMap[coachId] : undefined;
         const coachName = coach?.user_id ? coachNamesMap[coach.user_id] ?? null : null;
+        const planInfo = cls.studentPlanId ? planInfoById[cls.studentPlanId] : undefined;
         return {
-          id: cls.id,
-          date: cls.date,
+          id: cls.classSession.id,
+          date: cls.classSession.date,
           courtName: court?.name ?? null,
           coachName: coachName,
+          studentPlanId: cls.studentPlanId,
+          planName: planInfo?.name ?? null,
+          planPurchasedAt: planInfo?.purchased_at ?? null,
         };
       });
 
@@ -1156,108 +1275,141 @@ export default function StudentsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {historyItems.map((item) => {
-                        const d = new Date(item.date);
-                        const yyyy = d.getFullYear();
-                        const mm = String(d.getMonth() + 1).padStart(2, '0');
-                        const dd = String(d.getDate()).padStart(2, '0');
-                        const hh = String(d.getHours()).padStart(2, '0');
-                        const min = String(d.getMinutes()).padStart(2, '0');
+                      {(() => {
+                        const groups: Record<string, typeof historyItems> = {};
+                        historyItems.forEach((it) => {
+                          const key = it.studentPlanId ?? 'unknown';
+                          if (!groups[key]) groups[key] = [];
+                          groups[key].push(it);
+                        });
 
-                        const notesArr = classNotesByClass[item.id] ?? [];
-                        const firstNote = notesArr[0] ?? null;
-                        const isCoach = role === 'coach';
-                        const isAdmin = role === 'admin' || role === 'super_admin';
-                        const isStudent = role === 'student';
+                        const groupKeys = Object.keys(groups).sort((a, b) => {
+                          const aItem = groups[a]?.[0] ?? null;
+                          const bItem = groups[b]?.[0] ?? null;
+                          const aMs = aItem?.planPurchasedAt ? new Date(aItem.planPurchasedAt).getTime() : 0;
+                          const bMs = bItem?.planPurchasedAt ? new Date(bItem.planPurchasedAt).getTime() : 0;
+                          if (aMs !== bMs) return bMs - aMs;
+                          return a.localeCompare(b);
+                        });
 
-                        return [
-                          (
-                            <tr key={`${item.id}-row`} className="border-b last:border-b-0">
-                              <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
-                              <td className="py-1.5 px-2">{`${hh}:${min}`}</td>
-                              <td className="py-1.5 px-2">{item.courtName ?? '-'}</td>
-                              <td className="py-1.5 px-2">{item.coachName ?? '-'}</td>
-                            </tr>
-                          ),
-                          (
-                            <tr key={`${item.id}-note`} className="border-b last:border-b-0">
-                              <td colSpan={4} className="py-1.5 px-2 bg-gray-50/40">
-                                {isCoach ? (
-                                  <div className="space-y-1">
-                                    {editingNote && editingNote.classId === item.id ? (
-                                      <div className="space-y-1">
-                                        <label className="block text-xs text-gray-600">Nota para esta clase</label>
-                                        <textarea
-                                          className="w-full border rounded-md px-2 py-1 text-base resize-y min-h-[60px]"
-                                          style={{ fontSize: '16px' }}
-                                          value={editingNote.draft}
-                                          onChange={(e) =>
-                                            setEditingNote((prev) =>
-                                              prev && prev.classId === item.id
-                                                ? { ...prev, draft: e.target.value }
-                                                : prev,
-                                            )
-                                          }
-                                          placeholder="Escribí una nota sobre el rendimiento del alumno en esta clase..."
-                                        />
-                                        {notesError && (
-                                          <p className="text-[11px] text-red-600">{notesError}</p>
-                                        )}
-                                        <div className="flex items-center gap-2 mt-1">
-                                          <button
-                                            type="button"
-                                            onClick={handleSaveNote}
-                                            disabled={savingNote}
-                                            className="px-3 py-1 rounded-full bg-[#3cadaf] text-white text-[11px] font-semibold hover:bg-[#31435d] disabled:opacity-60"
-                                          >
-                                            {savingNote ? 'Guardando...' : 'Guardar nota'}
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={handleCancelEditNote}
-                                            disabled={savingNote}
-                                            className="px-3 py-1 rounded-full border border-slate-300 text-[11px] text-slate-700 bg-white hover:bg-slate-50"
-                                          >
-                                            Cancelar
-                                          </button>
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                                        <p className="text-[12px] text-gray-700">
-                                          {firstNote ? (
-                                            <>
-                                              <span className="font-semibold">Tu nota:</span>{' '}
-                                              <span className="font-semibold">{firstNote.note}</span>
-                                            </>
-                                          ) : (
-                                            'Aún no dejaste una nota para esta clase.'
-                                          )}
-                                        </p>
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            handleStartEditNote(item.id, firstNote ? firstNote.note : '')
-                                          }
-                                          className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
-                                        >
-                                          <StickyNote className="w-3.5 h-3.5 text-[#3cadaf]" />
-                                          {firstNote ? 'Editar nota' : 'Agregar nota'}
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
-                                ) : (isStudent || isAdmin) && firstNote ? (
-                                  <p className="text-[13px] text-gray-700">
-                                    <span className="font-semibold">Nota del profesor:</span>{' '}
-                                    <span className="font-semibold">{firstNote.note}</span>
-                                  </p>
-                                ) : null}
+                        return groupKeys.flatMap((key) => {
+                          const items = groups[key] ?? [];
+                          const headerName = items[0]?.planName ?? (key === 'unknown' ? 'Plan sin identificar' : 'Plan');
+
+                          const headerRow = (
+                            <tr key={`${key}-header`} className="border-b bg-slate-50">
+                              <td colSpan={4} className="py-2 px-2 text-xs font-semibold text-slate-700">
+                                {headerName}
                               </td>
                             </tr>
-                          ),
-                        ];
-                      })}
+                          );
+
+                          const rows = items.flatMap((item) => {
+                            const d = new Date(item.date);
+                            const yyyy = d.getFullYear();
+                            const mm = String(d.getMonth() + 1).padStart(2, '0');
+                            const dd = String(d.getDate()).padStart(2, '0');
+                            const hh = String(d.getHours()).padStart(2, '0');
+                            const min = String(d.getMinutes()).padStart(2, '0');
+
+                            const notesArr = classNotesByClass[item.id] ?? [];
+                            const firstNote = notesArr[0] ?? null;
+                            const isCoach = role === 'coach';
+                            const isAdmin = role === 'admin' || role === 'super_admin';
+                            const isStudent = role === 'student';
+
+                            return [
+                              (
+                                <tr key={`${item.id}-row`} className="border-b last:border-b-0">
+                                  <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
+                                  <td className="py-1.5 px-2">{`${hh}:${min}`}</td>
+                                  <td className="py-1.5 px-2">{item.courtName ?? '-'}</td>
+                                  <td className="py-1.5 px-2">{item.coachName ?? '-'}</td>
+                                </tr>
+                              ),
+                              (
+                                <tr key={`${item.id}-note`} className="border-b last:border-b-0">
+                                  <td colSpan={4} className="py-1.5 px-2 bg-gray-50/40">
+                                    {isCoach ? (
+                                      <div className="space-y-1">
+                                        {editingNote && editingNote.classId === item.id ? (
+                                          <div className="space-y-1">
+                                            <label className="block text-xs text-gray-600">Nota para esta clase</label>
+                                            <textarea
+                                              className="w-full border rounded-md px-2 py-1 text-base resize-y min-h-[60px]"
+                                              style={{ fontSize: '16px' }}
+                                              value={editingNote.draft}
+                                              onChange={(e) =>
+                                                setEditingNote((prev) =>
+                                                  prev && prev.classId === item.id
+                                                    ? { ...prev, draft: e.target.value }
+                                                    : prev,
+                                                )
+                                              }
+                                              placeholder="Escribí una nota sobre el rendimiento del alumno en esta clase..."
+                                            />
+                                            {notesError && (
+                                              <p className="text-[11px] text-red-600">{notesError}</p>
+                                            )}
+                                            <div className="flex items-center gap-2 mt-1">
+                                              <button
+                                                type="button"
+                                                onClick={handleSaveNote}
+                                                disabled={savingNote}
+                                                className="px-3 py-1 rounded-full bg-[#3cadaf] text-white text-[11px] font-semibold hover:bg-[#31435d] disabled:opacity-60"
+                                              >
+                                                {savingNote ? 'Guardando...' : 'Guardar nota'}
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={handleCancelEditNote}
+                                                disabled={savingNote}
+                                                className="px-3 py-1 rounded-full border border-slate-300 text-[11px] text-slate-700 bg-white hover:bg-slate-50"
+                                              >
+                                                Cancelar
+                                              </button>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                            <p className="text-[12px] text-gray-700">
+                                              {firstNote ? (
+                                                <>
+                                                  <span className="font-semibold">Tu nota:</span>{' '}
+                                                  <span className="font-semibold">{firstNote.note}</span>
+                                                </>
+                                              ) : (
+                                                'Aún no dejaste una nota para esta clase.'
+                                              )}
+                                            </p>
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                handleStartEditNote(item.id, firstNote ? firstNote.note : '')
+                                              }
+                                              className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                                            >
+                                              <StickyNote className="w-3.5 h-3.5 text-[#3cadaf]" />
+                                              {firstNote ? 'Editar nota' : 'Agregar nota'}
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : (isStudent || isAdmin) && firstNote ? (
+                                      <p className="text-[13px] text-gray-700">
+                                        <span className="font-semibold">Nota del profesor:</span>{' '}
+                                        <span className="font-semibold">{firstNote.note}</span>
+                                      </p>
+                                    ) : null}
+                                  </td>
+                                </tr>
+                              ),
+                            ];
+                          });
+
+                          return [headerRow, ...rows];
+                        });
+                      })()}
                     </tbody>
                   </table>
                 </div>
