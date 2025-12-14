@@ -799,6 +799,7 @@ export default function PlansClient() {
             body: JSON.stringify({
               academyId: academyIdForPush,
               studentId: paymentStudentId,
+              studentPlanId: paymentStudentPlanId,
               amount: amountNum,
               currency: 'PYG',
               paymentDate: dateToUse,

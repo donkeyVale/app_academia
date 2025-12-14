@@ -3,10 +3,34 @@ import { NextRequest, NextResponse } from 'next/server';
 import webPush from 'web-push';
 import { supabaseAdmin } from '@/lib/supabase-service';
 
+function formatGs(amount: number) {
+  try {
+    return new Intl.NumberFormat('es-PY', { maximumFractionDigits: 0 }).format(amount);
+  } catch {
+    return String(Math.round(amount));
+  }
+}
+
+function formatWhen(paymentDate?: string | null) {
+  try {
+    if (paymentDate) {
+      const now = new Date();
+      const [y, m, d] = String(paymentDate).split('-').map((x) => Number(x));
+      if (y && m && d) {
+        const dt = new Date(Date.UTC(y, m - 1, d, now.getUTCHours(), now.getUTCMinutes(), 0));
+        return dt.toLocaleString('es-PY', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Asuncion' });
+      }
+    }
+    return new Date().toLocaleString('es-PY', { dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Asuncion' });
+  } catch {
+    return '';
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { academyId, studentId, amount, currency = 'PYG', paymentDate } = body || {};
+    const { academyId, studentId, studentPlanId, amount, currency = 'PYG', paymentDate } = body || {};
 
     if (!academyId || typeof academyId !== 'string') {
       return NextResponse.json({ error: 'Falta academyId.' }, { status: 400 });
@@ -14,6 +38,10 @@ export async function POST(req: NextRequest) {
 
     if (!studentId || typeof studentId !== 'string') {
       return NextResponse.json({ error: 'Falta studentId.' }, { status: 400 });
+    }
+
+    if (!studentPlanId || typeof studentPlanId !== 'string') {
+      return NextResponse.json({ error: 'Falta studentPlanId.' }, { status: 400 });
     }
 
     const amountNum = Number(amount);
@@ -76,6 +104,7 @@ export async function POST(req: NextRequest) {
 
     // Enriquecer con nombre del alumno si es posible
     let studentName: string | null = null;
+    let studentUserId: string | null = null;
     try {
       const { data: studentRow, error: stErr } = await supabaseAdmin
         .from('students')
@@ -83,6 +112,7 @@ export async function POST(req: NextRequest) {
         .eq('id', studentId)
         .maybeSingle();
       if (!stErr && studentRow?.user_id) {
+        studentUserId = studentRow.user_id as unknown as string;
         const { data: prof, error: pErr } = await supabaseAdmin
           .from('profiles')
           .select('full_name')
@@ -94,20 +124,67 @@ export async function POST(req: NextRequest) {
       // ignorar
     }
 
-    let when = '';
-    try {
-      if (paymentDate) {
-        const d = new Date(String(paymentDate) + 'T00:00:00');
-        when = d.toLocaleDateString('es-PY', { timeZone: 'America/Asuncion' });
-      }
-    } catch {
-      // ignorar
+    // Plan + saldo
+    const { data: spRow, error: spErr } = await supabaseAdmin
+      .from('student_plans')
+      .select('id, base_price, final_price, plans(name)')
+      .eq('id', studentPlanId)
+      .maybeSingle();
+
+    if (spErr) {
+      return NextResponse.json({ error: spErr.message }, { status: 500 });
     }
 
-    const bodyText = `${studentName ? studentName + ': ' : ''}${amountNum} ${currency}${when ? ` (${when})` : ''}`;
+    if (!spRow) {
+      return NextResponse.json({ error: 'No se encontró el plan del alumno.' }, { status: 404 });
+    }
+
+    const planName = ((spRow as any)?.plans?.name as string | undefined) ?? 'tu plan';
+    const basePrice = (spRow as any)?.base_price as number | null | undefined;
+    const finalPrice = ((spRow as any)?.final_price as number | null | undefined) ?? basePrice ?? null;
+
+    const { data: payRows, error: payErr } = await supabaseAdmin
+      .from('payments')
+      .select('amount,status')
+      .eq('student_plan_id', studentPlanId);
+
+    if (payErr) {
+      return NextResponse.json({ error: payErr.message }, { status: 500 });
+    }
+
+    const totalPaid = (payRows ?? []).reduce((acc: number, p: any) => {
+      if (p?.status !== 'pagado') return acc;
+      const v = Number(p?.amount ?? 0);
+      return acc + (Number.isFinite(v) ? v : 0);
+    }, 0);
+
+    const balance = finalPrice != null ? Math.max(0, Number(finalPrice) - totalPaid) : null;
+
+    const whenText = formatWhen(paymentDate);
+    const amountText = currency === 'PYG' ? `Gs. ${formatGs(amountNum)}` : `${amountNum} ${currency}`;
+
+    const paidBeforeThis = totalPaid - amountNum;
+    const hadBalanceBefore = finalPrice != null ? Math.max(0, Number(finalPrice) - paidBeforeThis) : null;
+
+    const isFirstAndFull = finalPrice != null && paidBeforeThis <= 0 && amountNum >= Number(finalPrice);
+    const completesBalance = finalPrice != null && hadBalanceBefore != null && hadBalanceBefore > 0 && balance === 0 && !isFirstAndFull;
+
+    let title = 'Pago registrado';
+    let bodyText = '';
+    const who = studentName ? `${studentName}: ` : '';
+
+    if (isFirstAndFull) {
+      bodyText = `${who}Pago total registrado (${amountText}) por ${planName}. (${whenText})`;
+    } else if (completesBalance) {
+      title = 'Cuenta cancelada';
+      bodyText = `${who}Pago final registrado (${amountText}) por ${planName}. Cuenta cancelada. (${whenText})`;
+    } else {
+      const balanceText = balance != null ? `Saldo: Gs. ${formatGs(balance)}` : 'Saldo actualizado.';
+      bodyText = `${who}Pago parcial registrado (${amountText}) por ${planName}. ${balanceText}. (${whenText})`;
+    }
 
     const payload = JSON.stringify({
-      title: 'Pago registrado',
+      title,
       body: bodyText,
       data: { url: '/finance' },
     });
