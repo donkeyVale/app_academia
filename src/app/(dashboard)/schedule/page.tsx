@@ -1164,6 +1164,10 @@ export default function SchedulePage() {
     }
     setSaving(true);
     try {
+      const oldDateIso = editing.date;
+      const oldCourtId = editing.court_id;
+      const oldCoachId = editing.coach_id;
+
       const iso = new Date(`${editDay}T${editTime}:00`).toISOString();
       // anti-race: ensure no other class at same time/court
       const { data: clash, error: clashErr } = await supabase
@@ -1400,6 +1404,31 @@ export default function SchedulePage() {
         ...prev,
         [editing.id]: [...editSelectedStudents],
       }));
+
+      const isRescheduled = oldDateIso !== iso || oldCourtId !== editCourtId || oldCoachId !== editCoachId;
+      if (isRescheduled && selectedAcademyId) {
+        try {
+          await fetch('/api/push/class-rescheduled', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              classId: editing.id,
+              academyId: selectedAcademyId,
+              studentIds: [...editSelectedStudents],
+              coachId: editCoachId,
+              oldDateIso,
+              newDateIso: iso,
+              oldCourtId,
+              newCourtId: editCourtId,
+              oldCoachId,
+              newCoachId: editCoachId,
+            }),
+          });
+        } catch (pushErr) {
+          console.error('Error enviando push de clase reprogramada', pushErr);
+        }
+      }
+
       toast.success('Clase actualizada correctamente');
       setEditing(null);
     } catch (e: any) {
