@@ -147,35 +147,27 @@ export async function POST(req: NextRequest) {
       ),
     );
 
-    const okFetch = results.filter((r) => r.status === 'fulfilled').length;
+    const pushResponses = await Promise.all(
+      results.map(async (r, idx) => {
+        const studentPlanId = (toNotify[idx]?.id as string | undefined) ?? 'unknown';
+        if (r.status !== 'fulfilled') {
+          return { studentPlanId, status: null as number | null, body: debug ? { error: 'fetch_failed' } : undefined };
+        }
+        const res = r.value;
+        if (!debug) {
+          return { studentPlanId, status: res.status, body: undefined };
+        }
+        let json: any = null;
+        try {
+          json = await res.json();
+        } catch {
+          json = null;
+        }
+        return { studentPlanId, status: res.status, body: json };
+      }),
+    );
 
-    let pushResponses:
-      | {
-          studentPlanId: string;
-          status: number | null;
-          body: any;
-        }[]
-      | undefined;
-
-    if (debug) {
-      const settled = await Promise.all(
-        results.map(async (r, idx) => {
-          const studentPlanId = (toNotify[idx]?.id as string | undefined) ?? 'unknown';
-          if (r.status !== 'fulfilled') {
-            return { studentPlanId, status: null, body: { error: 'fetch_failed' } };
-          }
-          const res = r.value;
-          let json: any = null;
-          try {
-            json = await res.json();
-          } catch {
-            json = null;
-          }
-          return { studentPlanId, status: res.status, body: json };
-        }),
-      );
-      pushResponses = settled;
-    }
+    const okNotified = pushResponses.filter((r) => typeof r.status === 'number' && r.status >= 200 && r.status < 300).length;
 
     return NextResponse.json({
       ok: true,
@@ -183,7 +175,7 @@ export async function POST(req: NextRequest) {
       pending: pending.length,
       pendingMissingAcademy: pending.length - pendingWithAcademy.length,
       inserted: insertedIds.size,
-      notifiedRequests: okFetch,
+      notifiedRequests: okNotified,
       debug: debug
         ? {
             force,
