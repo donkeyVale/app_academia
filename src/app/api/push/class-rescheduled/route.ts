@@ -233,7 +233,7 @@ export async function POST(req: NextRequest) {
     const whenNew = formatWhen(newDateIso);
 
     // Si no mandaron canchas, intentamos usar lo de la clase actual
-    let oldWhere = await getWhereTextFromCourtId(oldCourtId ?? null);
+    const oldWhere = await getWhereTextFromCourtId(oldCourtId ?? null);
     let newWhere = await getWhereTextFromCourtId(newCourtId ?? null);
 
     if (!newWhere) {

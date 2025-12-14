@@ -817,7 +817,7 @@ export default function ReportsPage() {
         new Set(rowsRawAll.map((r) => r.class_sessions?.court_id).filter((id: string | null): id is string => !!id))
       );
 
-      let coachMap: Record<string, string | null> = {};
+      const coachMap: Record<string, string | null> = {};
       if (coachIds.length > 0) {
         const { data: coachesData, error: cErr } = await supabase
           .from("coaches")
@@ -1259,7 +1259,7 @@ export default function ReportsPage() {
       const coachIds = Array.from(
         new Set(classes.map((c) => c.coach_id).filter((id): id is string => !!id))
       );
-      let coachMap: Record<string, string | null> = {};
+      const coachMap: Record<string, string | null> = {};
       if (coachIds.length > 0) {
         const { data: coachesData, error: coachesErr } = await supabase
           .from("coaches")

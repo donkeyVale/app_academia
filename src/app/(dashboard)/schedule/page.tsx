@@ -484,7 +484,7 @@ export default function SchedulePage() {
     e.preventDefault();
     setSaving(true);
     setError(null);
-    let extraCreated = 0;
+    const extraCreated = 0;
     try {
       if (!courtId || !coachId || !day || !time) {
         const msg = 'Completa cancha, fecha y hora, y profesor';
