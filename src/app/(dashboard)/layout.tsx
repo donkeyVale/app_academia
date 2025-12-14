@@ -8,6 +8,7 @@ import { CalendarDays, Users, CreditCard, UserCog, BarChart3, LogOut, UserCircle
 import { createClientBrowser } from '@/lib/supabase';
 import { FooterAvatarButton } from '@/components/footer-avatar-button';
 import { FooterNav } from '@/components/footer-nav';
+import { PwaInstallPrompt } from '@/components/pwa-install-prompt';
 
 const iconColor = '#3cadaf';
 
@@ -290,6 +291,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <main className="w-full flex justify-center px-4 py-3 overflow-x-hidden">
         <div className="w-full max-w-5xl">{children}</div>
       </main>
+
+      <PwaInstallPrompt />
 
       <FooterNav
         isAdmin={isAdmin}
