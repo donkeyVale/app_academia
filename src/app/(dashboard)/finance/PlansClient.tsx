@@ -198,6 +198,46 @@ export default function PlansClient() {
   const [paymentStudentSearch, setPaymentStudentSearch] = useState('');
   const [reportStudentOpen, setReportStudentOpen] = useState(false);
   const [paymentStudentOpen, setPaymentStudentOpen] = useState(false);
+  const [planUsagesByPlanId, setPlanUsagesByPlanId] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    (async () => {
+      if (!paymentStudentId) {
+        setPlanUsagesByPlanId({});
+        return;
+      }
+      try {
+        const planIds = studentPlans.filter((sp) => sp.student_id === paymentStudentId).map((sp) => sp.id);
+        if (planIds.length === 0) {
+          setPlanUsagesByPlanId({});
+          return;
+        }
+
+        const { data, error } = await supabase
+          .from('plan_usages')
+          .select('student_plan_id')
+          .eq('student_id', paymentStudentId)
+          .in('student_plan_id', planIds);
+
+        if (error) {
+          console.error('Error cargando plan_usages para registrar pago', error);
+          setPlanUsagesByPlanId({});
+          return;
+        }
+
+        const map: Record<string, number> = {};
+        (data ?? []).forEach((row: any) => {
+          const id = row.student_plan_id as string | undefined;
+          if (!id) return;
+          map[id] = (map[id] ?? 0) + 1;
+        });
+        setPlanUsagesByPlanId(map);
+      } catch (e) {
+        console.error('Error cargando plan_usages para registrar pago', e);
+        setPlanUsagesByPlanId({});
+      }
+    })();
+  }, [paymentStudentId, studentPlans, supabase]);
 
   useEffect(() => {
     (async () => {
@@ -1499,9 +1539,22 @@ export default function PlansClient() {
                 <option value="">Selecciona un plan asignado</option>
                 {studentPlans
                   .filter((sp) => sp.student_id === paymentStudentId)
+                  .filter((sp) => {
+                    const used = planUsagesByPlanId[sp.id] ?? 0;
+                    const realRemaining = Math.max(0, (sp.remaining_classes ?? 0) - used);
+                    const basePrice = sp.base_price ?? null;
+                    const finalPrice = sp.final_price ?? basePrice;
+                    const totalPaid = paymentsByPlan[sp.id] ?? 0;
+                    const balance = finalPrice != null ? Math.max(0, finalPrice - totalPaid) : 0;
+                    return !(realRemaining === 0 && balance === 0);
+                  })
                   .map((sp) => (
                     <option key={sp.id} value={sp.id}>
-                      {(sp.plans?.name ?? sp.plan_id) + ` • Restantes: ${sp.remaining_classes}`}
+                      {(() => {
+                        const used = planUsagesByPlanId[sp.id] ?? 0;
+                        const realRemaining = Math.max(0, (sp.remaining_classes ?? 0) - used);
+                        return (sp.plans?.name ?? sp.plan_id) + ` • Restantes: ${realRemaining}`;
+                      })()}
                     </option>
                   ))}
               </select>
@@ -1511,6 +1564,8 @@ export default function PlansClient() {
                 {(() => {
                   const sp = studentPlans.find((sp) => sp.id === paymentStudentPlanId);
                   if (!sp) return null;
+                  const used = planUsagesByPlanId[sp.id] ?? 0;
+                  const realRemaining = Math.max(0, (sp.remaining_classes ?? 0) - used);
                   const basePrice = sp.base_price ?? null;
                   const finalPrice = sp.final_price ?? basePrice;
                   if (finalPrice == null) return 'Este plan no tiene un precio configurado.';
@@ -1518,6 +1573,7 @@ export default function PlansClient() {
                   const balance = Math.max(0, finalPrice - totalPaid);
                   return (
                     <span>
+                      Restantes reales: {realRemaining} •{' '}
                       Total plan: {formatPyg(finalPrice)} PYG • Pagado: {formatPyg(totalPaid)} PYG •{' '}
                       {balance === 0 ? (
                         <span className="text-green-600 font-semibold">Al día</span>
@@ -1606,4 +1662,3 @@ export default function PlansClient() {
     </div>
   );
 }
-//en blanco, otro mas
