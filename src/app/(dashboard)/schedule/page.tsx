@@ -1406,14 +1406,23 @@ export default function SchedulePage() {
       }));
 
       const isRescheduled = oldDateIso !== iso || oldCourtId !== editCourtId || oldCoachId !== editCoachId;
-      if (isRescheduled && selectedAcademyId) {
+      let academyIdToUse: string | null = selectedAcademyId;
+      if (!academyIdToUse && typeof window !== 'undefined') {
         try {
-          await fetch('/api/push/class-rescheduled', {
+          academyIdToUse = window.localStorage.getItem('selectedAcademyId');
+        } catch {
+          academyIdToUse = null;
+        }
+      }
+
+      if (isRescheduled && academyIdToUse) {
+        try {
+          const res = await fetch('/api/push/class-rescheduled', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               classId: editing.id,
-              academyId: selectedAcademyId,
+              academyId: academyIdToUse,
               studentIds: [...editSelectedStudents],
               coachId: editCoachId,
               oldDateIso,
@@ -1424,6 +1433,11 @@ export default function SchedulePage() {
               newCoachId: editCoachId,
             }),
           });
+
+          if (!res.ok) {
+            const txt = await res.text().catch(() => '');
+            console.error('Push class-rescheduled respondió con error', res.status, txt);
+          }
         } catch (pushErr) {
           console.error('Error enviando push de clase reprogramada', pushErr);
         }
@@ -2662,11 +2676,14 @@ export default function SchedulePage() {
                     >
                       <SelectTrigger className="w-full h-9 text-xs">
                         <SelectValue
-                          placeholder={locationId ? 'Selecciona una cancha' : 'Selecciona un complejo primero'}
+                          placeholder={'Selecciona una cancha'}
                         />
                       </SelectTrigger>
                       <SelectContent>
-                        {(locationId ? courts.filter((c) => c.location_id === locationId) : courts).map((c) => (
+                        {(selectedAcademyId && academyLocationIds.size > 0
+                          ? courts.filter((c) => academyLocationIds.has(c.location_id))
+                          : courts
+                        ).map((c) => (
                           <SelectItem key={c.id} value={c.id}>
                             {c.name}
                           </SelectItem>
