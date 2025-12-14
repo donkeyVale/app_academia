@@ -50,8 +50,96 @@ export async function POST(req: NextRequest) {
     }
 
     const rows = (plans ?? []) as any[];
+    // Recordatorio de clases (2 veces al día): buscar clases próximas en una ventana de 12 horas
+    // y enviar un push por alumno (solo student).
+    const classReminderWindowEnd = new Date(now.getTime() + 12 * 60 * 60 * 1000);
+    const nowIso = now.toISOString();
+    const windowEndIso = classReminderWindowEnd.toISOString();
+
+    const { data: bookings, error: bookingsErr } = await supabaseAdmin
+      .from('bookings')
+      .select('student_id, class_id, class_sessions!inner(date)')
+      .eq('status', 'reserved')
+      .gt('class_sessions.date', nowIso)
+      .lte('class_sessions.date', windowEndIso);
+
+    if (bookingsErr) {
+      return NextResponse.json({ error: bookingsErr.message }, { status: 500 });
+    }
+
+    // Elegir la clase más próxima por alumno
+    const firstByStudent = new Map<string, { studentId: string; classId: string; dateIso: string }>();
+    for (const b of (bookings ?? []) as any[]) {
+      const studentId = b?.student_id as string | undefined;
+      const classId = b?.class_id as string | undefined;
+      const dateIso = (b?.class_sessions as any)?.date as string | undefined;
+      if (!studentId || !classId || !dateIso) continue;
+      const existing = firstByStudent.get(studentId);
+      if (!existing) {
+        firstByStudent.set(studentId, { studentId, classId, dateIso });
+        continue;
+      }
+      if (new Date(dateIso).getTime() < new Date(existing.dateIso).getTime()) {
+        firstByStudent.set(studentId, { studentId, classId, dateIso });
+      }
+    }
+
+    const classReminderTargets = Array.from(firstByStudent.values());
+
+    const origin = req.nextUrl.origin;
+    const classReminderSettled = await Promise.allSettled(
+      classReminderTargets.map((t) =>
+        fetch(`${origin}/api/push/class-reminder`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studentId: t.studentId,
+            classId: t.classId,
+            dateIso: t.dateIso,
+          }),
+        }),
+      ),
+    );
+
+    const classReminderPushResponses = await Promise.all(
+      classReminderSettled.map(async (r, idx) => {
+        const studentId = classReminderTargets[idx]?.studentId ?? 'unknown';
+        if (r.status !== 'fulfilled') {
+          return { studentId, status: null as number | null, body: debug ? { error: 'fetch_failed' } : undefined };
+        }
+        const res = r.value;
+        if (!debug) {
+          return { studentId, status: res.status, body: undefined };
+        }
+        let json: any = null;
+        try {
+          json = await res.json();
+        } catch {
+          json = null;
+        }
+        return { studentId, status: res.status, body: json };
+      }),
+    );
+
+    const classReminderNotified = classReminderPushResponses.filter(
+      (r) => typeof r.status === 'number' && r.status >= 200 && r.status < 300,
+    ).length;
+
     if (rows.length === 0) {
-      return NextResponse.json({ ok: true, checked: 0, notified: 0, debug: debug ? { force } : undefined });
+      return NextResponse.json({
+        ok: true,
+        checked: 0,
+        notified: 0,
+        classReminderChecked: classReminderTargets.length,
+        classReminderNotified,
+        debug: debug
+          ? {
+              force,
+              classReminderWindow: { nowIso, windowEndIso },
+              classReminderPushResponses,
+            }
+          : undefined,
+      });
     }
 
     // 2) Para cada plan: contar usos + calcular restantes reales y saldo
@@ -162,7 +250,7 @@ export async function POST(req: NextRequest) {
 
     const insertedIds = new Set<string>(((inserted ?? []) as any[]).map((r) => r.student_plan_id as string));
 
-    const origin = req.nextUrl.origin;
+    // Nota: origin ya calculado arriba
     const toNotify = pendingWithAcademy.filter((r) => insertedIds.has(r.id));
 
     const results = await Promise.allSettled(
@@ -210,6 +298,8 @@ export async function POST(req: NextRequest) {
       pendingMissingAcademy: pending.length - pendingWithAcademy.length,
       inserted: insertedIds.size,
       notifiedRequests: okNotified,
+      classReminderChecked: classReminderTargets.length,
+      classReminderNotified,
       debug: debug
         ? {
             force,
@@ -218,6 +308,8 @@ export async function POST(req: NextRequest) {
             pendingPlanIds: pending.slice(0, 20).map((r) => r.id),
             insertedPlanIds: Array.from(insertedIds).slice(0, 20),
             pushResponses,
+            classReminderWindow: { nowIso, windowEndIso },
+            classReminderPushResponses,
           }
         : undefined,
     });
