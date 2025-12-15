@@ -28,7 +28,7 @@ async function sendWelcomeEmail(to: string, fullName: string) {
       <div style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 18px 45px rgba(15,23,42,0.35);">
         <div style="background:linear-gradient(135deg,#0f172a,#1d3b4f,#3cadaf);padding:24px 24px 20px; text-align:center; color:#e5f6ff;">
           <img src="https://agendo.nativatech.com.py/icons/LogoAgendo1024.png" alt="Agendo" style="height:56px;width:auto;display:block;margin:0 auto 12px;" />
-          <h1 style="margin:0;font-size:22px;font-weight:650;letter-spacing:0.03em;">Bienvenido a Agendo</h1>
+          <h1 style="margin:0;font-size:22px;font-weight:650;letter-spacing:0.03em;color:#ffffff;">Bienvenido a Agendo</h1>
         </div>
         <div style="padding:20px 24px 24px; color:#111827; font-size:14px; line-height:1.6;">
           <p style="margin:0 0 12px;">Hola <strong>${safeName}</strong>,</p>
