@@ -42,7 +42,16 @@ export default function FinancePage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyItems, setHistoryItems] = useState<
-    { id: string; date: string; courtName: string | null; coachName: string | null; note: string | null }[]
+    {
+      id: string;
+      date: string;
+      courtName: string | null;
+      coachName: string | null;
+      note: string | null;
+      studentPlanId: string | null;
+      planName: string | null;
+      planPurchasedAt: string | null;
+    }[]
   >([]);
 
   const roleResolved = role === 'super_admin' || role === 'admin' || role === 'coach' || role === 'student';
@@ -423,26 +432,39 @@ export default function FinancePage() {
 
                         const { data: usagesData, error: usagesErr } = await supabase
                           .from('plan_usages')
-                          .select('class_id, class_sessions!inner(id,date,court_id,coach_id)')
+                          .select('class_id, student_plan_id, class_sessions!inner(id,date,court_id,coach_id)')
                           .eq('student_id', studentId)
                           .limit(50);
 
                         if (usagesErr) throw usagesErr;
+                        const rawUsages = (usagesData ?? []) as any[];
+                        const byClassId: Record<
+                          string,
+                          {
+                            classId: string;
+                            studentPlanId: string | null;
+                            classSession: { id: string; date: string; court_id: string | null; coach_id: string | null };
+                          }
+                        > = {};
 
-                        const classSessionsRaw = (usagesData ?? [])
-                          .map((u: any) => u.class_sessions as any)
-                          .filter((c) => !!c);
-
-                        const byId: Record<string, any> = {};
-                        classSessionsRaw.forEach((c: any) => {
-                          if (!byId[c.id]) byId[c.id] = c;
+                        rawUsages.forEach((u: any) => {
+                          const cls = u.class_sessions as any;
+                          const classId = (u.class_id as string | null) ?? (cls?.id as string | null);
+                          if (!classId || !cls?.id) return;
+                          if (byClassId[classId]) return;
+                          byClassId[classId] = {
+                            classId,
+                            studentPlanId: (u.student_plan_id as string | null) ?? null,
+                            classSession: {
+                              id: cls.id as string,
+                              date: cls.date as string,
+                              court_id: (cls.court_id as string | null) ?? null,
+                              coach_id: (cls.coach_id as string | null) ?? null,
+                            },
+                          };
                         });
-                        const classSessions = Object.values(byId) as {
-                          id: string;
-                          date: string;
-                          court_id: string | null;
-                          coach_id: string | null;
-                        }[];
+
+                        const classSessions = Object.values(byClassId);
 
                         if (!classSessions.length) {
                           setHistoryItems([]);
@@ -453,17 +475,46 @@ export default function FinancePage() {
                         const courtIds = Array.from(
                           new Set(
                             classSessions
-                              .map((c) => c.court_id)
+                              .map((c) => c.classSession.court_id)
                               .filter((id): id is string => !!id),
                           ),
                         );
                         const coachIds = Array.from(
                           new Set(
                             classSessions
-                              .map((c) => c.coach_id)
+                              .map((c) => c.classSession.coach_id)
                               .filter((id): id is string => !!id),
                           ),
                         );
+
+                        const planIds = Array.from(
+                          new Set(
+                            classSessions
+                              .map((c) => c.studentPlanId)
+                              .filter((id): id is string => !!id),
+                          ),
+                        );
+
+                        let planInfoById: Record<string, { name: string | null; purchased_at: string | null }> = {};
+                        if (planIds.length) {
+                          const { data: spRows, error: spErr } = await supabase
+                            .from('student_plans')
+                            .select('id, purchased_at, plans(name)')
+                            .in('id', planIds);
+                          if (spErr) throw spErr;
+
+                          planInfoById = (spRows ?? []).reduce<
+                            Record<string, { name: string | null; purchased_at: string | null }>
+                          >((acc, row: any) => {
+                            const pid = row.id as string;
+                            const planName = ((row as any)?.plans?.name as string | undefined) ?? null;
+                            acc[pid] = {
+                              name: planName,
+                              purchased_at: (row.purchased_at as string | null) ?? null,
+                            };
+                            return acc;
+                          }, {});
+                        }
 
                         let courtsMap: Record<string, { id: string; name: string }> = {};
                         let coachesMap: Record<string, { id: string; user_id: string | null }> = {};
@@ -520,17 +571,23 @@ export default function FinancePage() {
                         }
 
                         const baseItems = classSessions.map((cls) => {
-                          const court = cls.court_id ? courtsMap[cls.court_id] : undefined;
-                          const coach = cls.coach_id ? coachesMap[cls.coach_id] : undefined;
+                          const courtId = cls.classSession.court_id;
+                          const coachId = cls.classSession.coach_id;
+                          const court = courtId ? courtsMap[courtId] : undefined;
+                          const coach = coachId ? coachesMap[coachId] : undefined;
                           const coachName = coach?.user_id
                             ? coachNamesMap[coach.user_id] ?? null
                             : null;
+                          const planInfo = cls.studentPlanId ? planInfoById[cls.studentPlanId] : undefined;
                           return {
-                            id: cls.id,
-                            date: cls.date,
+                            id: cls.classSession.id,
+                            date: cls.classSession.date,
                             courtName: court?.name ?? null,
                             coachName,
                             note: null as string | null,
+                            studentPlanId: cls.studentPlanId,
+                            planName: planInfo?.name ?? null,
+                            planPurchasedAt: planInfo?.purchased_at ?? null,
                           };
                         });
 
@@ -621,41 +678,75 @@ export default function FinancePage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {historyItems.map((item) => {
-                          const d = new Date(item.date);
-                          const yyyy = d.getFullYear();
-                          const mm = String(d.getMonth() + 1).padStart(2, '0');
-                          const dd = String(d.getDate()).padStart(2, '0');
-                          const hh = String(d.getHours()).padStart(2, '0');
-                          const min = String(d.getMinutes()).padStart(2, '0');
+                        {(() => {
+                          const groups: Record<string, typeof historyItems> = {};
+                          historyItems.forEach((it) => {
+                            const key = it.studentPlanId ?? 'unknown';
+                            if (!groups[key]) groups[key] = [];
+                            groups[key].push(it);
+                          });
 
-                          return [
-                            (
-                              <tr key={`${item.id}-row`} className="border-b last:border-b-0">
-                                <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
-                                <td className="py-1.5 px-2">{`${hh}:${min}`}</td>
-                                <td className="py-1.5 px-2">{item.courtName ?? '-'}</td>
-                                <td className="py-1.5 px-2">{item.coachName ?? '-'}</td>
-                              </tr>
-                            ),
-                            (
-                              <tr key={`${item.id}-note`} className="border-b last:border-b-0">
-                                <td colSpan={4} className="py-1.5 px-2 bg-gray-50/40">
-                                  {item.note ? (
-                                    <p className="text-[12px] text-gray-700">
-                                      <span className="font-semibold">Nota:</span>{' '}
-                                      <span className="font-semibold">{item.note}</span>
-                                    </p>
-                                  ) : (
-                                    <p className="text-[12px] text-gray-500">
-                                      Esta clase no tiene notas cargadas.
-                                    </p>
-                                  )}
+                          const groupKeys = Object.keys(groups).sort((a, b) => {
+                            const aItem = groups[a]?.[0] ?? null;
+                            const bItem = groups[b]?.[0] ?? null;
+                            const aMs = aItem?.planPurchasedAt ? new Date(aItem.planPurchasedAt).getTime() : 0;
+                            const bMs = bItem?.planPurchasedAt ? new Date(bItem.planPurchasedAt).getTime() : 0;
+                            if (aMs !== bMs) return bMs - aMs;
+                            return a.localeCompare(b);
+                          });
+
+                          return groupKeys.flatMap((key) => {
+                            const items = groups[key] ?? [];
+                            const headerName =
+                              items[0]?.planName ?? (key === 'unknown' ? 'Plan sin identificar' : 'Plan');
+
+                            const headerRow = (
+                              <tr key={`${key}-header`} className="border-b bg-slate-50">
+                                <td colSpan={4} className="py-2 px-2 text-xs font-semibold text-slate-700">
+                                  {headerName}
                                 </td>
                               </tr>
-                            ),
-                          ];
-                        })}
+                            );
+
+                            const rows = items.flatMap((item) => {
+                              const d = new Date(item.date);
+                              const yyyy = d.getFullYear();
+                              const mm = String(d.getMonth() + 1).padStart(2, '0');
+                              const dd = String(d.getDate()).padStart(2, '0');
+                              const hh = String(d.getHours()).padStart(2, '0');
+                              const min = String(d.getMinutes()).padStart(2, '0');
+
+                              return [
+                                (
+                                  <tr key={`${item.id}-row`} className="border-b last:border-b-0">
+                                    <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
+                                    <td className="py-1.5 px-2">{`${hh}:${min}`}</td>
+                                    <td className="py-1.5 px-2">{item.courtName ?? '-'}</td>
+                                    <td className="py-1.5 px-2">{item.coachName ?? '-'}</td>
+                                  </tr>
+                                ),
+                                (
+                                  <tr key={`${item.id}-note`} className="border-b last:border-b-0">
+                                    <td colSpan={4} className="py-1.5 px-2 bg-gray-50/40">
+                                      {item.note ? (
+                                        <p className="text-[12px] text-gray-700">
+                                          <span className="font-semibold">Nota:</span>{' '}
+                                          <span className="font-semibold">{item.note}</span>
+                                        </p>
+                                      ) : (
+                                        <p className="text-[12px] text-gray-500">
+                                          Esta clase no tiene notas cargadas.
+                                        </p>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ),
+                              ];
+                            });
+
+                            return [headerRow, ...rows];
+                          });
+                        })()}
                       </tbody>
                     </table>
                   </div>
