@@ -446,9 +446,9 @@ export default function SchedulePage() {
         setTime('');
         return;
       }
-      // Candidate hours 06:00 - 22:00 inclusive
+      // Candidate hours 06:00 - 20:00 inclusive
       const candidates: string[] = [];
-      for (let h = 6; h <= 22; h++) {
+      for (let h = 6; h <= 20; h++) {
         const hh = String(h).padStart(2, '0');
         candidates.push(`${hh}:00`);
       }
@@ -491,6 +491,16 @@ export default function SchedulePage() {
         toast.error(msg);
         setSaving(false);
         return;
+      }
+
+      // Validar rango horario permitido (06:00 a 20:00)
+      {
+        const hour = Number(time.split(':')[0] ?? 'NaN');
+        if (Number.isNaN(hour) || hour < 6 || hour > 20) {
+          toast.error('Horario inválido. Seleccioná una hora entre 06:00 y 20:00.');
+          setSaving(false);
+          return;
+        }
       }
       const iso = new Date(`${day}T${time}:00`).toISOString();
 
@@ -1118,7 +1128,7 @@ export default function SchedulePage() {
         return;
       }
       const candidates: string[] = [];
-      for (let h = 6; h <= 22; h++) candidates.push(`${String(h).padStart(2, '0')}:00`);
+      for (let h = 6; h <= 20; h++) candidates.push(`${String(h).padStart(2, '0')}:00`);
       const dayStart = new Date(`${editDay}T00:00:00`);
       const dayEnd = new Date(`${editDay}T23:59:59`);
       const { data: dayClasses, error } = await supabase
@@ -1152,6 +1162,15 @@ export default function SchedulePage() {
     if (!editCourtId || !editCoachId || !editDay || !editTime) {
       toast.error('Completa cancha, fecha, hora y profesor');
       return;
+    }
+
+    // Validar rango horario permitido (06:00 a 20:00)
+    {
+      const hour = Number(editTime.split(':')[0] ?? 'NaN');
+      if (Number.isNaN(hour) || hour < 6 || hour > 20) {
+        toast.error('Horario inválido. Seleccioná una hora entre 06:00 y 20:00.');
+        return;
+      }
     }
     if (editSelectedStudents.length < 1) {
       toast.error('Selecciona al menos 1 alumno (máximo 4).');
