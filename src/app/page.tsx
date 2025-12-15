@@ -11,14 +11,6 @@ import { useRouter } from 'next/navigation';
 import { createClientBrowser } from '@/lib/supabase';
 import { motion } from 'framer-motion';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import {
   Smartphone,
   Layers,
   Users,
@@ -141,8 +133,6 @@ export default function HomePage() {
   const [coachesCount, setCoachesCount] = useState(0);
   const [studentsCount, setStudentsCount] = useState(0);
   const [showInstallHelpOpen, setShowInstallHelpOpen] = useState(false);
-  const [showInstallPopup, setShowInstallPopup] = useState(false);
-  const [popupDontShowAgain, setPopupDontShowAgain] = useState(false);
 
   // métricas específicas para coach
   const [coachTodayClasses, setCoachTodayClasses] = useState(0);
@@ -626,20 +616,7 @@ export default function HomePage() {
     })();
   }, [selectedAcademyId, supabase]);
 
-  // Popup de recordatorio para leer cómo instalar la app en el celular
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const stored = window.localStorage.getItem('hide_install_help_reminder');
-      if (stored === 'true') {
-        setShowInstallPopup(false);
-      } else {
-        setShowInstallPopup(true);
-      }
-    } catch {
-      // si localStorage falla, simplemente no mostramos el popup
-    }
-  }, []);
+  // Nota: el recordatorio de instalación se maneja con el banner iOS (PwaInstallPrompt).
 
   const initials = (() => {
     const name = (userName ?? '').trim();
@@ -977,26 +954,38 @@ export default function HomePage() {
               Seguí estos pasos para tener acceso rápido desde la pantalla de inicio de tu celular.
             </p>
 
-          <div>
-            <h3 className="font-semibold text-[#31435d]">iPhone (Safari)</h3>
-            <ol className="list-decimal list-inside text-gray-700 space-y-1 mt-1">
-              <li>Abrí este enlace en Safari.</li>
-              <li>Tocá el botón <strong>Compartir</strong> (icono de cuadrado con flecha hacia arriba).</li>
-              <li>En el menú que se abre, tocá los <strong>tres puntitos</strong> (Más opciones).</li>
-              <li>Elegí <strong>"Agregar a inicio"</strong> o <strong>"Agregar a pantalla de inicio"</strong>.</li>
-              <li>Confirmá con <strong>Agregar</strong>.</li>
-            </ol>
-          </div>
+            <div>
+              <h3 className="font-semibold text-[#31435d]">iPhone (Safari)</h3>
+              <ol className="list-decimal list-inside text-gray-700 space-y-1 mt-1">
+                <li>Abrí este enlace en Safari.</li>
+                <li>
+                  Tocá el botón <strong>Compartir</strong> (icono de cuadrado con flecha hacia arriba).
+                </li>
+                <li>
+                  En el menú que se abre, tocá los <strong>tres puntitos</strong> (Más opciones).
+                </li>
+                <li>
+                  Elegí <strong>"Agregar a inicio"</strong> o <strong>"Agregar a pantalla de inicio"</strong>.
+                </li>
+                <li>
+                  Confirmá con <strong>Agregar</strong>.
+                </li>
+              </ol>
+            </div>
 
-          <div>
-            <h3 className="font-semibold text-[#31435d]">Android (Chrome)</h3>
-            <ol className="list-decimal list-inside text-gray-700 space-y-1 mt-1">
-              <li>Abrí este enlace en Chrome.</li>
-              <li>Tocá el botón de <strong>tres puntos</strong> arriba a la derecha.</li>
-              <li>Elegí <strong>"Agregar a pantalla principal"</strong> o <strong>"Instalar app"</strong>.</li>
-              <li>Confirmá cuando aparezca el mensaje.</li>
-            </ol>
-          </div>
+            <div>
+              <h3 className="font-semibold text-[#31435d]">Android (Chrome)</h3>
+              <ol className="list-decimal list-inside text-gray-700 space-y-1 mt-1">
+                <li>Abrí este enlace en Chrome.</li>
+                <li>
+                  Tocá el botón de <strong>tres puntos</strong> arriba a la derecha.
+                </li>
+                <li>
+                  Elegí <strong>"Agregar a pantalla principal"</strong> o <strong>"Instalar app"</strong>.
+                </li>
+                <li>Confirmá cuando aparezca el mensaje.</li>
+              </ol>
+            </div>
 
             <p className="text-gray-600">
               Una vez instalado, vas a ver el icono de la academia en tu pantalla de inicio y podés entrar directo como si fuera una app.
@@ -1052,90 +1041,6 @@ export default function HomePage() {
           </>
         )}
       />
-
-      <Dialog open={showInstallPopup} onOpenChange={setShowInstallPopup}>
-        <DialogContent
-          className="w-full max-w-md sm:max-w-lg max-h-[90vh] p-0 flex flex-col rounded-xl border border-gray-200 shadow-xl bg-slate-50/95 backdrop-blur data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95"
-        >
-          <DialogHeader className="px-4 pt-4 pb-2 border-b bg-white/80 backdrop-blur-sm rounded-t-xl">
-            <div className="flex items-center gap-2">
-              <Smartphone className="w-4 h-4 text-[#3cadaf]" />
-              <DialogTitle className="text-lg font-semibold text-[#31435d]">
-                Instalá esta app en tu celular
-              </DialogTitle>
-            </div>
-            <DialogDescription className="sr-only">
-              Recordatorio para leer la guía de instalación de la app en tu celular
-            </DialogDescription>
-          </DialogHeader>
-          <div className="px-4 py-3 overflow-y-auto text-sm space-y-3">
-            <p className="text-gray-700">
-              Tenés disponible una guía rápida para instalar esta app en la pantalla de inicio de tu celular.
-            </p>
-            <p className="text-gray-600">
-              Podés leerla cuando quieras en la sección <strong>"¿Cómo instalar esta app en tu celular?"</strong> al final de esta pantalla.
-            </p>
-            <div className="flex items-center gap-2 text-xs text-gray-600">
-              <input
-                id="dont-show-install-popup"
-                type="checkbox"
-                className="rounded border-gray-300"
-                checked={popupDontShowAgain}
-                onChange={(e) => setPopupDontShowAgain(e.target.checked)}
-              />
-              <label htmlFor="dont-show-install-popup">
-                No volver a mostrar este recordatorio.
-              </label>
-            </div>
-          </div>
-          <DialogFooter className="flex justify-end gap-2 px-4 py-3 border-t bg-white text-xs rounded-b-xl">
-            <button
-              type="button"
-              className="px-3 py-2 border rounded"
-              onClick={() => {
-                if (typeof window !== 'undefined' && popupDontShowAgain) {
-                  try {
-                    window.localStorage.setItem('hide_install_help_reminder', 'true');
-                  } catch {}
-                }
-                setShowInstallPopup(false);
-              }}
-            >
-              Cerrar
-            </button>
-            <button
-              type="button"
-              className="px-3 py-2 bg-[#3cadaf] hover:bg-[#31435d] text-white rounded"
-              onClick={() => {
-                if (typeof window !== 'undefined') {
-                  // 1) Abrimos el acordeón de ayuda si aún no está abierto
-                  if (!showInstallHelpOpen) {
-                    setShowInstallHelpOpen(true);
-                  }
-
-                  // 2) Esperamos un pequeño tiempo para que el contenido se monte y luego hacemos scroll
-                  setTimeout(() => {
-                    const el = document.getElementById('install-app-help');
-                    if (el) {
-                      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                    }
-                  }, 120);
-
-                  // 3) Respetamos la preferencia de no volver a mostrar el popup
-                  if (popupDontShowAgain) {
-                    try {
-                      window.localStorage.setItem('hide_install_help_reminder', 'true');
-                    } catch {}
-                  }
-                }
-                setShowInstallPopup(false);
-              }}
-            >
-              Ver instrucciones ahora
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </section>
   );
 }

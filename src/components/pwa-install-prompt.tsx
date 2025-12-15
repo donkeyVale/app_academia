@@ -8,6 +8,8 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
 };
 
+const HIDE_IOS_INSTALL_BANNER_KEY = 'hide_ios_install_banner';
+
 export function PwaInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
@@ -16,6 +18,15 @@ export function PwaInstallPrompt() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    try {
+      const stored = window.localStorage.getItem(HIDE_IOS_INSTALL_BANNER_KEY);
+      if (stored === 'true') {
+        setDismissed(true);
+      }
+    } catch {
+      // ignore
+    }
 
     const updateInstalled = () => {
       const standalone =
@@ -61,7 +72,8 @@ export function PwaInstallPrompt() {
     return isIOS && isWebKit && !isCriOS && !isFxiOS;
   }, []);
 
-  const showInstall = !installed && !dismissed && (!!deferredPrompt || isIosSafari);
+  // UX: este banner se usa solo para iOS Safari (en Android ya existe el prompt/botón nativo).
+  const showInstall = !installed && !dismissed && isIosSafari;
 
   if (!showInstall) return null;
 
@@ -104,7 +116,16 @@ export function PwaInstallPrompt() {
                 type="button"
                 className="p-2 rounded-lg hover:bg-gray-50"
                 aria-label="Cerrar"
-                onClick={() => setDismissed(true)}
+                onClick={() => {
+                  setDismissed(true);
+                  if (typeof window !== 'undefined') {
+                    try {
+                      window.localStorage.setItem(HIDE_IOS_INSTALL_BANNER_KEY, 'true');
+                    } catch {
+                      // ignore
+                    }
+                  }
+                }}
               >
                 <X className="w-4 h-4 text-gray-500" />
               </button>
