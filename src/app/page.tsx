@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { FooterAvatarButton } from '@/components/footer-avatar-button';
 import { FooterNav } from '@/components/footer-nav';
+import { PwaInstallPrompt } from '@/components/pwa-install-prompt';
 import { AgendoLogo } from '@/components/agendo-logo';
 import AdminHomeIncomeExpensesCard from '@/app/(dashboard)/AdminHomeIncomeExpensesCard';
 import { useRouter } from 'next/navigation';
@@ -995,6 +996,8 @@ export default function HomePage() {
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
+
+      <PwaInstallPrompt />
 
       <FooterNav
         isAdmin={isAdmin}

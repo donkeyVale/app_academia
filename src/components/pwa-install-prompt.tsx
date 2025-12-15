@@ -149,9 +149,11 @@ export function PwaInstallPrompt() {
               </button>
             </div>
             <div className="px-4 py-4 space-y-2 text-sm text-gray-700">
-              <div>1) Abrí el menú de Compartir (icono de cuadrado con flecha hacia arriba).</div>
-              <div>2) Tocá <span className="font-semibold">Agregar a pantalla de inicio</span>.</div>
-              <div>3) Confirmá con <span className="font-semibold">Agregar</span>.</div>
+              <div>1) Tocá el botón de <span className="font-semibold">tres puntitos</span> (Más opciones).</div>
+              <div>2) Elegí <span className="font-semibold">Compartir</span>.</div>
+              <div>3) En el menú de Compartir, tocá otra vez los <span className="font-semibold">tres puntitos</span>.</div>
+              <div>4) Elegí <span className="font-semibold">Agregar a inicio</span> o <span className="font-semibold">Agregar a pantalla de inicio</span>.</div>
+              <div>5) Confirmá con <span className="font-semibold">Agregar</span>.</div>
             </div>
             <div className="px-4 pb-4">
               <button
