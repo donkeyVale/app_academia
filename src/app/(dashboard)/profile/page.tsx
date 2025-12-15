@@ -6,6 +6,7 @@ import { useEffect, useState, useRef } from "react";
 import { createClientBrowser } from "@/lib/supabase";
 import { UserCircle2, Upload, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { toast } from "sonner";
@@ -640,8 +641,7 @@ export default function ProfilePage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm mb-1">Contraseña actual</label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     className="border rounded px-3 w-full h-10 text-base md:text-sm"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
@@ -650,8 +650,7 @@ export default function ProfilePage() {
                 </div>
                 <div>
                   <label className="block text-sm mb-1">Nueva contraseña</label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     className="border rounded px-3 w-full h-10 text-base md:text-sm"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
@@ -662,8 +661,7 @@ export default function ProfilePage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm mb-1">Repetir nueva contraseña</label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     className="border rounded px-3 w-full h-10 text-base md:text-sm"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}

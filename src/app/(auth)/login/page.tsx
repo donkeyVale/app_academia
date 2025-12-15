@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
+import { PasswordInput } from '@/components/ui/password-input';
 
 export default function LoginPage() {
   const supabase = createClientBrowser();
@@ -88,10 +89,9 @@ export default function LoginPage() {
 
           <div className="space-y-1">
             <label className="block text-xs font-medium text-gray-600">Contraseña</label>
-            <input
+            <PasswordInput
               className="w-full border border-gray-200 rounded-md px-3 h-10 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf] focus:border-[#3cadaf]"
               placeholder="••••••••"
-              type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
