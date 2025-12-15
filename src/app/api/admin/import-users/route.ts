@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-service';
 import nodemailer from 'nodemailer';
 
-async function sendWelcomeEmail(to: string, fullName: string) {
+async function sendWelcomeEmail(to: string, fullName: string): Promise<'sent' | 'skipped'> {
   const host = process.env.SMTP_HOST || 'smtp.gmail.com';
   const port = Number(process.env.SMTP_PORT || 587);
   const user = process.env.SMTP_USER;
@@ -10,7 +10,7 @@ async function sendWelcomeEmail(to: string, fullName: string) {
   const from = process.env.SMTP_FROM || user;
 
   if (!user || !pass || !from) {
-    return;
+    return 'skipped';
   }
 
   const transporter = nodemailer.createTransport({
@@ -30,12 +30,12 @@ async function sendWelcomeEmail(to: string, fullName: string) {
           <h1 style="margin:0;font-size:22px;font-weight:650;letter-spacing:0.03em;color:#ffffff;">Bienvenido a Agendo</h1>
         </div>
         <div style="padding:20px 24px 24px; color:#111827; font-size:14px; line-height:1.6;">
-          <p style="margin:0 0 12px;">Hola <strong>${'${safeName}'}</strong>,</p>
+          <p style="margin:0 0 12px;">Hola <strong>${safeName}</strong>,</p>
           <p style="margin:0 0 10px;">Tu usuario para <strong>Agendo</strong> ya fue creado.</p>
           <p style="margin:0 0 10px;">Ya podés ingresar al sistema con tu correo y la contraseña inicial que te indicó tu academia (normalmente tu n.º de cédula).</p>
           <p style="margin:0 0 16px;">Una vez dentro, te recomendamos cambiar tu contraseña desde tu perfil para mayor seguridad.</p>
           <div style="margin:18px 0 16px; text-align:center;">
-            <a href="${'${process.env.APP_BASE_URL || ""}'}" style="display:inline-block;padding:10px 20px;border-radius:999px;background:#3cadaf;color:#ffffff;font-weight:600;font-size:13px;text-decoration:none;letter-spacing:0.03em;">Ir al panel de Agendo</a>
+            <a href="${process.env.APP_BASE_URL || ''}" style="display:inline-block;padding:10px 20px;border-radius:999px;background:#3cadaf;color:#ffffff;font-weight:600;font-size:13px;text-decoration:none;letter-spacing:0.03em;">Ir al panel de Agendo</a>
           </div>
           <p style="margin:0 0 8px;font-size:12px;color:#6b7280;">Si no esperabas este correo, podés ignorarlo.</p>
         </div>
@@ -49,6 +49,8 @@ async function sendWelcomeEmail(to: string, fullName: string) {
     subject: 'Bienvenido a Agendo',
     html,
   });
+
+  return 'sent';
 }
 
 // Tipo de una fila proveniente del CSV (ya parseada en el frontend)
@@ -337,8 +339,12 @@ export async function POST(req: NextRequest) {
 
       // Enviar correo de bienvenida (si falla, no rompe la importación)
       try {
-        await sendWelcomeEmail(email, fullName);
-      } catch (_emailError) {
+        const emailStatus = await sendWelcomeEmail(email, fullName);
+        if (emailStatus === 'skipped') {
+          console.warn('SMTP no configurado; se omitió el envío de correo en import-users', { email });
+        }
+      } catch (emailError) {
+        console.error('Error enviando correo de bienvenida en import-users', { email, error: String((emailError as any)?.message ?? emailError) });
       }
 
       // Marcar como éxito y actualizar índices de duplicados para esta sesión
