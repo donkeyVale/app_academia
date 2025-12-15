@@ -13,20 +13,18 @@ const HIDE_IOS_INSTALL_BANNER_KEY = 'hide_ios_install_banner';
 export function PwaInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissed, setDismissed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      return window.localStorage.getItem(HIDE_IOS_INSTALL_BANNER_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [iosHelpOpen, setIosHelpOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-
-    try {
-      const stored = window.localStorage.getItem(HIDE_IOS_INSTALL_BANNER_KEY);
-      if (stored === 'true') {
-        setDismissed(true);
-      }
-    } catch {
-      // ignore
-    }
 
     const updateInstalled = () => {
       const standalone =
