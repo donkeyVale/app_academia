@@ -124,6 +124,9 @@ export default function StudentsPage() {
         const r = (profile?.role as 'super_admin' | 'admin' | 'coach' | 'student' | null) ?? null;
         roleFromProfile = r === 'super_admin' || r === 'admin' || r === 'coach' || r === 'student' ? r : null;
         setRole(roleFromProfile);
+        if (roleFromProfile === 'coach') {
+          setShowOnlyMyStudents(true);
+        }
       }
 
       setChecking(false);
@@ -517,9 +520,6 @@ export default function StudentsPage() {
         setMyStudentIds(myIds);
         setNextClassByStudent(nextByStudent);
         setStudentsWithNotes(studentsWithNotesList);
-        if (roleFromProfile === 'coach') {
-          setShowOnlyMyStudents(true);
-        }
       } catch (err: any) {
         setError(err?.message ?? 'Error cargando alumnos.');
       } finally {
