@@ -9,6 +9,7 @@ import { Users, UserPlus, ListChecks, Calendar as CalendarIcon, Trash2 } from 'l
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 
 const ROLES = ['admin', 'coach', 'student'] as const;
@@ -100,6 +101,8 @@ export default function UsersPage() {
   const [email, setEmail] = useState('');
   const [birthDate, setBirthDate] = useState('');
   const [selectedRoles, setSelectedRoles] = useState<Role[]>(['student']);
+
+  const [usersSearch, setUsersSearch] = useState('');
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -989,7 +992,19 @@ export default function UsersPage() {
             ) : users.length === 0 ? (
               <p className="text-sm text-gray-600">Todavía no hay usuarios registrados.</p>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="space-y-3">
+                <div className="max-w-xs">
+                  <label className="block text-xs mb-1 text-gray-600">Buscar usuario</label>
+                  <Input
+                    type="text"
+                    value={usersSearch}
+                    onChange={(e) => setUsersSearch(e.target.value)}
+                    placeholder="Nombre o rol"
+                    className="h-10 text-base"
+                  />
+                </div>
+
+                <div className="overflow-x-auto">
                 <table className="min-w-full text-sm border-collapse">
                   <thead>
                     <tr className="border-b bg-gray-50">
@@ -999,22 +1014,32 @@ export default function UsersPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {users.map((u) => {
-                      const allRoles = rolesForUser(u.id);
-                      return (
-                        <tr
-                          key={u.id}
-                          className="border-b last:border-b-0 hover:bg-gray-50 cursor-pointer"
-                          onClick={() => openUserDetail(u.id)}
-                        >
-                          <td className="py-2 px-3 whitespace-nowrap">{u.full_name ?? '(Sin nombre)'}</td>
-                          <td className="py-2 px-3 whitespace-nowrap">{u.role}</td>
-                          <td className="py-2 px-3 text-xs text-gray-700">{allRoles.join(', ') || '-'}</td>
-                        </tr>
-                      );
-                    })}
+                    {users
+                      .filter((u) => {
+                        const term = usersSearch.trim().toLowerCase();
+                        if (!term) return true;
+                        const name = (u.full_name ?? '').toLowerCase();
+                        const mainRole = String(u.role ?? '').toLowerCase();
+                        const roles = rolesForUser(u.id).join(', ').toLowerCase();
+                        return name.includes(term) || mainRole.includes(term) || roles.includes(term);
+                      })
+                      .map((u) => {
+                        const allRoles = rolesForUser(u.id);
+                        return (
+                          <tr
+                            key={u.id}
+                            className="border-b last:border-b-0 hover:bg-gray-50 cursor-pointer"
+                            onClick={() => openUserDetail(u.id)}
+                          >
+                            <td className="py-2 px-3 whitespace-nowrap">{u.full_name ?? '(Sin nombre)'}</td>
+                            <td className="py-2 px-3 whitespace-nowrap">{u.role}</td>
+                            <td className="py-2 px-3 text-xs text-gray-700">{allRoles.join(', ') || '-'}</td>
+                          </tr>
+                        );
+                      })}
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
           </div>
