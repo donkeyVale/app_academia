@@ -814,7 +814,9 @@ export default function UsersPage() {
                   <div>
                     <label className="block text-sm mb-1">Correo electrónico</label>
                     <input
-                      type="email"
+                      type="text"
+                      inputMode="email"
+                      autoComplete="email"
                       className="border rounded px-3 w-full h-10 text-base md:text-sm"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -1090,7 +1092,9 @@ export default function UsersPage() {
                     <div>
                       <label className="block text-sm mb-1">Correo electrónico</label>
                       <input
-                        type="email"
+                        type="text"
+                        inputMode="email"
+                        autoComplete="email"
                         className="border rounded px-3 w-full h-10 text-base md:text-sm"
                         value={detailEmail}
                         onChange={(e) => setDetailEmail(e.target.value)}
