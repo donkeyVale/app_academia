@@ -24,8 +24,11 @@ export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, ca
   const [moreOpen, setMoreOpen] = useState(false);
   const useMobileAdminCompactMenu = isAdmin;
   return (
-    <nav className="fixed bottom-0 inset-x-0 border-t bg-white/95 backdrop-blur-sm">
-      <div className="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
+    <nav
+      className="fixed bottom-0 inset-x-0 border-t bg-white/95 backdrop-blur-sm"
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}
+    >
+      <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
         {useMobileAdminCompactMenu ? (
           <>
             <div className="flex-1 sm:hidden flex items-center justify-between text-xs">
