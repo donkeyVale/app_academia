@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { createClientBrowser } from "@/lib/supabase";
+import { Input } from "@/components/ui/input";
 
 type AppRole = "super_admin" | "admin" | "coach" | "student" | null;
 
@@ -35,6 +36,8 @@ export default function AssignmentsPage() {
   const [academies, setAcademies] = useState<Academy[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [assignments, setAssignments] = useState<UserAcademy[]>([]);
+
+  const [usersSearch, setUsersSearch] = useState("");
 
   const [newAcademyId, setNewAcademyId] = useState<string>("");
   const [newRole, setNewRole] = useState<"admin" | "coach" | "student">("admin");
@@ -215,6 +218,17 @@ export default function AssignmentsPage() {
     [users, selectedUserId]
   );
 
+  const filteredUsers = useMemo(() => {
+    const term = usersSearch.trim().toLowerCase();
+    if (!term) return users;
+    return users.filter((u) => {
+      const name = (u.full_name ?? "").toLowerCase();
+      const roleText = String(u.role ?? "").toLowerCase();
+      const id = u.id.toLowerCase();
+      return name.includes(term) || roleText.includes(term) || id.includes(term);
+    });
+  }, [users, usersSearch]);
+
   return (
     <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4">
       <div className="flex items-start justify-between gap-4">
@@ -264,8 +278,19 @@ export default function AssignmentsPage() {
               ) : users.length === 0 ? (
                 <p className="text-gray-600">No se encontraron usuarios.</p>
               ) : (
-                <ul className="space-y-1">
-                  {users.map((u) => (
+                <div className="space-y-3">
+                  <div className="max-w-xs">
+                    <label className="block text-xs mb-1 text-gray-600">Buscar usuario</label>
+                    <Input
+                      type="text"
+                      value={usersSearch}
+                      onChange={(e) => setUsersSearch(e.target.value)}
+                      placeholder="Nombre o rol"
+                      className="h-10 text-base"
+                    />
+                  </div>
+                  <ul className="space-y-1">
+                    {filteredUsers.map((u) => (
                     <li key={u.id}>
                       <button
                         type="button"
@@ -283,8 +308,9 @@ export default function AssignmentsPage() {
                         </span>
                       </button>
                     </li>
-                  ))}
-                </ul>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
           </div>
