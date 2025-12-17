@@ -125,17 +125,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         return;
       }
 
+      if (typeof Notification === 'undefined' || typeof Notification.requestPermission !== 'function') {
+        return;
+      }
+
       try {
         const alreadyPrompted = window.localStorage.getItem('pushPermissionPrompted');
         if (alreadyPrompted) return;
-
-        window.localStorage.setItem('pushPermissionPrompted', '1');
 
         const { data } = await supabase.auth.getUser();
         const userId = data.user?.id as string | undefined;
         if (!userId) return;
 
         const permission = await Notification.requestPermission();
+        if (permission !== 'default') {
+          window.localStorage.setItem('pushPermissionPrompted', '1');
+        }
         if (permission !== 'granted') return;
 
         let registration: ServiceWorkerRegistration;
