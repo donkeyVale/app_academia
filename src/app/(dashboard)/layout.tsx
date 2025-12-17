@@ -9,6 +9,7 @@ import { createClientBrowser } from '@/lib/supabase';
 import { FooterAvatarButton } from '@/components/footer-avatar-button';
 import { FooterNav } from '@/components/footer-nav';
 import { PwaInstallPrompt } from '@/components/pwa-install-prompt';
+import { PushPermissionPrompt } from '@/components/push-permission-prompt';
 
 const iconColor = '#3cadaf';
 
@@ -121,27 +122,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         return;
       }
 
-      if (typeof Notification !== 'undefined' && Notification.permission !== 'default') {
-        return;
-      }
-
       if (typeof Notification === 'undefined' || typeof Notification.requestPermission !== 'function') {
         return;
       }
 
-      try {
-        const alreadyPrompted = window.localStorage.getItem('pushPermissionPrompted');
-        if (alreadyPrompted) return;
+      // iOS/Safari suele bloquear el prompt si no hay interacción del usuario.
+      // La solicitud de permiso se hace desde PushPermissionPrompt (botón).
+      if (Notification.permission !== 'granted') {
+        return;
+      }
 
+      try {
         const { data } = await supabase.auth.getUser();
         const userId = data.user?.id as string | undefined;
         if (!userId) return;
-
-        const permission = await Notification.requestPermission();
-        if (permission !== 'default') {
-          window.localStorage.setItem('pushPermissionPrompted', '1');
-        }
-        if (permission !== 'granted') return;
 
         let registration: ServiceWorkerRegistration;
         try {
@@ -307,6 +301,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </main>
 
       <PwaInstallPrompt />
+
+      <PushPermissionPrompt />
 
       <FooterNav
         isAdmin={isAdmin}

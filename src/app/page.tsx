@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { FooterAvatarButton } from '@/components/footer-avatar-button';
 import { FooterNav } from '@/components/footer-nav';
 import { PwaInstallPrompt } from '@/components/pwa-install-prompt';
+import { PushPermissionPrompt } from '@/components/push-permission-prompt';
 import { AgendoLogo } from '@/components/agendo-logo';
 import AdminHomeIncomeExpensesCard from '@/app/(dashboard)/AdminHomeIncomeExpensesCard';
 import { useRouter } from 'next/navigation';
@@ -157,11 +158,13 @@ export default function HomePage() {
       const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!vapidPublicKey) return;
 
-      if (typeof Notification !== 'undefined' && Notification.permission !== 'default') {
+      if (typeof Notification === 'undefined' || typeof Notification.requestPermission !== 'function') {
         return;
       }
 
-      if (typeof Notification === 'undefined' || typeof Notification.requestPermission !== 'function') {
+      // iOS/Safari suele bloquear el prompt si no hay interacción del usuario.
+      // La solicitud de permiso se hace desde PushPermissionPrompt (botón).
+      if (Notification.permission !== 'granted') {
         return;
       }
 
@@ -172,12 +175,6 @@ export default function HomePage() {
         const { data } = await supabase.auth.getUser();
         const userId = data.user?.id as string | undefined;
         if (!userId) return;
-
-        const permission = await Notification.requestPermission();
-        if (permission !== 'default') {
-          window.localStorage.setItem('pushPermissionPrompted', '1');
-        }
-        if (permission !== 'granted') return;
 
         let registration: ServiceWorkerRegistration;
         try {
@@ -1057,6 +1054,8 @@ export default function HomePage() {
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       <PwaInstallPrompt />
+
+      <PushPermissionPrompt />
 
       <FooterNav
         isAdmin={isAdmin}
