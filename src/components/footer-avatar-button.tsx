@@ -24,17 +24,24 @@ export function FooterAvatarButton({
     <button
       type="button"
       onClick={onClick}
-      className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-gray-200 flex items-center justify-center text-xs sm:text-sm font-medium text-gray-700 overflow-visible hover:ring-2 hover:ring-[#3cadaf]"
+      className={
+        "group h-12 w-12 sm:h-14 sm:w-14 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium text-gray-700 overflow-visible " +
+        (avatarUrl ? "bg-transparent" : "bg-gray-200 hover:ring-2 hover:ring-[#3cadaf]")
+      }
       aria-label="Abrir menú de usuario"
     >
       {avatarUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={avatarUrl}
-          alt="Avatar"
-          className="h-full w-full rounded-full object-cover"
+        <span
+          className="h-full w-full rounded-full overflow-hidden ring-0 group-hover:ring-2 ring-[#3cadaf]"
           style={{ transform }}
-        />
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={avatarUrl}
+            alt="Avatar"
+            className="h-full w-full object-cover"
+          />
+        </span>
       ) : initials ? (
         <span
           className="text-base sm:text-lg inline-block"
