@@ -93,14 +93,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!coachRow) {
-      return NextResponse.json(
-        { error: 'Este usuario no tiene un registro de profesor asociado.' },
-        { status: 400 },
-      );
+    let coachId: string | null = (coachRow?.id as string | undefined) ?? null;
+
+    if (!coachId) {
+      const { data: createdCoach, error: createCoachErr } = await supabaseAdmin
+        .from('coaches')
+        .upsert({ user_id: userId }, { onConflict: 'user_id' })
+        .select('id')
+        .single();
+
+      if (createCoachErr) {
+        return NextResponse.json(
+          { error: 'No se pudo crear el registro de profesor asociado a este usuario.' },
+          { status: 500 },
+        );
+      }
+
+      coachId = (createdCoach?.id as string | undefined) ?? null;
     }
 
-    const coachId = coachRow.id as string;
+    if (!coachId) {
+      return NextResponse.json(
+        { error: 'No se pudo obtener el profesor asociado a este usuario.' },
+        { status: 500 },
+      );
+    }
 
     // Si es admin, validar que el coach pertenezca a la academia indicada
     if (isAdmin) {

@@ -91,6 +91,11 @@ type UserRolesRow = {
   role: Role;
 };
 
+type AcademyOption = {
+  id: string;
+  name: string;
+};
+
 export default function UsersPage() {
   const supabase = createClientBrowser();
 
@@ -136,6 +141,9 @@ export default function UsersPage() {
   const [detailRoles, setDetailRoles] = useState<Role[]>([]);
   const [detailCoachFee, setDetailCoachFee] = useState('');
   const [detailCoachFeeSaving, setDetailCoachFeeSaving] = useState(false);
+  const [detailCoachAcademyId, setDetailCoachAcademyId] = useState<string | null>(null);
+  const [detailCoachAcademies, setDetailCoachAcademies] = useState<AcademyOption[]>([]);
+  const [detailCoachFeeAcademyId, setDetailCoachFeeAcademyId] = useState<string | null>(null);
 
   // Importación masiva desde CSV
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -240,6 +248,34 @@ export default function UsersPage() {
       active = false;
     };
   }, [supabase]);
+
+  const loadCoachFee = async (params: {
+    targetUserId: string;
+    academyId: string;
+  }) => {
+    if (!currentUserId) return;
+    try {
+      const feeRes = await fetch('/api/admin/get-coach-fee', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentUserId,
+          userId: params.targetUserId,
+          academyId: params.academyId,
+        }),
+      });
+      const feeJson = await feeRes.json();
+      if (feeRes.ok) {
+        const fee = feeJson?.feePerClass as number | null | undefined;
+        setDetailCoachFee(fee != null ? formatPyg(fee) : '');
+      } else if (feeJson?.error) {
+        toast.error(feeJson.error);
+      }
+    } catch (e: any) {
+      const msg = e?.message ?? 'No se pudo cargar la tarifa del profesor.';
+      toast.error(msg);
+    }
+  };
 
   const toggleRole = (role: Role) => {
     setSelectedRoles((prev) => {
@@ -515,6 +551,9 @@ export default function UsersPage() {
     setDetailSubmitting(false);
     setDetailDeleting(false);
     setDetailCoachFee('');
+    setDetailCoachAcademyId(null);
+    setDetailCoachAcademies([]);
+    setDetailCoachFeeAcademyId(null);
     try {
       const res = await fetch('/api/admin/get-user', {
         method: 'POST',
@@ -540,30 +579,58 @@ export default function UsersPage() {
       const validRoles = roles.filter((r) => (ROLES as readonly string[]).includes(r)) as Role[];
       setDetailRoles(validRoles.length ? validRoles : ['student']);
 
-      // Cargar tarifa por clase si es coach y hay academia seleccionada
-      if (validRoles.includes('coach') && currentUserId && selectedAcademyId) {
+      let effectiveAcademyId: string | null = selectedAcademyId;
+
+      // Para super_admin: la tarifa debe aplicarse por academia del coach (no depende de la academia del super_admin)
+      if (validRoles.includes('coach') && role === 'super_admin') {
         try {
-          const feeRes = await fetch('/api/admin/get-coach-fee', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              currentUserId,
-              userId: u.id,
-              academyId: selectedAcademyId,
-            }),
-          });
-          const feeJson = await feeRes.json();
-          if (feeRes.ok) {
-            const fee = feeJson?.feePerClass as number | null | undefined;
-            setDetailCoachFee(fee != null ? formatPyg(fee) : '');
-          } else if (feeJson?.error) {
-            toast.error(feeJson.error);
+          const { data: uaRows, error: uaErr } = await supabase
+            .from('user_academies')
+            .select('academy_id')
+            .eq('user_id', u.id)
+            .eq('role', 'coach');
+
+          if (!uaErr && uaRows) {
+            const coachAcademyIds = Array.from(
+              new Set(
+                (uaRows as { academy_id: string | null }[])
+                  .map((r) => r.academy_id)
+                  .filter((id): id is string => !!id)
+              )
+            );
+
+            if (coachAcademyIds.length > 0) {
+              const { data: acadRows, error: acadErr } = await supabase
+                .from('academies')
+                .select('id, name')
+                .in('id', coachAcademyIds)
+                .order('name');
+
+              if (!acadErr && acadRows) {
+                const options = (acadRows as { id: string; name: string | null }[]).map((a) => ({
+                  id: a.id,
+                  name: a.name ?? a.id,
+                }));
+                setDetailCoachAcademies(options);
+
+                const preferred = selectedAcademyId && coachAcademyIds.includes(selectedAcademyId)
+                  ? selectedAcademyId
+                  : options[0]?.id ?? null;
+
+                setDetailCoachFeeAcademyId(preferred);
+                setDetailCoachAcademyId(preferred);
+                effectiveAcademyId = preferred;
+              }
+            }
           }
-        } catch (e: any) {
-          // Si falla la carga de tarifa, solo mostramos el error como toast
-          const msg = e?.message ?? 'No se pudo cargar la tarifa del profesor.';
-          toast.error(msg);
+        } catch {
+          // ignore
         }
+      }
+
+      // Cargar tarifa por clase si es coach y hay academia seleccionada
+      if (validRoles.includes('coach') && effectiveAcademyId) {
+        await loadCoachFee({ targetUserId: u.id, academyId: effectiveAcademyId });
       }
     } catch (e: any) {
       setDetailError(e?.message ?? 'Error inesperado cargando el usuario.');
@@ -643,8 +710,9 @@ export default function UsersPage() {
   };
 
   const handleUpdateCoachFee = async () => {
-    if (!detailUserId || !currentUserId || !selectedAcademyId) {
-      toast.error('No se puede guardar la tarifa: falta información de usuario o academia.');
+    const effectiveAcademyId = detailCoachFeeAcademyId ?? selectedAcademyId ?? detailCoachAcademyId;
+    if (!detailUserId || !currentUserId || !effectiveAcademyId) {
+      toast.error('No se puede guardar la tarifa: falta información del usuario o de la academia.');
       return;
     }
 
@@ -668,7 +736,7 @@ export default function UsersPage() {
         body: JSON.stringify({
           currentUserId,
           userId: detailUserId,
-          academyId: selectedAcademyId,
+          academyId: effectiveAcademyId,
           feePerClass: fee,
         }),
       });
@@ -1152,6 +1220,31 @@ export default function UsersPage() {
 
                   {detailRoles.includes('coach') && (
                     <div>
+                      {role === 'super_admin' && detailCoachAcademies.length > 1 && detailUserId && (
+                        <div className="mb-2">
+                          <label className="block text-sm mb-1">Academia para la tarifa</label>
+                          <select
+                            value={detailCoachFeeAcademyId ?? ''}
+                            onChange={async (e) => {
+                              const next = e.target.value || null;
+                              setDetailCoachFeeAcademyId(next);
+                              setDetailCoachAcademyId(next);
+                              if (next) {
+                                await loadCoachFee({ targetUserId: detailUserId, academyId: next });
+                              } else {
+                                setDetailCoachFee('');
+                              }
+                            }}
+                            className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#3cadaf] focus:border-[#3cadaf] bg-white"
+                          >
+                            {detailCoachAcademies.map((a) => (
+                              <option key={a.id} value={a.id}>
+                                {a.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                       <label className="block text-sm mb-1">
                         Tarifa por clase (Gs) – academia actual
                       </label>

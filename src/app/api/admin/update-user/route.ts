@@ -108,6 +108,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Si el usuario tiene rol de profesor, asegurar su registro en coaches
+    if (uniqueRoles.includes('coach')) {
+      const { error: coachUpsertError } = await supabaseAdmin
+        .from('coaches')
+        .upsert({ user_id: userId }, { onConflict: 'user_id' });
+
+      if (coachUpsertError) {
+        return NextResponse.json(
+          { error: coachUpsertError.message ?? 'No se pudo actualizar el registro de profesor.' },
+          { status: 400 }
+        );
+      }
+    }
+
     return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json(

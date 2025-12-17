@@ -297,6 +297,22 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
+      // Si el usuario tiene rol de profesor, asegurar su registro en coaches
+      if (uniqueRoles.includes('coach')) {
+        const { error: coachUpsertError } = await supabaseAdmin
+          .from('coaches')
+          .upsert({ user_id: newUserId }, { onConflict: 'user_id' });
+
+        if (coachUpsertError) {
+          results.push({
+            index: i,
+            status: 'error',
+            message: 'Usuario creado, pero falló la creación del registro de profesor.',
+          });
+          continue;
+        }
+      }
+
       // Si el usuario tiene rol de alumno, crear también su registro en students (igual que create-user)
       if (uniqueRoles.includes('student')) {
         const { error: studentInsertError } = await supabaseAdmin

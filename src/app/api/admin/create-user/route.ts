@@ -201,6 +201,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Si el usuario tiene rol de profesor, asegurar su registro en coaches
+    if (uniqueRoles.includes('coach')) {
+      const { error: coachUpsertError } = await supabaseAdmin
+        .from('coaches')
+        .upsert({ user_id: newUserId }, { onConflict: 'user_id' });
+
+      if (coachUpsertError) {
+        return NextResponse.json(
+          { error: 'Usuario creado, pero falló la creación del registro de profesor.' },
+          { status: 500 }
+        );
+      }
+    }
+
     // Si el usuario tiene rol de alumno, crear también su registro en students
     if (uniqueRoles.includes('student')) {
       const { error: studentInsertError } = await supabaseAdmin
