@@ -121,7 +121,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         return;
       }
 
+      if (typeof Notification !== 'undefined' && Notification.permission !== 'default') {
+        return;
+      }
+
       try {
+        const alreadyPrompted = window.localStorage.getItem('pushPermissionPrompted');
+        if (alreadyPrompted) return;
+
+        window.localStorage.setItem('pushPermissionPrompted', '1');
+
         const { data } = await supabase.auth.getUser();
         const userId = data.user?.id as string | undefined;
         if (!userId) return;

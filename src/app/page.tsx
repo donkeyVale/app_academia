@@ -150,6 +150,60 @@ export default function HomePage() {
   };
 
   useEffect(() => {
+    async function setupPush() {
+      if (typeof window === 'undefined') return;
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+
+      const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!vapidPublicKey) return;
+
+      if (typeof Notification !== 'undefined' && Notification.permission !== 'default') {
+        return;
+      }
+
+      try {
+        const alreadyPrompted = window.localStorage.getItem('pushPermissionPrompted');
+        if (alreadyPrompted) return;
+
+        window.localStorage.setItem('pushPermissionPrompted', '1');
+
+        const { data } = await supabase.auth.getUser();
+        const userId = data.user?.id as string | undefined;
+        if (!userId) return;
+
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') return;
+
+        let registration: ServiceWorkerRegistration;
+        try {
+          registration = await navigator.serviceWorker.ready;
+        } catch {
+          registration = await navigator.serviceWorker.register('/sw.js');
+        }
+
+        let subscription = await registration.pushManager.getSubscription();
+        if (!subscription) {
+          const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: convertedVapidKey as unknown as ArrayBuffer,
+          });
+        }
+
+        await fetch('/api/push/subscribe', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...subscription.toJSON(), userId, platform: 'web' }),
+        });
+      } catch (err) {
+        console.error('Error configurando notificaciones push', err);
+      }
+    }
+
+    setupPush();
+  }, [supabase]);
+
+  useEffect(() => {
     let active = true;
     (async () => {
       const { data } = await supabase.auth.getUser();
