@@ -228,7 +228,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {academyOptions.length > 0 && (
+      {academyOptions.length > 1 && (
         <div className="border rounded-lg bg-white shadow-sm border-t-4 border-emerald-500">
           <div className="px-4 py-3 border-b bg-gray-50 rounded-t-lg">
             <p className="text-sm font-semibold text-[#31435d]">Academia actual</p>

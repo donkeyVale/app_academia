@@ -731,7 +731,7 @@ export default function HomePage() {
         </div>
       </div>
 
-      {academyOptions.length > 0 && selectedAcademyId && (
+      {academyOptions.length > 1 && selectedAcademyId && (
         <div className="flex items-center justify-between gap-2 text-xs text-gray-600 bg-white border border-emerald-100 rounded-lg px-3 py-2 shadow-sm">
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center justify-center text-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-100">
