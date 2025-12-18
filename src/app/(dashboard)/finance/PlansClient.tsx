@@ -825,15 +825,16 @@ export default function PlansClient() {
       });
       if (insErr) throw insErr;
 
-      let academyIdForPush: string | null = null;
-      if (typeof window !== 'undefined') {
+      // Para push, preferimos la academia real del plan (multiacademia). Fallback: selectedAcademyId.
+      let academyIdForPush: string | null = (sp?.academy_id as string | null | undefined) ?? null;
+      if (!academyIdForPush && typeof window !== 'undefined') {
         const stored = window.localStorage.getItem('selectedAcademyId');
         academyIdForPush = stored && stored.trim() ? stored : null;
       }
 
       if (paymentStatus === 'pagado' && academyIdForPush) {
         try {
-          await fetch('/api/push/payment-registered', {
+          const adminRes = await fetch('/api/push/payment-registered', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -846,7 +847,17 @@ export default function PlansClient() {
             }),
           });
 
-          await fetch('/api/push/payment-student', {
+          if (!adminRes.ok) {
+            let errJson: any = null;
+            try {
+              errJson = await adminRes.json();
+            } catch {
+              errJson = null;
+            }
+            console.error('Push payment-registered falló', { status: adminRes.status, body: errJson });
+          }
+
+          const studentRes = await fetch('/api/push/payment-student', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -858,6 +869,16 @@ export default function PlansClient() {
               paymentDate: dateToUse,
             }),
           });
+
+          if (!studentRes.ok) {
+            let errJson: any = null;
+            try {
+              errJson = await studentRes.json();
+            } catch {
+              errJson = null;
+            }
+            console.error('Push payment-student falló', { status: studentRes.status, body: errJson });
+          }
         } catch (pushErr) {
           console.error('Error enviando notificación push de pago registrado', pushErr);
         }
