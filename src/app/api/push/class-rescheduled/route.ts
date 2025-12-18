@@ -60,6 +60,8 @@ export async function POST(req: NextRequest) {
       newCourtId,
       oldCoachId,
       newCoachId,
+      rescheduledByRole,
+      rescheduledByUserId,
     } = body || {};
 
     if (!academyId || typeof academyId !== 'string') {
@@ -207,6 +209,20 @@ export async function POST(req: NextRequest) {
     }
 
     // Datos nominales
+    let actorName: string | null = null;
+    try {
+      if (rescheduledByUserId && typeof rescheduledByUserId === 'string') {
+        const { data: pRow } = await supabaseAdmin
+          .from('profiles')
+          .select('full_name')
+          .eq('id', rescheduledByUserId)
+          .maybeSingle();
+        actorName = ((pRow as any)?.full_name as string | undefined) ?? null;
+      }
+    } catch {
+      // ignorar
+    }
+
     let coachName: string | null = null;
     try {
       if (coachId) {
@@ -287,14 +303,20 @@ export async function POST(req: NextRequest) {
 
     const changesText = changesParts.length > 0 ? changesParts.join(' | ') : 'Se actualizó la clase.';
 
-    const studentBody = `Tu clase${coachName ? ` con ${coachName}` : ''} fue reprogramada. ${changesText}`;
+    const actorSuffix = actorName
+      ? ` por ${actorName}`
+      : rescheduledByRole && typeof rescheduledByRole === 'string'
+        ? ` por ${rescheduledByRole === 'coach' ? 'el profesor' : rescheduledByRole === 'admin' || rescheduledByRole === 'super_admin' ? 'un administrador' : rescheduledByRole}`
+        : '';
+
+    const studentBody = `Tu clase${coachName ? ` con ${coachName}` : ''} fue reprogramada${actorSuffix}. ${changesText}`;
 
     let coachWithText = '';
     if (studentsCount <= 0) coachWithText = '';
     else if (studentsCount === 1) coachWithText = firstStudentName ? ` con ${firstStudentName}` : ' con un alumno';
     else coachWithText = firstStudentName ? ` con ${firstStudentName} y ${studentsCount - 1} más` : ` con ${studentsCount} alumnos`;
 
-    const coachBody = `Tu clase${coachWithText} fue reprogramada. ${changesText}`;
+    const coachBody = `Tu clase${coachWithText} fue reprogramada${actorSuffix}. ${changesText}`;
 
     const payloadStudents = JSON.stringify({
       title: 'Clase reprogramada',
@@ -308,7 +330,12 @@ export async function POST(req: NextRequest) {
       data: { url: '/schedule' },
     });
 
-    const adminBody = `Una clase fue reprogramada. ${changesText}`;
+    let studentsLabel = '';
+    if (studentsCount <= 0) studentsLabel = 'Sin alumnos';
+    else if (studentsCount === 1) studentsLabel = firstStudentName ? firstStudentName : '1 alumno';
+    else studentsLabel = firstStudentName ? `${firstStudentName} y ${studentsCount - 1} más` : `${studentsCount} alumnos`;
+
+    const adminBody = `Clase de ${studentsLabel}${coachName ? ` con ${coachName}` : ''} fue reprogramada${actorSuffix}. ${changesText}`;
 
     const payloadAdmins = JSON.stringify({
       title: 'Clase reprogramada',

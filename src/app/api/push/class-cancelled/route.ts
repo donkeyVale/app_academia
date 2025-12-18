@@ -166,7 +166,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Ningún usuario tiene activadas las notificaciones para esta clase cancelada.' }, { status: 404 });
     }
 
-    const { data: subs, error: subsError } = await supabaseAdmin
+    const allowedCoachUserIds = new Set<string>();
+    const allowedStudentUserIds = new Set<string>();
+    const allowedAdminUserIds = new Set<string>();
+    for (const id of allowedUserIds) {
+      if (coachUserIdSet.has(id)) allowedCoachUserIds.add(id);
+      if (studentUserIds.has(id)) allowedStudentUserIds.add(id);
+      if (academyAdminUserIds.has(id)) allowedAdminUserIds.add(id);
+    }
+
+    const { data: subsAll, error: subsError } = await supabaseAdmin
       .from('push_subscriptions')
       .select('*')
       .in('user_id', Array.from(allowedUserIds));
@@ -175,7 +184,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: subsError.message }, { status: 500 });
     }
 
-    if (!subs || subs.length === 0) {
+    const subs = (subsAll ?? []) as any[];
+    if (subs.length === 0) {
       return NextResponse.json({ error: 'No hay suscripciones registradas para los usuarios objetivo.' }, { status: 404 });
     }
 
@@ -216,6 +226,53 @@ export async function POST(req: NextRequest) {
             .eq('id', (cRow as any).user_id)
             .maybeSingle();
           actorName = ((pRow as any)?.full_name as string | undefined) ?? null;
+        }
+      }
+    } catch {
+      // ignorar
+    }
+
+    // Nombre del profesor (para mensajes nominales)
+    let coachName: string | null = null;
+    try {
+      if (coachId) {
+        const { data: cRow } = await supabaseAdmin
+          .from('coaches')
+          .select('user_id')
+          .eq('id', coachId)
+          .maybeSingle();
+        const coachUserId = (cRow as any)?.user_id as string | undefined;
+        if (coachUserId) {
+          const { data: pRow } = await supabaseAdmin
+            .from('profiles')
+            .select('full_name')
+            .eq('id', coachUserId)
+            .maybeSingle();
+          coachName = ((pRow as any)?.full_name as string | undefined) ?? null;
+        }
+      }
+    } catch {
+      // ignorar
+    }
+
+    // Nombre(s) de alumnos (label nominal)
+    let firstStudentName: string | null = null;
+    let studentsCount = 0;
+    try {
+      if (uniqueStudentIds.length > 0) {
+        studentsCount = uniqueStudentIds.length;
+        const { data: stRows } = await supabaseAdmin
+          .from('students')
+          .select('id, user_id')
+          .in('id', uniqueStudentIds);
+        const firstUserId = (stRows as any[])?.find((r) => r.user_id)?.user_id as string | undefined;
+        if (firstUserId) {
+          const { data: pRow } = await supabaseAdmin
+            .from('profiles')
+            .select('full_name')
+            .eq('id', firstUserId)
+            .maybeSingle();
+          firstStudentName = ((pRow as any)?.full_name as string | undefined) ?? null;
         }
       }
     } catch {
@@ -272,23 +329,49 @@ export async function POST(req: NextRequest) {
       // ignorar
     }
 
-    let bodyText = '';
-    if (cancelledByRole === 'student') {
-      bodyText = `${actorName ?? 'Un alumno'} canceló la clase${when ? ` del ${when}` : ''}${whereText ? ` (${whereText})` : ''}.`;
-    } else if (cancelledByRole === 'coach') {
-      bodyText = `${actorName ?? 'El profesor'} canceló la clase${when ? ` del ${when}` : ''}${whereText ? ` (${whereText})` : ''}.`;
-    } else {
-      bodyText = `${actorName ?? 'Un administrador'} canceló la clase${when ? ` del ${when}` : ''}${whereText ? ` (${whereText})` : ''}.`;
-    }
+    const whenText = when ? ` del ${when}` : '';
+    const whereSuffix = whereText ? ` (${whereText})` : '';
+    const actorText = actorName
+      ? actorName
+      : cancelledByRole === 'coach'
+        ? 'el profesor'
+        : cancelledByRole === 'admin' || cancelledByRole === 'super_admin'
+          ? 'un administrador'
+          : cancelledByRole === 'student'
+            ? 'un alumno'
+            : 'un usuario';
 
-    const payload = JSON.stringify({
+    let studentsLabel = '';
+    if (studentsCount <= 0) studentsLabel = 'Sin alumnos';
+    else if (studentsCount === 1) studentsLabel = firstStudentName ? firstStudentName : '1 alumno';
+    else studentsLabel = firstStudentName ? `${firstStudentName} y ${studentsCount - 1} más` : `${studentsCount} alumnos`;
+
+    const studentBody = `Tu clase${coachName ? ` con ${coachName}` : ''} fue cancelada por ${actorText}${whenText}${whereSuffix}.`;
+    const coachBody = `Tu clase${studentsCount > 0 ? ` con ${studentsLabel}` : ''} fue cancelada por ${actorText}${whenText}${whereSuffix}.`;
+    const adminBody = `Clase de ${studentsLabel}${coachName ? ` con ${coachName}` : ''} fue cancelada por ${actorText}${whenText}${whereSuffix}.`;
+
+    const payloadStudents = JSON.stringify({
       title: 'Clase cancelada',
-      body: bodyText,
+      body: studentBody,
+      data: { url: '/schedule' },
+    });
+    const payloadCoach = JSON.stringify({
+      title: 'Clase cancelada',
+      body: coachBody,
+      data: { url: '/schedule' },
+    });
+    const payloadAdmins = JSON.stringify({
+      title: 'Clase cancelada',
+      body: adminBody,
       data: { url: '/schedule' },
     });
 
-    const results = await Promise.allSettled(
-      (subs as any[]).map((sub) =>
+    const studentSubs = subs.filter((s) => allowedStudentUserIds.has(s.user_id));
+    const coachSubs = subs.filter((s) => allowedCoachUserIds.has(s.user_id));
+    const adminSubs = subs.filter((s) => allowedAdminUserIds.has(s.user_id));
+
+    const resultsStudents = await Promise.allSettled(
+      studentSubs.map((sub) =>
         webPush.sendNotification(
           {
             endpoint: sub.endpoint,
@@ -297,10 +380,42 @@ export async function POST(req: NextRequest) {
               auth: sub.auth,
             },
           },
-          payload,
+          payloadStudents,
         ),
       ),
     );
+
+    const resultsCoach = await Promise.allSettled(
+      coachSubs.map((sub) =>
+        webPush.sendNotification(
+          {
+            endpoint: sub.endpoint,
+            keys: {
+              p256dh: sub.p256dh,
+              auth: sub.auth,
+            },
+          },
+          payloadCoach,
+        ),
+      ),
+    );
+
+    const resultsAdmins = await Promise.allSettled(
+      adminSubs.map((sub) =>
+        webPush.sendNotification(
+          {
+            endpoint: sub.endpoint,
+            keys: {
+              p256dh: sub.p256dh,
+              auth: sub.auth,
+            },
+          },
+          payloadAdmins,
+        ),
+      ),
+    );
+
+    const results = [...resultsStudents, ...resultsCoach, ...resultsAdmins];
 
     // Limpiar endpoints muertos (410/404) para mejorar confiabilidad
     await Promise.allSettled(
@@ -309,7 +424,8 @@ export async function POST(req: NextRequest) {
         const reason: any = (r as any).reason;
         const statusCode = Number(reason?.statusCode ?? reason?.status);
         if (statusCode !== 404 && statusCode !== 410) return Promise.resolve();
-        const endpoint = (subs as any[])[idx]?.endpoint as string | undefined;
+        const mergedSubs = [...studentSubs, ...coachSubs, ...adminSubs];
+        const endpoint = (mergedSubs as any[])[idx]?.endpoint as string | undefined;
         if (!endpoint) return Promise.resolve();
         return supabaseAdmin.from('push_subscriptions').delete().eq('endpoint', endpoint);
       }),
@@ -317,7 +433,7 @@ export async function POST(req: NextRequest) {
 
     const ok = results.filter((r) => r.status === 'fulfilled').length;
 
-    return NextResponse.json({ ok, total: subs.length });
+    return NextResponse.json({ ok, total: studentSubs.length + coachSubs.length + adminSubs.length });
   } catch (e: any) {
     console.error('Error en /api/push/class-cancelled', e);
     return NextResponse.json({ error: e?.message ?? 'Error enviando notificaciones de clase cancelada' }, { status: 500 });

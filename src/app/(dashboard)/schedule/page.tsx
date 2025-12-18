@@ -1448,6 +1448,8 @@ export default function SchedulePage() {
               newCourtId: editCourtId,
               oldCoachId,
               newCoachId: editCoachId,
+              rescheduledByRole: role,
+              rescheduledByUserId: currentUserId,
             }),
           });
 
