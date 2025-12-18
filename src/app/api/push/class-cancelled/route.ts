@@ -103,6 +103,12 @@ export async function POST(req: NextRequest) {
     } else if (cancelledByRole === 'admin' || cancelledByRole === 'super_admin') {
       for (const id of coachUserIdSet) targetUserIds.add(id);
       for (const id of studentUserIds) targetUserIds.add(id);
+      for (const id of academyAdminUserIds) targetUserIds.add(id);
+
+      // Evitar notificar al mismo admin que ejecutó la acción
+      if (cancelledByUserId && typeof cancelledByUserId === 'string') {
+        targetUserIds.delete(cancelledByUserId);
+      }
     } else {
       // fallback conservador
       for (const id of coachUserIdSet) targetUserIds.add(id);

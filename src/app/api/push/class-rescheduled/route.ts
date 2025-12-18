@@ -107,9 +107,28 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Admins de la academia
+    const academyAdminUserIds = new Set<string>();
+    const { data: uaAdminRows, error: uaAdminErr } = await supabaseAdmin
+      .from('user_academies')
+      .select('user_id, role')
+      .eq('academy_id', academyId);
+
+    if (uaAdminErr) {
+      return NextResponse.json({ error: uaAdminErr.message }, { status: 500 });
+    }
+
+    for (const row of (uaAdminRows ?? []) as any[]) {
+      if (!row.user_id) continue;
+      if (row.role === 'admin' || row.role === 'super_admin') {
+        academyAdminUserIds.add(row.user_id as string);
+      }
+    }
+
     const targetUserIds = new Set<string>();
     for (const id of coachUserIds) targetUserIds.add(id);
     for (const id of studentUserIds) targetUserIds.add(id);
+    for (const id of academyAdminUserIds) targetUserIds.add(id);
 
     if (targetUserIds.size === 0) {
       return NextResponse.json({ error: 'No se encontraron usuarios para notificar.' }, { status: 404 });
@@ -166,6 +185,11 @@ export async function POST(req: NextRequest) {
     for (const id of allowedUserIds) {
       if (coachUserIds.has(id)) allowedCoachUserIds.add(id);
       if (studentUserIds.has(id)) allowedStudentUserIds.add(id);
+    }
+
+    const allowedAdminUserIds = new Set<string>();
+    for (const id of allowedUserIds) {
+      if (academyAdminUserIds.has(id)) allowedAdminUserIds.add(id);
     }
 
     const { data: subsAll, error: subsError } = await supabaseAdmin
@@ -284,8 +308,17 @@ export async function POST(req: NextRequest) {
       data: { url: '/schedule' },
     });
 
+    const adminBody = `Una clase fue reprogramada. ${changesText}`;
+
+    const payloadAdmins = JSON.stringify({
+      title: 'Clase reprogramada',
+      body: adminBody,
+      data: { url: '/schedule' },
+    });
+
     const studentSubs = subs.filter((s) => allowedStudentUserIds.has(s.user_id));
     const coachSubs = subs.filter((s) => allowedCoachUserIds.has(s.user_id));
+    const adminSubs = subs.filter((s) => allowedAdminUserIds.has(s.user_id));
 
     const resultsStudents = await Promise.allSettled(
       studentSubs.map((sub) =>
@@ -311,7 +344,19 @@ export async function POST(req: NextRequest) {
       ),
     );
 
-    const results = [...resultsStudents, ...resultsCoach];
+    const resultsAdmins = await Promise.allSettled(
+      adminSubs.map((sub) =>
+        webPush.sendNotification(
+          {
+            endpoint: sub.endpoint,
+            keys: { p256dh: sub.p256dh, auth: sub.auth },
+          },
+          payloadAdmins,
+        ),
+      ),
+    );
+
+    const results = [...resultsStudents, ...resultsCoach, ...resultsAdmins];
 
     // Limpiar endpoints muertos (410/404) para mejorar confiabilidad
     await Promise.allSettled(
@@ -320,7 +365,7 @@ export async function POST(req: NextRequest) {
         const reason: any = (r as any).reason;
         const statusCode = Number(reason?.statusCode ?? reason?.status);
         if (statusCode !== 404 && statusCode !== 410) return Promise.resolve();
-        const mergedSubs = [...studentSubs, ...coachSubs];
+        const mergedSubs = [...studentSubs, ...coachSubs, ...adminSubs];
         const endpoint = (mergedSubs as any[])[idx]?.endpoint as string | undefined;
         if (!endpoint) return Promise.resolve();
         return supabaseAdmin.from('push_subscriptions').delete().eq('endpoint', endpoint);
@@ -329,7 +374,7 @@ export async function POST(req: NextRequest) {
 
     const ok = results.filter((r) => r.status === 'fulfilled').length;
 
-    return NextResponse.json({ ok, total: studentSubs.length + coachSubs.length });
+    return NextResponse.json({ ok, total: studentSubs.length + coachSubs.length + adminSubs.length });
   } catch (e: any) {
     console.error('Error en /api/push/class-rescheduled', e);
     return NextResponse.json({ error: e?.message ?? 'Error enviando notificaciones de clase reprogramada' }, { status: 500 });
