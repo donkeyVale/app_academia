@@ -1,12 +1,33 @@
-self.addEventListener('install', () => {
+const CACHE_NAME = 'agendo-static-v2';
+const STATIC_ALLOWLIST = [
+  '/',
+  '/manifest.json',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+  '/icons/logoHome.png',
+  '/icons/LogoAgendo1024.png',
+];
+
+self.addEventListener('install', (event) => {
   self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(STATIC_ALLOWLIST).catch(() => undefined);
+    }),
+  );
 });
 
-self.addEventListener('activate', () => {
-  self.clients.claim();
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)));
+      await self.clients.claim();
+    })(),
+  );
 });
 
-// Caché simple de GET del mismo origen
+// Caché PWA (evita cachear HTML/Next build para no quedar con assets viejos y romper la hidratación)
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
@@ -17,17 +38,64 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Nunca interceptar API, auth callbacks, etc.
+  if (url.pathname.startsWith('/api/')) {
+    return;
+  }
+
+  // Navegaciones (HTML): network-first. Si falla, fallback al '/'
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      (async () => {
+        try {
+          return await fetch(event.request);
+        } catch {
+          const cached = await caches.match('/');
+          return cached || Response.error();
+        }
+      })(),
+    );
+    return;
+  }
+
+  // No cachear recursos de build de Next (pueden cambiar por deploy)
+  if (url.pathname.startsWith('/_next/')) {
+    return;
+  }
+
+  // Cache-first SOLO para assets estáticos (icons, imágenes, etc)
+  const isStaticAsset =
+    url.pathname.startsWith('/icons/') ||
+    url.pathname.startsWith('/images/') ||
+    url.pathname.endsWith('.png') ||
+    url.pathname.endsWith('.jpg') ||
+    url.pathname.endsWith('.jpeg') ||
+    url.pathname.endsWith('.svg') ||
+    url.pathname.endsWith('.webp') ||
+    url.pathname.endsWith('.ico') ||
+    url.pathname.endsWith('.css');
+
+  if (!isStaticAsset) {
+    // Para el resto, dejamos pasar a red sin cachear.
+    return;
+  }
+
   event.respondWith(
-    caches.open('v1').then(async (cache) => {
+    (async () => {
+      const cache = await caches.open(CACHE_NAME);
       const cached = await cache.match(event.request);
       if (cached) return cached;
 
-      const res = await fetch(event.request);
-      if (res && res.status === 200) {
-        cache.put(event.request, res.clone());
+      try {
+        const res = await fetch(event.request);
+        if (res && res.status === 200) {
+          cache.put(event.request, res.clone());
+        }
+        return res;
+      } catch {
+        return cached || Response.error();
       }
-      return res;
-    })
+    })(),
   );
 });
 
