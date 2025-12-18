@@ -67,7 +67,46 @@ export default function RootLayout({
             __html: `
         if ('serviceWorker' in navigator) {
           window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js').catch(console.error);
+            navigator.serviceWorker.register('/sw.js').then((reg) => {
+              try {
+                reg.update();
+              } catch (e) {}
+
+              function tryActivateWaiting() {
+                if (reg.waiting) {
+                  try {
+                    reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+                  } catch (e) {}
+                }
+              }
+
+              tryActivateWaiting();
+
+              reg.addEventListener('updatefound', () => {
+                const installing = reg.installing;
+                if (!installing) return;
+                installing.addEventListener('statechange', () => {
+                  if (installing.state === 'installed') {
+                    tryActivateWaiting();
+                  }
+                });
+              });
+
+              let reloaded = false;
+              navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (reloaded) return;
+                reloaded = true;
+                window.location.reload();
+              });
+
+              document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') {
+                  try {
+                    reg.update();
+                  } catch (e) {}
+                }
+              });
+            }).catch(console.error);
           });
         }
       `,
