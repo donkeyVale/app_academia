@@ -160,8 +160,24 @@ export default function AdminHomeIncomeExpensesCard() {
             }[];
 
             if (classes.length > 0) {
+              // Contar solo clases con al menos 1 alumno (booking)
+              const classIds = classes.map((c) => c.id);
+              const { data: bookingsData, error: bookingsErr } = await supabase
+                .from('bookings')
+                .select('class_id')
+                .in('class_id', classIds);
+              if (bookingsErr) throw bookingsErr;
+
+              const bookedClassIds = new Set<string>();
+              for (const row of (bookingsData ?? []) as any[]) {
+                const cid = row?.class_id as string | undefined;
+                if (cid) bookedClassIds.add(cid);
+              }
+
+              const classesWithStudents = classes.filter((c) => bookedClassIds.has(c.id));
+
               const coachIds = Array.from(
-                new Set(classes.map((c) => c.coach_id).filter((id): id is string => !!id)),
+                new Set(classesWithStudents.map((c) => c.coach_id).filter((id): id is string => !!id)),
               );
 
               if (coachIds.length > 0) {
@@ -177,12 +193,77 @@ export default function AdminHomeIncomeExpensesCard() {
                   feeMap[row.coach_id as string] = (row.fee_per_class as number | null) ?? null;
                 });
 
-                totalExpenses = classes.reduce((acc, cls) => {
+                const teacherExpenses = classesWithStudents.reduce((acc, cls) => {
                   const coachId = cls.coach_id as string | null;
                   if (!coachId) return acc;
                   const fee = feeMap[coachId] ?? 0;
                   return acc + (fee || 0);
                 }, 0);
+
+                // Alquiler de cancha: por sede (base) y override por cancha
+                const activeLocationFeeMap: Record<string, { fee: number; valid_from: string }> = {};
+                const activeCourtFeeMap: Record<string, { fee: number; valid_from: string }> = {};
+
+                try {
+                  const { data: locFees, error: locFeesErr } = await supabase
+                    .from('location_rent_fees')
+                    .select('location_id, fee_per_class, valid_from, valid_to')
+                    .eq('academy_id', selectedAcademyId);
+                  if (locFeesErr) throw locFeesErr;
+                  for (const r of (locFees ?? []) as any[]) {
+                    const lid = r.location_id as string | undefined;
+                    const fee = Number(r.fee_per_class);
+                    const vf = r.valid_from as string | undefined;
+                    const vt = r.valid_to as string | null | undefined;
+                    if (!lid || !vf || Number.isNaN(fee) || fee < 0) continue;
+                    if (vt != null) continue; // nos interesa la activa
+                    activeLocationFeeMap[lid] = { fee, valid_from: vf };
+                  }
+
+                  const { data: courtFees, error: courtFeesErr } = await supabase
+                    .from('court_rent_fees')
+                    .select('court_id, fee_per_class, valid_from, valid_to')
+                    .eq('academy_id', selectedAcademyId);
+                  if (courtFeesErr) throw courtFeesErr;
+                  for (const r of (courtFees ?? []) as any[]) {
+                    const cid = r.court_id as string | undefined;
+                    const fee = Number(r.fee_per_class);
+                    const vf = r.valid_from as string | undefined;
+                    const vt = r.valid_to as string | null | undefined;
+                    if (!cid || !vf || Number.isNaN(fee) || fee < 0) continue;
+                    if (vt != null) continue;
+                    activeCourtFeeMap[cid] = { fee, valid_from: vf };
+                  }
+                } catch {
+                  // si falla cargar fees, no rompemos el card: alquiler=0
+                }
+
+                const courtToLocation: Record<string, string | null> = {};
+                for (const c of courts) courtToLocation[c.id] = c.location_id ?? null;
+
+                const rentExpenses = classesWithStudents.reduce((acc, cls) => {
+                  const courtId = cls.court_id as string | null;
+                  if (!courtId) return acc;
+
+                  // chequeo de vigencia por fecha (valid_from <= class_date)
+                  const classDay = (cls.date || '').slice(0, 10);
+
+                  const courtFeeRow = activeCourtFeeMap[courtId];
+                  if (courtFeeRow && courtFeeRow.valid_from <= classDay) {
+                    return acc + (courtFeeRow.fee || 0);
+                  }
+
+                  const locationId = courtToLocation[courtId] ?? null;
+                  if (!locationId) return acc;
+                  const locFeeRow = activeLocationFeeMap[locationId];
+                  if (locFeeRow && locFeeRow.valid_from <= classDay) {
+                    return acc + (locFeeRow.fee || 0);
+                  }
+
+                  return acc;
+                }, 0);
+
+                totalExpenses = teacherExpenses + rentExpenses;
               }
             }
           }

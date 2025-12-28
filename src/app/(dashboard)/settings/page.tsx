@@ -18,6 +18,19 @@ export default function SettingsPage() {
   const [academyOptions, setAcademyOptions] = useState<{ id: string; name: string }[]>([]);
   const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
 
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [rentLoading, setRentLoading] = useState(false);
+  const [rentSaving, setRentSaving] = useState(false);
+  const [rentError, setRentError] = useState<string | null>(null);
+  const [rentLocations, setRentLocations] = useState<{ id: string; name: string | null }[]>([]);
+  const [rentCourts, setRentCourts] = useState<{ id: string; name: string | null; location_id: string | null }[]>([]);
+  const [rentLocationValues, setRentLocationValues] = useState<
+    Record<string, { feePerClass: string; validFrom: string }>
+  >({});
+  const [rentCourtValues, setRentCourtValues] = useState<
+    Record<string, { feePerClass: string; validFrom: string }>
+  >({});
+
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -28,6 +41,8 @@ export default function SettingsPage() {
         setLoading(false);
         return;
       }
+
+      setCurrentUserId(user.id);
 
       try {
         const { data: profile, error: profErr } = await supabase
@@ -107,6 +122,146 @@ export default function SettingsPage() {
       }
     })();
   }, [supabase]);
+
+  useEffect(() => {
+    (async () => {
+      setRentError(null);
+      if (!currentUserId) return;
+      if (role !== 'admin' && role !== 'super_admin') return;
+      if (!selectedAcademyId) {
+        setRentLocations([]);
+        setRentCourts([]);
+        setRentLocationValues({});
+        setRentCourtValues({});
+        return;
+      }
+
+      setRentLoading(true);
+      try {
+        const { data: alRows, error: alErr } = await supabase
+          .from('academy_locations')
+          .select('location_id')
+          .eq('academy_id', selectedAcademyId);
+
+        if (alErr) throw alErr;
+
+        const locationIds = Array.from(
+          new Set(
+            (alRows ?? [])
+              .map((r: any) => (r?.location_id as string | null) ?? null)
+              .filter((id: string | null): id is string => !!id),
+          ),
+        );
+
+        if (locationIds.length === 0) {
+          setRentLocations([]);
+          setRentCourts([]);
+          setRentLocationValues({});
+          setRentCourtValues({});
+          return;
+        }
+
+        const [locRes, courtsRes] = await Promise.all([
+          supabase.from('locations').select('id,name').in('id', locationIds).order('name'),
+          supabase.from('courts').select('id,name,location_id').in('location_id', locationIds).order('name'),
+        ]);
+
+        if (locRes.error) throw locRes.error;
+        if (courtsRes.error) throw courtsRes.error;
+
+        const locs = (locRes.data ?? []) as { id: string; name: string | null }[];
+        const courts = (courtsRes.data ?? []) as { id: string; name: string | null; location_id: string | null }[];
+        setRentLocations(locs);
+        setRentCourts(courts);
+
+        const feesRes = await fetch('/api/admin/get-rent-fees', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ currentUserId, academyId: selectedAcademyId }),
+        });
+
+        if (!feesRes.ok) {
+          const txt = await feesRes.text().catch(() => '');
+          throw new Error(txt || 'No se pudo cargar la configuración de alquiler.');
+        }
+
+        const feesJson = (await feesRes.json().catch(() => null)) as any;
+        const locationFees = (feesJson?.locationFees ?? []) as any[];
+        const courtFees = (feesJson?.courtFees ?? []) as any[];
+
+        const nextLocValues: Record<string, { feePerClass: string; validFrom: string }> = {};
+        for (const l of locs) {
+          const match = locationFees.find((x) => x.location_id === l.id);
+          nextLocValues[l.id] = {
+            feePerClass: match?.fee_per_class != null ? String(match.fee_per_class) : '',
+            validFrom: match?.valid_from ? String(match.valid_from) : new Date().toISOString().slice(0, 10),
+          };
+        }
+
+        const nextCourtValues: Record<string, { feePerClass: string; validFrom: string }> = {};
+        for (const c of courts) {
+          const match = courtFees.find((x) => x.court_id === c.id);
+          nextCourtValues[c.id] = {
+            feePerClass: match?.fee_per_class != null ? String(match.fee_per_class) : '',
+            validFrom: match?.valid_from ? String(match.valid_from) : new Date().toISOString().slice(0, 10),
+          };
+        }
+
+        setRentLocationValues(nextLocValues);
+        setRentCourtValues(nextCourtValues);
+      } catch (e: any) {
+        setRentError(e?.message ?? 'Error cargando configuración de alquiler.');
+      } finally {
+        setRentLoading(false);
+      }
+    })();
+  }, [currentUserId, role, selectedAcademyId, supabase]);
+
+  const onSaveRentFees = async () => {
+    if (!currentUserId) return;
+    if (role !== 'admin' && role !== 'super_admin') return;
+    if (!selectedAcademyId) return;
+
+    setRentSaving(true);
+    setRentError(null);
+    try {
+      const locationFeesPayload = Object.entries(rentLocationValues)
+        .map(([locationId, v]) => ({
+          locationId,
+          feePerClass: Number(v.feePerClass),
+          validFrom: v.validFrom,
+        }))
+        .filter((x) => Number.isFinite(x.feePerClass) && x.feePerClass >= 0 && !!x.validFrom);
+
+      const courtFeesPayload = Object.entries(rentCourtValues)
+        .map(([courtId, v]) => ({
+          courtId,
+          feePerClass: Number(v.feePerClass),
+          validFrom: v.validFrom,
+        }))
+        .filter((x) => Number.isFinite(x.feePerClass) && x.feePerClass >= 0 && !!x.validFrom);
+
+      const res = await fetch('/api/admin/update-rent-fees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentUserId,
+          academyId: selectedAcademyId,
+          locationFees: locationFeesPayload,
+          courtFees: courtFeesPayload,
+        }),
+      });
+
+      if (!res.ok) {
+        const txt = await res.text().catch(() => '');
+        throw new Error(txt || 'No se pudo guardar la configuración de alquiler.');
+      }
+    } catch (e: any) {
+      setRentError(e?.message ?? 'Error guardando configuración de alquiler.');
+    } finally {
+      setRentSaving(false);
+    }
+  };
 
   const onToggleNotify = async () => {
     setSaving(true);
@@ -304,6 +459,148 @@ export default function SettingsPage() {
                 Sedes y canchas
               </Link>
             </div>
+          </div>
+        </div>
+      )}
+
+      {(role === 'admin' || role === 'super_admin') && (
+        <div className="border rounded-lg bg-white shadow-sm border-t-4 border-emerald-500">
+          <div className="px-4 py-3 border-b bg-gray-50 rounded-t-lg flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-[#31435d]">Alquiler de canchas (egresos)</p>
+              <p className="text-xs text-gray-600 mt-0.5">
+                Configurá el costo por clase (60 min) que la academia paga al complejo. Se aplica solo si hubo al menos 1 alumno.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onSaveRentFees}
+              disabled={rentSaving || rentLoading || !selectedAcademyId}
+              className="inline-flex items-center rounded-md bg-[#3cadaf] px-4 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-[#34989e] disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {rentSaving ? 'Guardando...' : 'Guardar'}
+            </button>
+          </div>
+
+          <div className="px-4 py-4 space-y-3 text-sm">
+            {rentError && <p className="text-xs text-red-600">{rentError}</p>}
+
+            {!selectedAcademyId ? (
+              <p className="text-xs text-gray-600">
+                Seleccioná una academia en esta pantalla para configurar el alquiler.
+              </p>
+            ) : rentLoading ? (
+              <p className="text-xs text-gray-600">Cargando sedes y canchas...</p>
+            ) : rentLocations.length === 0 ? (
+              <p className="text-xs text-gray-600">No hay sedes vinculadas a esta academia.</p>
+            ) : (
+              <div className="space-y-4">
+                {rentLocations.map((loc) => {
+                  const locValue = rentLocationValues[loc.id] ?? {
+                    feePerClass: '',
+                    validFrom: new Date().toISOString().slice(0, 10),
+                  };
+                  const courtsForLoc = rentCourts.filter((c) => c.location_id === loc.id);
+
+                  return (
+                    <div key={loc.id} className="border rounded-md p-3">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-semibold text-[#31435d]">{loc.name ?? loc.id}</p>
+                          <p className="text-xs text-gray-500">Tarifa base por sede (si no hay override por cancha)</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] text-gray-600">Vigente desde</label>
+                            <input
+                              type="date"
+                              value={locValue.validFrom}
+                              onChange={(e) =>
+                                setRentLocationValues((prev) => ({
+                                  ...prev,
+                                  [loc.id]: { ...locValue, validFrom: e.target.value },
+                                }))
+                              }
+                              className="rounded-md border border-gray-300 px-2 py-1 text-xs"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[11px] text-gray-600">Alquiler por clase</label>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              value={locValue.feePerClass}
+                              onChange={(e) =>
+                                setRentLocationValues((prev) => ({
+                                  ...prev,
+                                  [loc.id]: { ...locValue, feePerClass: e.target.value },
+                                }))
+                              }
+                              className="w-28 rounded-md border border-gray-300 px-2 py-1 text-xs"
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {courtsForLoc.length > 0 && (
+                        <div className="mt-3 space-y-2">
+                          <p className="text-xs font-semibold text-gray-700">Override por cancha (opcional)</p>
+                          <div className="space-y-2">
+                            {courtsForLoc.map((c) => {
+                              const cValue = rentCourtValues[c.id] ?? {
+                                feePerClass: '',
+                                validFrom: new Date().toISOString().slice(0, 10),
+                              };
+                              return (
+                                <div
+                                  key={c.id}
+                                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border rounded-md px-2 py-2"
+                                >
+                                  <div className="text-xs font-medium text-[#31435d]">{c.name ?? c.id}</div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex flex-col gap-1">
+                                      <label className="text-[11px] text-gray-600">Vigente desde</label>
+                                      <input
+                                        type="date"
+                                        value={cValue.validFrom}
+                                        onChange={(e) =>
+                                          setRentCourtValues((prev) => ({
+                                            ...prev,
+                                            [c.id]: { ...cValue, validFrom: e.target.value },
+                                          }))
+                                        }
+                                        className="rounded-md border border-gray-300 px-2 py-1 text-xs"
+                                      />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                      <label className="text-[11px] text-gray-600">Alquiler por clase</label>
+                                      <input
+                                        type="number"
+                                        inputMode="decimal"
+                                        value={cValue.feePerClass}
+                                        onChange={(e) =>
+                                          setRentCourtValues((prev) => ({
+                                            ...prev,
+                                            [c.id]: { ...cValue, feePerClass: e.target.value },
+                                          }))
+                                        }
+                                        className="w-28 rounded-md border border-gray-300 px-2 py-1 text-xs"
+                                        placeholder="(usa tarifa base)"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
