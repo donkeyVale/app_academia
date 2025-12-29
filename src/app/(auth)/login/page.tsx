@@ -1,9 +1,10 @@
 'use client';
 
 import Image from 'next/image';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
 import { PasswordInput } from '@/components/ui/password-input';
+import { toast } from 'sonner';
 
 export default function LoginPage() {
   const supabase = createClientBrowser();
@@ -12,6 +13,16 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('inactive') === '1') {
+      const msg = 'Tu usuario está inactivo en todas tus academias. Comunicate con el administrador.';
+      setInfo(msg);
+      toast.error(msg);
+    }
+  }, []);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

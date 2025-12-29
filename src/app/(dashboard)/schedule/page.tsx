@@ -128,6 +128,7 @@ export default function SchedulePage() {
   const [classes, setClasses] = useState<ClassSession[]>([]);
   const [bookingsCount, setBookingsCount] = useState<Record<string, number>>({});
   const [studentsByClass, setStudentsByClass] = useState<Record<string, string[]>>({});
+  const [attendanceMarkedByClass, setAttendanceMarkedByClass] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -430,9 +431,23 @@ export default function SchedulePage() {
           setBookingsCount(map);
           setStudentsByClass(byClass);
         }
+
+        const { data: attRows, error: attErr } = await supabase
+          .from('attendance')
+          .select('class_id')
+          .in('class_id', classIds);
+        if (!attErr) {
+          const marked: Record<string, boolean> = {};
+          (attRows ?? []).forEach((r: any) => {
+            const cid = r.class_id as string | null;
+            if (cid) marked[cid] = true;
+          });
+          setAttendanceMarkedByClass(marked);
+        }
       } else {
         setBookingsCount({});
         setStudentsByClass({});
+        setAttendanceMarkedByClass({});
       }
       setLoading(false);
     })();
@@ -446,9 +461,9 @@ export default function SchedulePage() {
         setTime('');
         return;
       }
-      // Candidate hours 06:00 - 20:00 inclusive
+      // Candidate hours 06:00 - 23:00 inclusive
       const candidates: string[] = [];
-      for (let h = 6; h <= 20; h++) {
+      for (let h = 6; h <= 23; h++) {
         const hh = String(h).padStart(2, '0');
         candidates.push(`${hh}:00`);
       }
@@ -493,11 +508,11 @@ export default function SchedulePage() {
         return;
       }
 
-      // Validar rango horario permitido (06:00 a 20:00)
+      // Validar rango horario permitido (06:00 a 23:00)
       {
         const hour = Number(time.split(':')[0] ?? 'NaN');
-        if (Number.isNaN(hour) || hour < 6 || hour > 20) {
-          toast.error('Horario inválido. Seleccioná una hora entre 06:00 y 20:00.');
+        if (Number.isNaN(hour) || hour < 6 || hour > 23) {
+          toast.error('Horario inválido. Seleccioná una hora entre 06:00 y 23:00.');
           setSaving(false);
           return;
         }
@@ -875,10 +890,10 @@ export default function SchedulePage() {
     filterTo,
   ]);
 
-  // Clases recientes (últimas 6h) que ya terminaron, para poder marcar asistencia aunque pasaron los 60 minutos
+  // Clases recientes (últimas 24h) que ya terminaron, para poder marcar asistencia aunque pasaron los 60 minutos
   const recentClasses = useMemo(() => {
     const now = new Date();
-    const cutoff = new Date(now.getTime() - 6 * 60 * 60 * 1000);
+    const cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     return classes.filter((cls) => {
       const startTs = new Date(cls.date).getTime();
       const endTs = startTs + 60 * 60 * 1000;
@@ -886,9 +901,10 @@ export default function SchedulePage() {
       if (endTs >= now.getTime()) return false;
       // solo últimas 24h
       if (startTs < cutoff.getTime()) return false;
+      if (attendanceMarkedByClass[cls.id]) return false;
       return true;
     });
-  }, [classes]);
+  }, [classes, attendanceMarkedByClass]);
 
   const studentPastClasses = useMemo(() => {
     if (role !== 'student' || !studentId) return [];
@@ -1112,6 +1128,10 @@ export default function SchedulePage() {
         });
       }
 
+      setAttendanceMarkedByClass((prev) => ({
+        ...prev,
+        [attendanceClass.id]: true,
+      }));
       setAttendanceClass(null);
     } catch (e: any) {
       setError(e.message || 'Error guardando asistencia');
@@ -1128,7 +1148,7 @@ export default function SchedulePage() {
         return;
       }
       const candidates: string[] = [];
-      for (let h = 6; h <= 20; h++) candidates.push(`${String(h).padStart(2, '0')}:00`);
+      for (let h = 6; h <= 23; h++) candidates.push(`${String(h).padStart(2, '0')}:00`);
       const dayStart = new Date(`${editDay}T00:00:00`);
       const dayEnd = new Date(`${editDay}T23:59:59`);
       const { data: dayClasses, error } = await supabase
@@ -1164,11 +1184,11 @@ export default function SchedulePage() {
       return;
     }
 
-    // Validar rango horario permitido (06:00 a 20:00)
+    // Validar rango horario permitido (06:00 a 23:00)
     {
       const hour = Number(editTime.split(':')[0] ?? 'NaN');
-      if (Number.isNaN(hour) || hour < 6 || hour > 20) {
-        toast.error('Horario inválido. Seleccioná una hora entre 06:00 y 20:00.');
+      if (Number.isNaN(hour) || hour < 6 || hour > 23) {
+        toast.error('Horario inválido. Seleccioná una hora entre 06:00 y 23:00.');
         return;
       }
     }
@@ -1612,7 +1632,7 @@ export default function SchedulePage() {
                       }
                     />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="max-h-60 overflow-y-auto">
                     {availableTimes.map((t) => (
                       <SelectItem key={t} value={t}>
                         {t}
@@ -2738,27 +2758,32 @@ export default function SchedulePage() {
                   </div>
                   <div>
                     <label className="mb-1 block text-xs font-medium text-slate-700">Hora disponible</label>
-                    <select
-                      className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/50"
+                    <Select
                       value={editTime}
-                      onChange={(e) => setEditTime(e.target.value)}
-                      disabled={!editCourtId || !editDay}
+                      onValueChange={(val) => setEditTime(val)}
+                      disabled={!editCourtId || !editDay || editAvailableTimes.length === 0}
                     >
-                      <option value="" disabled>
-                        {!editCourtId
-                          ? 'Selecciona una cancha'
-                          : !editDay
-                          ? 'Selecciona una fecha'
-                          : editAvailableTimes.length
-                          ? 'Selecciona una hora'
-                          : 'Sin horarios disponibles'}
-                      </option>
-                      {editAvailableTimes.map((t) => (
-                        <option key={t} value={t}>
-                          {t}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="w-full h-9 text-xs">
+                        <SelectValue
+                          placeholder={
+                            !editCourtId
+                              ? 'Selecciona una cancha'
+                              : !editDay
+                              ? 'Selecciona una fecha'
+                              : editAvailableTimes.length
+                              ? 'Selecciona una hora'
+                              : 'Sin horarios disponibles'
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-60 overflow-y-auto">
+                        {editAvailableTimes.map((t) => (
+                          <SelectItem key={t} value={t}>
+                            {t}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     {editCourtId && editDay && editAvailableTimes.length === 0 && (
                       <p className="mt-1 text-xs text-red-600">
                         No hay horarios disponibles para esta cancha en el día seleccionado.

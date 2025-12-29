@@ -13,6 +13,8 @@ export async function POST(req: NextRequest) {
       email,
       birthDate,
       roles,
+      academyId,
+      academyIsActive,
     } = body as {
       userId?: string;
       firstName?: string;
@@ -22,6 +24,8 @@ export async function POST(req: NextRequest) {
       email?: string;
       birthDate?: string;
       roles?: string[];
+      academyId?: string;
+      academyIsActive?: boolean;
     };
 
     if (!userId) {
@@ -118,6 +122,21 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           { error: coachUpsertError.message ?? 'No se pudo actualizar el registro de profesor.' },
           { status: 400 }
+        );
+      }
+    }
+
+    if (academyId && typeof academyIsActive === 'boolean') {
+      const { error: uaUpdateErr } = await supabaseAdmin
+        .from('user_academies')
+        .update({ is_active: academyIsActive })
+        .eq('user_id', userId)
+        .eq('academy_id', academyId);
+
+      if (uaUpdateErr) {
+        return NextResponse.json(
+          { error: uaUpdateErr.message ?? 'No se pudo actualizar el estado del usuario en la academia.' },
+          { status: 400 },
         );
       }
     }

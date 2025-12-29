@@ -12,6 +12,7 @@ import AdminHomeIncomeExpensesCard from '@/app/(dashboard)/AdminHomeIncomeExpens
 import { useRouter } from 'next/navigation';
 import { createClientBrowser } from '@/lib/supabase';
 import { motion } from 'framer-motion';
+import { toast } from 'sonner';
 import {
   Smartphone,
   Layers,
@@ -242,7 +243,7 @@ export default function HomePage() {
         try {
           const { data: uaRows, error: uaErr } = await supabase
             .from('user_academies')
-            .select('academy_id')
+            .select('academy_id, is_active')
             .eq('user_id', userId);
 
           if (uaErr) {
@@ -256,7 +257,8 @@ export default function HomePage() {
           } else if (uaRows) {
             const academyIds = Array.from(
               new Set(
-                (uaRows as { academy_id: string | null }[])
+                (uaRows as { academy_id: string | null; is_active: boolean | null }[])
+                  .filter((row) => (row.is_active ?? true) === true)
                   .map((row) => row.academy_id)
                   .filter((id): id is string => !!id)
               )
@@ -294,17 +296,31 @@ export default function HomePage() {
                   initial = validIds[0] ?? null;
                 }
 
+                if (stored && stored !== initial && typeof window !== 'undefined') {
+                  toast.error(
+                    'Tu usuario está inactivo en la academia seleccionada. Te cambiamos a una academia activa.',
+                  );
+                }
+
                 setSelectedAcademyId(initial);
                 if (initial && typeof window !== 'undefined') {
                   window.localStorage.setItem('selectedAcademyId', initial);
                 }
               }
             } else {
+              try {
+                await supabase.auth.signOut();
+              } catch {
+                // ignore
+              }
               setHasAcademies(false);
               setAcademyOptions([]);
               setSelectedAcademyId(null);
               if (typeof window !== 'undefined') {
                 window.localStorage.removeItem('selectedAcademyId');
+              }
+              if (typeof window !== 'undefined') {
+                window.location.href = '/login?inactive=1';
               }
             }
           }

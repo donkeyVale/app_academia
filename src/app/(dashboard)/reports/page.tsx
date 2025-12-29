@@ -108,6 +108,13 @@ interface CoachExpenseRow {
   total_expense: number;
 }
 
+interface RentExpenseRow {
+  location_id: string;
+  location_name: string | null;
+  classes_count: number;
+  rent_total: number;
+}
+
 interface LocationOption {
   id: string;
   label: string;
@@ -202,7 +209,6 @@ export default function ReportsPage() {
   const [studentSummary, setStudentSummary] = useState<StudentSummaryRow[]>([]);
   const [planSummary, setPlanSummary] = useState<PlanSummaryRow[]>([]);
   const [showIncome, setShowIncome] = useState(false);
-  const [showStudentSummary, setShowStudentSummary] = useState(false);
   const [showPlanSummary, setShowPlanSummary] = useState(false);
   const [studentDetailModalOpen, setStudentDetailModalOpen] = useState(false);
   const [studentDetailName, setStudentDetailName] = useState<string | null>(null);
@@ -260,11 +266,17 @@ export default function ReportsPage() {
 
   const [exportMenu, setExportMenu] = useState<{
     income: boolean;
-    expensesCoach: boolean;
+    expenses: boolean;
     attendanceStudent: boolean;
     attendanceCoach: boolean;
     attendanceLocation: boolean;
-  }>({ income: false, expensesCoach: false, attendanceStudent: false, attendanceCoach: false, attendanceLocation: false });
+  }>({
+    income: false,
+    expenses: false,
+    attendanceStudent: false,
+    attendanceCoach: false,
+    attendanceLocation: false,
+  });
 
   // Multi-academia
   const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
@@ -275,6 +287,11 @@ export default function ReportsPage() {
   const [coachExpensesLoading, setCoachExpensesLoading] = useState(false);
   const [coachExpenses, setCoachExpenses] = useState<CoachExpenseRow[]>([]);
   const [coachExpensesTotal, setCoachExpensesTotal] = useState(0);
+
+  // Egresos por alquiler de cancha
+  const [rentExpensesLoading, setRentExpensesLoading] = useState(false);
+  const [rentExpenses, setRentExpenses] = useState<RentExpenseRow[]>([]);
+  const [rentExpensesTotal, setRentExpensesTotal] = useState(0);
   const [hasAutoRunFromPreset, setHasAutoRunFromPreset] = useState(false);
 
   const exportToExcel = async (
@@ -1354,6 +1371,7 @@ export default function ReportsPage() {
     }
 
     setCoachExpensesLoading(true);
+    setRentExpensesLoading(true);
     setError(null);
     try {
       const { data: courtsData, error: courtsErr } = await supabase
@@ -1597,13 +1615,41 @@ export default function ReportsPage() {
       const total = rows.reduce((acc, r) => acc + r.total_expense, 0);
       setCoachExpenses(rows);
       setCoachExpensesTotal(total);
+
+      // Egresos por alquiler (RPC)
+      try {
+        const { data: rentRows, error: rentErr } = await supabase.rpc('get_rent_expenses', {
+          academy_id: selectedAcademyId,
+          from_date: fromDate,
+          to_date: toDate,
+        });
+
+        if (rentErr) throw rentErr;
+
+        const mappedRent = ((rentRows ?? []) as any[]).map((r) => ({
+          location_id: r.location_id as string,
+          location_name: (r.location_name as string | null) ?? null,
+          classes_count: Number(r.classes_count ?? 0),
+          rent_total: Number(r.rent_total ?? 0),
+        })) as RentExpenseRow[];
+
+        setRentExpenses(mappedRent);
+        setRentExpensesTotal(mappedRent.reduce((acc, r) => acc + (r.rent_total || 0), 0));
+      } catch (rpcErr: any) {
+        console.error('Error cargando alquiler (RPC get_rent_expenses)', rpcErr);
+        setRentExpenses([]);
+        setRentExpensesTotal(0);
+      }
     } catch (e: any) {
       const msg = e?.message ?? 'Error cargando egresos por profesor.';
       setError(msg);
       setCoachExpenses([]);
       setCoachExpensesTotal(0);
+      setRentExpenses([]);
+      setRentExpensesTotal(0);
     } finally {
       setCoachExpensesLoading(false);
+      setRentExpensesLoading(false);
     }
   };
 
@@ -1742,7 +1788,7 @@ export default function ReportsPage() {
                         onClick={() =>
                           setExportMenu((m) => ({
                             income: !m.income,
-                            expensesCoach: false,
+                            expenses: false,
                             attendanceStudent: false,
                             attendanceCoach: false,
                             attendanceLocation: false,
@@ -1806,64 +1852,78 @@ export default function ReportsPage() {
 
               {rows.length > 0 && (
                 <>
-                  {/* Vista mobile: tarjetas apiladas */}
-                  <div className="mt-3 space-y-2 md:hidden">
-                    {rows.map((r) => (
-                      <div
-                        key={r.id}
-                        className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1"
-                      >
-                        <div className="flex justify-between gap-2">
-                          <span className="font-semibold text-[#31435d]">
-                            {r.student_name ?? r.student_id}
-                          </span>
-                          <span className="text-gray-500">
-                            {new Date(r.payment_date).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <div className="text-gray-600">
-                          <span className="font-semibold">Plan:</span>{" "}
-                          {r.plan_name ?? "-"}
-                        </div>
-                        <div className="flex justify-between items-center gap-2">
-                          <span className="capitalize text-gray-600">{r.method}</span>
-                          <span className="font-semibold text-[#31435d]">
-                            {formatPyg(r.amount)} {r.currency}
-                          </span>
-                        </div>
+                  {/* Resumen por alumno (el detalle completo se ve en el modal) */}
+                  {studentSummary.length > 0 && (
+                    <div className="border rounded-lg bg-white p-3 space-y-3 text-sm mt-3">
+                      <div>
+                        <p className="text-xs text-gray-600">Resumen por alumno</p>
+                        <p className="text-[11px] text-gray-500">
+                          Solo muestra total y cantidad de pagos. Toca un alumno para ver el histórico.
+                        </p>
                       </div>
-                    ))}
-                  </div>
 
-                  {/* Vista desktop: tabla clásica */}
-                  <div className="overflow-x-auto mt-3 hidden md:block">
-                    <table className="min-w-full text-xs md:text-sm">
-                      <thead>
-                        <tr className="bg-gray-50 text-left">
-                          <th className="px-3 py-2 border-b">Fecha</th>
-                          <th className="px-3 py-2 border-b">Alumno</th>
-                          <th className="px-3 py-2 border-b">Plan</th>
-                          <th className="px-3 py-2 border-b">Método</th>
-                          <th className="px-3 py-2 border-b text-right">Monto</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {rows.map((r) => (
-                          <tr key={r.id} className="border-b last:border-b-0">
-                            <td className="px-3 py-2 align-top">
-                              {new Date(r.payment_date).toLocaleDateString()}
-                            </td>
-                            <td className="px-3 py-2 align-top">{r.student_name ?? r.student_id}</td>
-                            <td className="px-3 py-2 align-top">{r.plan_name ?? "-"}</td>
-                            <td className="px-3 py-2 align-top capitalize">{r.method}</td>
-                            <td className="px-3 py-2 align-top text-right">
-                              {formatPyg(r.amount)} {r.currency}
-                            </td>
-                          </tr>
+                      {/* Mobile: tarjetas */}
+                      <div className="space-y-2 md:hidden">
+                        {studentSummary.map((s) => (
+                          <button
+                            key={s.student_id}
+                            type="button"
+                            className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1 text-left w-full hover:bg-gray-50"
+                            onClick={() => {
+                              const detail = rows.filter((r) => r.student_id === s.student_id);
+                              setStudentDetailRows(detail);
+                              setStudentDetailName(s.student_name ?? s.student_id);
+                              setStudentDetailModalOpen(true);
+                            }}
+                          >
+                            <div className="flex justify-between gap-2">
+                              <span className="font-semibold text-[#31435d]">
+                                {s.student_name ?? s.student_id}
+                              </span>
+                              <span className="text-gray-500">
+                                {s.payments_count} pago{s.payments_count !== 1 ? "s" : ""}
+                              </span>
+                            </div>
+                            <div className="text-gray-600">
+                              <span className="font-semibold">Total:</span>{" "}
+                              {formatPyg(s.total_amount)} PYG
+                            </div>
+                          </button>
                         ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      </div>
+
+                      {/* Desktop: tabla */}
+                      <div className="overflow-x-auto hidden md:block">
+                        <table className="min-w-full text-xs md:text-sm">
+                          <thead>
+                            <tr className="bg-gray-50 text-left">
+                              <th className="px-3 py-2 border-b">Alumno</th>
+                              <th className="px-3 py-2 border-b text-right">Total pagado</th>
+                              <th className="px-3 py-2 border-b text-right">Pagos</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {studentSummary.map((s) => (
+                              <tr
+                                key={s.student_id}
+                                className="border-b last:border-b-0 cursor-pointer hover:bg-gray-50"
+                                onClick={() => {
+                                  const detail = rows.filter((r) => r.student_id === s.student_id);
+                                  setStudentDetailRows(detail);
+                                  setStudentDetailName(s.student_name ?? s.student_id);
+                                  setStudentDetailModalOpen(true);
+                                }}
+                              >
+                                <td className="px-3 py-2 align-top">{s.student_name ?? s.student_id}</td>
+                                <td className="px-3 py-2 align-top text-right">{formatPyg(s.total_amount)} PYG</td>
+                                <td className="px-3 py-2 align-top text-right">{s.payments_count}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -1872,7 +1932,7 @@ export default function ReportsPage() {
         </AnimatePresence>
       </div>
 
-      {/* Egresos por profesor y ganancia neta */}
+      {/* Egresos por profesor/cancha y ganancia neta */}
       <div className="border rounded-lg bg-white shadow-sm overflow-hidden">
         <button
           type="button"
@@ -1881,7 +1941,7 @@ export default function ReportsPage() {
         >
           <span className="inline-flex items-center gap-2">
             <Banknote className="w-4 h-4 text-[#3cadaf]" />
-            Egresos por profesor y ganancia neta
+            Egresos por profesor/cancha y ganancia neta
           </span>
           <span className="text-xs text-gray-500">{showCoachExpenses ? "▼" : "▲"}</span>
         </button>
@@ -1928,16 +1988,22 @@ export default function ReportsPage() {
                         {coachExpensesLoading ? "..." : `${formatPyg(coachExpensesTotal)} PYG`}
                       </p>
                     </div>
+                    <div>
+                      <p className="text-xs text-gray-600">Total alquiler de canchas</p>
+                      <p className="text-lg font-semibold text-[#31435d]">
+                        {rentExpensesLoading ? "..." : `${formatPyg(rentExpensesTotal)} PYG`}
+                      </p>
+                    </div>
                     <div className="flex flex-col items-start md:items-end gap-1 text-xs text-gray-500 relative">
                       <div>
                         <p className="text-xs text-gray-600">Ganancia neta (ingresos - egresos)</p>
                         <p className="text-lg font-semibold text-[#31435d]">
                           {coachExpensesLoading
                             ? "..."
-                            : `${formatPyg(totalAmount - coachExpensesTotal)} PYG`}
+                            : `${formatPyg(totalAmount - (coachExpensesTotal + rentExpensesTotal))} PYG`}
                         </p>
                       </div>
-                      {coachExpenses.length > 0 && (
+                      {(coachExpenses.length > 0 || rentExpenses.length > 0) && (
                         <div className="relative mt-1">
                           <button
                             type="button"
@@ -1945,7 +2011,7 @@ export default function ReportsPage() {
                             onClick={() =>
                               setExportMenu((m) => ({
                                 income: false,
-                                expensesCoach: !m.expensesCoach,
+                                expenses: !m.expenses,
                                 attendanceStudent: false,
                                 attendanceCoach: false,
                                 attendanceLocation: false,
@@ -1955,23 +2021,37 @@ export default function ReportsPage() {
                             <Download className="w-3 h-3" />
                             Exportar
                           </button>
-                          {exportMenu.expensesCoach && (
-                            <div className="absolute right-0 mt-1 w-40 border rounded bg-white shadow text-[11px] z-10">
+                          {exportMenu.expenses && (
+                            <div className="absolute left-0 md:left-auto md:right-0 mt-1 w-40 border rounded bg-white shadow text-[11px] z-10">
                               <button
                                 type="button"
                                 className="w-full px-3 py-1 text-left hover:bg-gray-50"
                                 onClick={() => {
-                                  exportToExcel(
-                                    `egresos-profesores-${fromDate || ""}-${toDate || ""}.xlsx`,
-                                    "Egresos por profesor",
-                                    coachExpenses.map((c) => ({
-                                      Profesor: c.coach_name ?? c.coach_id,
-                                      "Clases impartidas": c.classes_count,
-                                      "Tarifa por clase": c.fee_per_class ?? 0,
-                                      "Egreso total": c.total_expense,
+                                  const rowsToExport = [
+                                    ...coachExpenses.map((c) => ({
+                                      Categoria: 'Profesor',
+                                      Nombre: c.coach_name ?? c.coach_id,
+                                      Clases: c.classes_count,
+                                      'Tarifa por clase': c.fee_per_class ?? 0,
+                                      'Egreso total': c.total_expense,
+                                      Moneda: 'PYG',
                                     })),
+                                    ...rentExpenses.map((r) => ({
+                                      Categoria: 'Cancha',
+                                      Nombre: r.location_name ?? r.location_id,
+                                      Clases: r.classes_count,
+                                      'Tarifa por clase': '',
+                                      'Egreso total': r.rent_total,
+                                      Moneda: 'PYG',
+                                    })),
+                                  ];
+
+                                  exportToExcel(
+                                    `egresos-${fromDate || ""}-${toDate || ""}.xlsx`,
+                                    "Egresos",
+                                    rowsToExport,
                                   );
-                                  setExportMenu((m) => ({ ...m, expensesCoach: false }));
+                                  setExportMenu((m) => ({ ...m, expenses: false }));
                                 }}
                               >
                                 Excel (.xlsx)
@@ -1980,23 +2060,39 @@ export default function ReportsPage() {
                                 type="button"
                                 className="w-full px-3 py-1 text-left hover:bg-gray-50"
                                 onClick={() => {
-                                  exportToPdf(
-                                    `egresos-profesores-${fromDate || ""}-${toDate || ""}.pdf`,
-                                    "Egresos por profesor",
-                                    [
-                                      "Profesor",
-                                      "Clases impartidas",
-                                      "Tarifa por clase",
-                                      "Egreso total",
-                                    ],
-                                    coachExpenses.map((c) => [
+                                  const rowsToExport = [
+                                    ...coachExpenses.map((c) => [
+                                      'Profesor',
                                       c.coach_name ?? c.coach_id,
                                       String(c.classes_count),
                                       String(c.fee_per_class ?? 0),
                                       String(c.total_expense),
+                                      'PYG',
                                     ]),
+                                    ...rentExpenses.map((r) => [
+                                      'Cancha',
+                                      r.location_name ?? r.location_id,
+                                      String(r.classes_count),
+                                      '',
+                                      String(r.rent_total),
+                                      'PYG',
+                                    ]),
+                                  ];
+
+                                  exportToPdf(
+                                    `egresos-${fromDate || ""}-${toDate || ""}.pdf`,
+                                    "Egresos",
+                                    [
+                                      'Categoria',
+                                      'Nombre',
+                                      'Clases',
+                                      'Tarifa por clase',
+                                      'Egreso total',
+                                      'Moneda',
+                                    ],
+                                    rowsToExport,
                                   );
-                                  setExportMenu((m) => ({ ...m, expensesCoach: false }));
+                                  setExportMenu((m) => ({ ...m, expenses: false }));
                                 }}
                               >
                                 PDF (.pdf)
@@ -2052,7 +2148,7 @@ export default function ReportsPage() {
                         <BarChart
                           data={[
                             { label: "Ingresos", value: totalAmount },
-                            { label: "Egresos", value: coachExpensesTotal },
+                            { label: "Egresos", value: coachExpensesTotal + rentExpensesTotal },
                           ]}
                           margin={{ top: 8, right: 16, left: 24, bottom: 8 }}
                         >
@@ -2083,140 +2179,87 @@ export default function ReportsPage() {
                 </div>
               )}
 
+              {(rentExpenses.length > 0 || rentExpensesLoading) && (
+                <div className="border rounded-lg bg-white p-3 space-y-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-gray-600">Detalle de alquiler por sede</p>
+                      <p className="text-[11px] text-gray-500">
+                        Se calcula por clase (60 min) y solo cuenta clases con al menos 1 alumno.
+                      </p>
+                    </div>
+                  </div>
+
+                  {rentExpensesLoading ? (
+                    <p className="text-xs text-gray-600">Calculando alquiler...</p>
+                  ) : rentExpenses.length === 0 ? (
+                    <p className="text-xs text-gray-600">Sin alquiler calculado para el rango.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full text-xs md:text-sm">
+                        <thead>
+                          <tr className="bg-gray-50 text-left">
+                            <th className="px-3 py-2 border-b">Sede</th>
+                            <th className="px-3 py-2 border-b text-right">Clases</th>
+                            <th className="px-3 py-2 border-b text-right">Alquiler total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rentExpenses.map((r) => (
+                            <tr key={r.location_id} className="border-b last:border-b-0">
+                              <td className="px-3 py-2 align-top">{r.location_name ?? r.location_id}</td>
+                              <td className="px-3 py-2 align-top text-right">{r.classes_count}</td>
+                              <td className="px-3 py-2 align-top text-right">{formatPyg(r.rent_total)} PYG</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {coachExpenses.length > 0 && (
-                <div className="overflow-x-auto mt-2">
-                  <table className="min-w-full text-xs md:text-sm">
-                    <thead>
-                      <tr className="bg-gray-50 text-left">
-                        <th className="px-3 py-2 border-b">Profesor</th>
-                        <th className="px-3 py-2 border-b text-right">Clases impartidas</th>
-                        <th className="px-3 py-2 border-b text-right">Tarifa/clase</th>
-                        <th className="px-3 py-2 border-b text-right">Egreso total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {coachExpenses.map((c) => (
-                        <tr key={c.coach_id} className="border-b last:border-b-0">
-                          <td className="px-3 py-2 align-top">{c.coach_name ?? c.coach_id}</td>
-                          <td className="px-3 py-2 align-top text-right">{c.classes_count}</td>
-                          <td className="px-3 py-2 align-top text-right">
-                            {c.fee_per_class != null ? `${formatPyg(c.fee_per_class)} PYG` : "Sin tarifa"}
-                          </td>
-                          <td className="px-3 py-2 align-top text-right">
-                            {formatPyg(c.total_expense)} PYG
-                          </td>
+                <div className="border rounded-lg bg-white p-3 space-y-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-gray-600">Detalle de egresos por profesor</p>
+                      <p className="text-[11px] text-gray-500">
+                        Se calcula como clases impartidas × tarifa por clase.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-xs md:text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 text-left">
+                          <th className="px-3 py-2 border-b">Profesor</th>
+                          <th className="px-3 py-2 border-b text-right">Clases impartidas</th>
+                          <th className="px-3 py-2 border-b text-right">Tarifa/clase</th>
+                          <th className="px-3 py-2 border-b text-right">Egreso total</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {coachExpenses.map((c) => (
+                          <tr key={c.coach_id} className="border-b last:border-b-0">
+                            <td className="px-3 py-2 align-top">{c.coach_name ?? c.coach_id}</td>
+                            <td className="px-3 py-2 align-top text-right">{c.classes_count}</td>
+                            <td className="px-3 py-2 align-top text-right">
+                              {c.fee_per_class != null ? `${formatPyg(c.fee_per_class)} PYG` : "Sin tarifa"}
+                            </td>
+                            <td className="px-3 py-2 align-top text-right">{formatPyg(c.total_expense)} PYG</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               )}
             </motion.div>
           )}
         </AnimatePresence>
       </div>
-
-      {/* Resumen por alumno */}
-      {studentSummary.length > 0 && (
-        <div className="border rounded-lg bg-white shadow_sm">
-          <button
-            type="button"
-            className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
-            onClick={() => setShowStudentSummary((v) => !v)}
-          >
-            <span className="inline-flex items-center gap-2">
-              <Users className="w-4 h-4 text-sky-500" />
-              Resumen por alumno
-            </span>
-            <span className="text-xs text-gray-500">{showStudentSummary ? '▼' : '▲'}</span>
-          </button>
-          <AnimatePresence initial={false}>
-            {showStudentSummary && (
-              <motion.div
-                key="student-summary-content"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.18, ease: "easeOut" }}
-                className="p-4 space-y-3 origin-top"
-              >
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                <p className="text-xs text-gray-500">
-                  Ordenado por monto total pagado (de mayor a menor).
-                </p>
-              </div>
-
-              {/* Mobile: tarjetas */}
-              <div className="mt-2 space-y-2 md:hidden">
-                {studentSummary.map((s) => (
-                  <button
-                    key={s.student_id}
-                    type="button"
-                    className="border rounded-lg px-3 py-2 text-xs bg-white flex flex-col gap-1 text-left w-full"
-                    onClick={() => {
-                      const detail = rows.filter((r) => r.student_id === s.student_id);
-                      setStudentDetailRows(detail);
-                      setStudentDetailName(s.student_name ?? s.student_id);
-                      setStudentDetailModalOpen(true);
-                    }}
-                  >
-                    <div className="flex justify-between gap-2">
-                      <span className="font-semibold text-[#31435d]">
-                        {s.student_name ?? s.student_id}
-                      </span>
-                      <span className="text-gray-500">
-                        {s.payments_count} pago{s.payments_count !== 1 ? 's' : ''}
-                      </span>
-                    </div>
-                    <div className="text-gray-600">
-                      <span className="font-semibold">Total:</span>{' '}
-                      {formatPyg(s.total_amount)} PYG
-                    </div>
-                  </button>
-                ))}
-              </div>
-
-              {/* Desktop: tabla */}
-              <div className="overflow-x-auto mt-2 hidden md:block">
-                <table className="min-w-full text-xs md:text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 text-left">
-                      <th className="px-3 py-2 border-b">Alumno</th>
-                      <th className="px-3 py-2 border-b text-right">Total pagado</th>
-                      <th className="px-3 py-2 border-b text-right">Pagos</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {studentSummary.map((s) => (
-                      <tr
-                        key={s.student_id}
-                        className="border-b last:border-b-0 cursor-pointer hover:bg-gray-50"
-                        onClick={() => {
-                          const detail = rows.filter((r) => r.student_id === s.student_id);
-                          setStudentDetailRows(detail);
-                          setStudentDetailName(s.student_name ?? s.student_id);
-                          setStudentDetailModalOpen(true);
-                        }}
-                      >
-                        <td className="px-3 py-2 align-top">
-                          {s.student_name ?? s.student_id}
-                        </td>
-                        <td className="px-3 py-2 align-top text-right">
-                          {formatPyg(s.total_amount)} PYG
-                        </td>
-                        <td className="px-3 py-2 align-top text-right">
-                          {s.payments_count}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
       {/* Resumen por plan */}
       {planSummary.length > 0 && (
         <div className="border rounded-lg bg-white shadow-sm overflow-hidden">
@@ -2384,7 +2427,7 @@ export default function ReportsPage() {
                         onClick={() =>
                           setExportMenu((m) => ({
                             income: false,
-                            expensesCoach: false,
+                            expenses: false,
                             attendanceStudent: !m.attendanceStudent,
                             attendanceCoach: false,
                             attendanceLocation: false,
@@ -2686,7 +2729,7 @@ export default function ReportsPage() {
                         onClick={() =>
                           setExportMenu((m) => ({
                             income: false,
-                            expensesCoach: false,
+                            expenses: false,
                             attendanceStudent: false,
                             attendanceCoach: !m.attendanceCoach,
                             attendanceLocation: false,
@@ -2988,7 +3031,7 @@ export default function ReportsPage() {
                         onClick={() =>
                           setExportMenu((m) => ({
                             income: false,
-                            expensesCoach: false,
+                            expenses: false,
                             attendanceStudent: false,
                             attendanceCoach: false,
                             attendanceLocation: !m.attendanceLocation,

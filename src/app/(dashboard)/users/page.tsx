@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
 import { formatPyg } from '@/lib/formatters';
 import { Users, UserPlus, ListChecks, Calendar as CalendarIcon, Trash2 } from 'lucide-react';
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 
 const ROLES = ['admin', 'coach', 'student'] as const;
@@ -86,6 +87,11 @@ type UserRow = {
   role: Role;
 };
 
+type UserAcademyStatus = {
+  academy_id: string;
+  is_active: boolean;
+};
+
 type UserRolesRow = {
   user_id: string;
   role: Role;
@@ -108,6 +114,12 @@ export default function UsersPage() {
   const [selectedRoles, setSelectedRoles] = useState<Role[]>(['student']);
 
   const [usersSearch, setUsersSearch] = useState('');
+
+  const [academyOptions, setAcademyOptions] = useState<AcademyOption[]>([]);
+  const [usersAcademyFilter, setUsersAcademyFilter] = useState<string>('all');
+  const [usersStatusFilter, setUsersStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
+  const [userAcademiesMap, setUserAcademiesMap] = useState<Record<string, string[]>>({});
+  const [userAcademyStatusMap, setUserAcademyStatusMap] = useState<Record<string, Record<string, boolean>>>({});
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -144,6 +156,9 @@ export default function UsersPage() {
   const [detailCoachAcademyId, setDetailCoachAcademyId] = useState<string | null>(null);
   const [detailCoachAcademies, setDetailCoachAcademies] = useState<AcademyOption[]>([]);
   const [detailCoachFeeAcademyId, setDetailCoachFeeAcademyId] = useState<string | null>(null);
+  const [detailAcademyStatuses, setDetailAcademyStatuses] = useState<UserAcademyStatus[]>([]);
+  const [detailStatusAcademyId, setDetailStatusAcademyId] = useState<string>('');
+  const [detailIsActive, setDetailIsActive] = useState(true);
 
   // Importación masiva desde CSV
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -165,6 +180,29 @@ export default function UsersPage() {
         setForbidden(true);
         setLoadingList(false);
         return;
+      }
+
+      const { data: uaAll } = await supabase
+        .from('user_academies')
+        .select('user_id, academy_id, is_active');
+      if (uaAll) {
+        const map: Record<string, string[]> = {};
+        const statusMap: Record<string, Record<string, boolean>> = {};
+        (uaAll as any[]).forEach((r) => {
+          const uid = r.user_id as string | null;
+          const aid = r.academy_id as string | null;
+          const active = (r.is_active as boolean | null | undefined) ?? true;
+          if (!uid || !aid) return;
+          if (!map[uid]) map[uid] = [];
+          if (!map[uid].includes(aid)) map[uid].push(aid);
+          if (!statusMap[uid]) statusMap[uid] = {};
+          statusMap[uid][aid] = active;
+        });
+        setUserAcademiesMap(map);
+        setUserAcademyStatusMap(statusMap);
+      } else {
+        setUserAcademiesMap({});
+        setUserAcademyStatusMap({});
       }
 
       setCurrentUserId(userId);
@@ -190,6 +228,15 @@ export default function UsersPage() {
         setForbidden(true);
         setLoadingList(false);
         return;
+      }
+
+      const { data: academiesData } = await supabase.from('academies').select('id, name').order('name');
+      if (active) {
+        const options = ((academiesData as any[]) ?? []).map((a) => ({
+          id: a.id as string,
+          name: (a.name as string | null) ?? (a.id as string),
+        }));
+        setAcademyOptions(options);
       }
 
       const [profilesRes, rolesRes] = await Promise.all([
@@ -540,9 +587,57 @@ export default function UsersPage() {
       }
     }
 
+    const { data: uaAll } = await supabase
+      .from('user_academies')
+      .select('user_id, academy_id, is_active');
+    if (uaAll) {
+      const map: Record<string, string[]> = {};
+      const statusMap: Record<string, Record<string, boolean>> = {};
+      (uaAll as any[]).forEach((r) => {
+        const uid = r.user_id as string | null;
+        const aid = r.academy_id as string | null;
+        const active = (r.is_active as boolean | null | undefined) ?? true;
+        if (!uid || !aid) return;
+        if (!map[uid]) map[uid] = [];
+        if (!map[uid].includes(aid)) map[uid].push(aid);
+        if (!statusMap[uid]) statusMap[uid] = {};
+        statusMap[uid][aid] = active;
+      });
+      setUserAcademiesMap(map);
+      setUserAcademyStatusMap(statusMap);
+    } else {
+      setUserAcademiesMap({});
+      setUserAcademyStatusMap({});
+    }
+
     setUsers(finalUsers);
     setUserRoles(finalUserRoles);
   };
+
+  const filteredUsers = useMemo(() => {
+    return users
+      .filter((u) => {
+        const term = usersSearch.trim().toLowerCase();
+        if (!term) return true;
+        const name = (u.full_name ?? '').toLowerCase();
+        const mainRole = String(u.role ?? '').toLowerCase();
+        const roles = rolesForUser(u.id).join(', ').toLowerCase();
+        return name.includes(term) || mainRole.includes(term) || roles.includes(term);
+      })
+      .filter((u) => {
+        if (usersStatusFilter === 'all') return true;
+        if (role !== 'super_admin') return true;
+        if (usersAcademyFilter === 'all') return true;
+        const isActive = (userAcademyStatusMap[u.id]?.[usersAcademyFilter] ?? true) === true;
+        return usersStatusFilter === 'active' ? isActive : !isActive;
+      })
+      .filter((u) => {
+        if (role !== 'super_admin') return true;
+        if (usersAcademyFilter === 'all') return true;
+        const academies = userAcademiesMap[u.id] ?? [];
+        return academies.includes(usersAcademyFilter);
+      });
+  }, [role, users, usersAcademyFilter, usersSearch, usersStatusFilter, userAcademiesMap, userAcademyStatusMap, userRoles]);
 
   const openUserDetail = async (userId: string) => {
     setDetailOpen(true);
@@ -575,6 +670,27 @@ export default function UsersPage() {
       setDetailPhone(((u.metaPhone as string | null) ?? u.phone ?? '+595') || '+595');
       setDetailEmail((u.email as string | null) ?? '');
       setDetailBirthDate((u.birthDate as string | null) ?? '');
+
+      const academies = ((u.academies as any[]) ?? []) as {
+        academy_id: string;
+        academy_name: string;
+        is_active: boolean;
+      }[];
+      const statuses: UserAcademyStatus[] = academies
+        .filter((a) => !!a?.academy_id)
+        .map((a) => ({ academy_id: a.academy_id, is_active: (a.is_active ?? true) === true }));
+      setDetailAcademyStatuses(statuses);
+
+      const preferredAcademyForStatus =
+        usersAcademyFilter !== 'all' && statuses.some((s) => s.academy_id === usersAcademyFilter)
+          ? usersAcademyFilter
+          : statuses[0]?.academy_id ?? '';
+      setDetailStatusAcademyId(preferredAcademyForStatus);
+      setDetailIsActive(
+        preferredAcademyForStatus
+          ? (statuses.find((s) => s.academy_id === preferredAcademyForStatus)?.is_active ?? true)
+          : true,
+      );
       const roles: string[] = (u.roles as string[] | undefined) ?? [];
       const validRoles = roles.filter((r) => (ROLES as readonly string[]).includes(r)) as Role[];
       setDetailRoles(validRoles.length ? validRoles : ['student']);
@@ -657,6 +773,8 @@ export default function UsersPage() {
           email: detailEmail,
           birthDate: detailBirthDate,
           roles: detailRoles,
+          academyId: isSuperAdmin ? (detailStatusAcademyId || null) : null,
+          academyIsActive: isSuperAdmin ? detailIsActive : null,
         }),
       });
       const json = await res.json();
@@ -1061,7 +1179,7 @@ export default function UsersPage() {
               <p className="text-sm text-gray-600">Todavía no hay usuarios registrados.</p>
             ) : (
               <div className="space-y-3">
-                <div className="max-w-xs">
+                <div className="grid gap-3 md:grid-cols-3">
                   <label className="block text-xs mb-1 text-gray-600">Buscar usuario</label>
                   <Input
                     type="text"
@@ -1071,6 +1189,38 @@ export default function UsersPage() {
                     className="h-10 text-base"
                   />
                 </div>
+
+                {isSuperAdmin && (
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div>
+                      <label className="block text-xs mb-1 text-gray-600">Filtrar por academia</label>
+                      <select
+                        className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/50"
+                        value={usersAcademyFilter}
+                        onChange={(e) => setUsersAcademyFilter(e.target.value)}
+                      >
+                        <option value="all">Todas</option>
+                        {academyOptions.map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs mb-1 text-gray-600">Filtrar por estado</label>
+                      <select
+                        className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/50"
+                        value={usersStatusFilter}
+                        onChange={(e) => setUsersStatusFilter(e.target.value as any)}
+                      >
+                        <option value="all">Todos</option>
+                        <option value="active">Activos</option>
+                        <option value="inactive">Inactivos</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
 
                 <div className="overflow-x-auto">
                 <table className="min-w-full text-sm border-collapse">
@@ -1082,29 +1232,36 @@ export default function UsersPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {users
-                      .filter((u) => {
-                        const term = usersSearch.trim().toLowerCase();
-                        if (!term) return true;
-                        const name = (u.full_name ?? '').toLowerCase();
-                        const mainRole = String(u.role ?? '').toLowerCase();
-                        const roles = rolesForUser(u.id).join(', ').toLowerCase();
-                        return name.includes(term) || mainRole.includes(term) || roles.includes(term);
-                      })
-                      .map((u) => {
-                        const allRoles = rolesForUser(u.id);
-                        return (
-                          <tr
-                            key={u.id}
-                            className="border-b last:border-b-0 hover:bg-gray-50 cursor-pointer"
-                            onClick={() => openUserDetail(u.id)}
-                          >
-                            <td className="py-2 px-3 whitespace-nowrap">{u.full_name ?? '(Sin nombre)'}</td>
-                            <td className="py-2 px-3 whitespace-nowrap">{u.role}</td>
-                            <td className="py-2 px-3 text-xs text-gray-700">{allRoles.join(', ') || '-'}</td>
-                          </tr>
-                        );
-                      })}
+                    {filteredUsers.map((u) => {
+                      const allRoles = rolesForUser(u.id);
+                      const isRowInactive =
+                        isSuperAdmin &&
+                        usersAcademyFilter !== 'all' &&
+                        (userAcademyStatusMap[u.id]?.[usersAcademyFilter] ?? true) === false;
+                      return (
+                        <tr
+                          key={u.id}
+                          className={
+                            'border-b last:border-b-0 cursor-pointer ' +
+                            (isRowInactive ? 'bg-rose-50/60 hover:bg-rose-50 ' : 'hover:bg-gray-50 ')
+                          }
+                          onClick={() => openUserDetail(u.id)}
+                        >
+                          <td className={"py-2 px-3 whitespace-nowrap " + (isRowInactive ? 'text-rose-700' : '')}>
+                            {u.full_name ?? '(Sin nombre)'}
+                            {isRowInactive && (
+                              <span className="ml-2 text-[11px] font-medium text-rose-700/90">(Inactivo)</span>
+                            )}
+                          </td>
+                          <td className={"py-2 px-3 whitespace-nowrap " + (isRowInactive ? 'text-rose-700/80' : '')}>
+                            {u.role}
+                          </td>
+                          <td className={"py-2 px-3 text-xs " + (isRowInactive ? 'text-rose-700/80' : 'text-gray-700')}>
+                            {allRoles.join(', ') || '-'}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
                 </div>
@@ -1135,6 +1292,57 @@ export default function UsersPage() {
                   onSubmit={isAdminReadOnly ? (e) => e.preventDefault() : handleUpdateUser}
                   className="space-y-3"
                 >
+                  {isSuperAdmin && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <label className="block text-sm mb-1">Estado</label>
+                          <p className="text-xs text-gray-500">Usuario activo/inactivo por academia</p>
+                        </div>
+                        <Switch
+                          checked={detailIsActive}
+                          onCheckedChange={(checked: boolean) => {
+                            setDetailIsActive(checked);
+                            setDetailAcademyStatuses((prev) =>
+                              prev.map((s) =>
+                                s.academy_id === detailStatusAcademyId ? { ...s, is_active: checked } : s,
+                              ),
+                            );
+                          }}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs mb-1 text-gray-600">Academia</label>
+                        <select
+                          className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/50"
+                          value={detailStatusAcademyId}
+                          onChange={(e) => {
+                            const nextAcademyId = e.target.value;
+                            setDetailStatusAcademyId(nextAcademyId);
+                            const nextActive =
+                              detailAcademyStatuses.find((s) => s.academy_id === nextAcademyId)?.is_active ??
+                              true;
+                            setDetailIsActive(nextActive);
+                          }}
+                          disabled={detailAcademyStatuses.length === 0}
+                        >
+                          {detailAcademyStatuses.length === 0 ? (
+                            <option value="">Sin academias asignadas</option>
+                          ) : (
+                            detailAcademyStatuses.map((s) => {
+                              const name = academyOptions.find((a) => a.id === s.academy_id)?.name ?? s.academy_id;
+                              return (
+                                <option key={s.academy_id} value={s.academy_id}>
+                                  {name}
+                                </option>
+                              );
+                            })
+                          )}
+                        </select>
+                      </div>
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm mb-1">Nombre</label>

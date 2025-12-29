@@ -5,8 +5,72 @@ import Image from "next/image";
 import Link from "next/link";
 import { createClientBrowser } from "@/lib/supabase";
 import { Bell, BellOff } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Calendar as CalendarIcon, ChevronDown, ChevronRight } from "lucide-react";
 
 type AppRole = "super_admin" | "admin" | "coach" | "student" | null;
+
+type DatePickerFieldProps = {
+  value: string;
+  onChange: (value: string) => void;
+};
+
+function parseYmd(value: string): Date | undefined {
+  if (!value) return undefined;
+  const parts = value.split("-");
+  if (parts.length !== 3) return undefined;
+  const [y, m, d] = parts.map((p) => Number(p));
+  if (!y || !m || !d) return undefined;
+  const date = new Date(y, m - 1, d);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date;
+}
+
+function formatYmd(date: Date | undefined): string {
+  if (!date) return "";
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function formatDisplay(date: Date | undefined): string {
+  if (!date) return "Seleccionar fecha";
+  return date.toLocaleDateString("es-PY");
+}
+
+function DatePickerField({ value, onChange }: DatePickerFieldProps) {
+  const selectedDate = parseYmd(value);
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full justify-start text-left text-base font-normal flex items-center gap-2 h-10"
+        >
+          <CalendarIcon className="h-4 w-4 text-gray-500" />
+          <span className={selectedDate ? "" : "text-gray-400"}>{formatDisplay(selectedDate)}</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={selectedDate}
+          onSelect={(date) => {
+            if (!date) return;
+            onChange(formatYmd(date));
+          }}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 export default function SettingsPage() {
   const supabase = createClientBrowser();
@@ -30,6 +94,7 @@ export default function SettingsPage() {
   const [rentCourtValues, setRentCourtValues] = useState<
     Record<string, { feePerClass: string; validFrom: string }>
   >({});
+  const [rentOpenLocations, setRentOpenLocations] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     (async () => {
@@ -173,6 +238,16 @@ export default function SettingsPage() {
         const courts = (courtsRes.data ?? []) as { id: string; name: string | null; location_id: string | null }[];
         setRentLocations(locs);
         setRentCourts(courts);
+
+        setRentOpenLocations((prev) => {
+          const next: Record<string, boolean> = { ...prev };
+          for (const l of locs) {
+            if (typeof next[l.id] !== 'boolean') {
+              next[l.id] = locs.length === 1;
+            }
+          }
+          return next;
+        });
 
         const feesRes = await fetch('/api/admin/get-rent-fees', {
           method: 'POST',
@@ -501,99 +576,118 @@ export default function SettingsPage() {
                     validFrom: new Date().toISOString().slice(0, 10),
                   };
                   const courtsForLoc = rentCourts.filter((c) => c.location_id === loc.id);
+                  const isOpen = !!rentOpenLocations[loc.id];
 
                   return (
                     <div key={loc.id} className="border rounded-md p-3">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="text-sm font-semibold text-[#31435d]">{loc.name ?? loc.id}</p>
-                          <p className="text-xs text-gray-500">Tarifa base por sede (si no hay override por cancha)</p>
-                        </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setRentOpenLocations((prev) => ({
+                            ...prev,
+                            [loc.id]: !prev[loc.id],
+                          }))
+                        }
+                        className="w-full flex items-center justify-between gap-3 text-left"
+                      >
                         <div className="flex items-center gap-2">
-                          <div className="flex flex-col gap-1">
-                            <label className="text-[11px] text-gray-600">Vigente desde</label>
-                            <input
-                              type="date"
-                              value={locValue.validFrom}
-                              onChange={(e) =>
-                                setRentLocationValues((prev) => ({
-                                  ...prev,
-                                  [loc.id]: { ...locValue, validFrom: e.target.value },
-                                }))
-                              }
-                              className="rounded-md border border-gray-300 px-2 py-1 text-xs"
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <label className="text-[11px] text-gray-600">Alquiler por clase</label>
-                            <input
-                              type="number"
-                              inputMode="decimal"
-                              value={locValue.feePerClass}
-                              onChange={(e) =>
-                                setRentLocationValues((prev) => ({
-                                  ...prev,
-                                  [loc.id]: { ...locValue, feePerClass: e.target.value },
-                                }))
-                              }
-                              className="w-28 rounded-md border border-gray-300 px-2 py-1 text-xs"
-                              placeholder="0"
-                            />
+                          {isOpen ? (
+                            <ChevronDown className="w-4 h-4 text-gray-500" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-gray-500" />
+                          )}
+                          <div>
+                            <p className="text-sm font-semibold text-[#31435d]">{loc.name ?? loc.id}</p>
+                            <p className="text-xs text-gray-500">Canchas: {courtsForLoc.length}</p>
                           </div>
                         </div>
-                      </div>
+                        <div className="text-xs text-gray-600">
+                          {locValue.feePerClass ? `Base: ${locValue.feePerClass} PYG` : 'Sin base'}
+                        </div>
+                      </button>
 
-                      {courtsForLoc.length > 0 && (
-                        <div className="mt-3 space-y-2">
-                          <p className="text-xs font-semibold text-gray-700">Override por cancha (opcional)</p>
-                          <div className="space-y-2">
-                            {courtsForLoc.map((c) => {
-                              const cValue = rentCourtValues[c.id] ?? {
-                                feePerClass: '',
-                                validFrom: new Date().toISOString().slice(0, 10),
-                              };
-                              return (
-                                <div
-                                  key={c.id}
-                                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border rounded-md px-2 py-2"
-                                >
-                                  <div className="text-xs font-medium text-[#31435d]">{c.name ?? c.id}</div>
-                                  <div className="flex items-center gap-2">
-                                    <div className="flex flex-col gap-1">
-                                      <label className="text-[11px] text-gray-600">Vigente desde</label>
-                                      <input
-                                        type="date"
-                                        value={cValue.validFrom}
-                                        onChange={(e) =>
-                                          setRentCourtValues((prev) => ({
-                                            ...prev,
-                                            [c.id]: { ...cValue, validFrom: e.target.value },
-                                          }))
-                                        }
-                                        className="rounded-md border border-gray-300 px-2 py-1 text-xs"
-                                      />
-                                    </div>
-                                    <div className="flex flex-col gap-1">
-                                      <label className="text-[11px] text-gray-600">Alquiler por clase</label>
-                                      <input
-                                        type="number"
-                                        inputMode="decimal"
-                                        value={cValue.feePerClass}
-                                        onChange={(e) =>
-                                          setRentCourtValues((prev) => ({
-                                            ...prev,
-                                            [c.id]: { ...cValue, feePerClass: e.target.value },
-                                          }))
-                                        }
-                                        className="w-28 rounded-md border border-gray-300 px-2 py-1 text-xs"
-                                        placeholder="(usa tarifa base)"
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
+                      {isOpen && (
+                        <div className="mt-3 space-y-3">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="flex flex-col gap-1">
+                              <label className="text-sm text-gray-600">Vigente desde (base sede)</label>
+                              <DatePickerField
+                                value={locValue.validFrom}
+                                onChange={(value) =>
+                                  setRentLocationValues((prev) => ({
+                                    ...prev,
+                                    [loc.id]: { ...locValue, validFrom: value },
+                                  }))
+                                }
+                              />
+                            </div>
+
+                            <div className="flex flex-col gap-1">
+                              <label className="text-sm text-gray-600">Alquiler base por clase</label>
+                              <Input
+                                type="number"
+                                inputMode="decimal"
+                                value={locValue.feePerClass}
+                                onChange={(e) =>
+                                  setRentLocationValues((prev) => ({
+                                    ...prev,
+                                    [loc.id]: { ...locValue, feePerClass: e.target.value },
+                                  }))
+                                }
+                                className="h-10 text-base"
+                                placeholder="0"
+                              />
+                            </div>
                           </div>
+
+                          {courtsForLoc.length > 0 && (
+                            <div className="mt-1 space-y-2">
+                              <p className="text-sm font-semibold text-gray-700">Overrides por cancha (opcional)</p>
+                              <div className="space-y-2">
+                                {courtsForLoc.map((c) => {
+                                  const cValue = rentCourtValues[c.id] ?? {
+                                    feePerClass: '',
+                                    validFrom: new Date().toISOString().slice(0, 10),
+                                  };
+                                  return (
+                                    <div key={c.id} className="border rounded-md p-2">
+                                      <p className="text-sm font-medium text-[#31435d]">{c.name ?? c.id}</p>
+                                      <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <div className="flex flex-col gap-1">
+                                          <label className="text-sm text-gray-600">Vigente desde (override)</label>
+                                          <DatePickerField
+                                            value={cValue.validFrom}
+                                            onChange={(value) =>
+                                              setRentCourtValues((prev) => ({
+                                                ...prev,
+                                                [c.id]: { ...cValue, validFrom: value },
+                                              }))
+                                            }
+                                          />
+                                        </div>
+                                        <div className="flex flex-col gap-1">
+                                          <label className="text-sm text-gray-600">Alquiler por clase</label>
+                                          <Input
+                                            type="number"
+                                            inputMode="decimal"
+                                            value={cValue.feePerClass}
+                                            onChange={(e) =>
+                                              setRentCourtValues((prev) => ({
+                                                ...prev,
+                                                [c.id]: { ...cValue, feePerClass: e.target.value },
+                                              }))
+                                            }
+                                            className="h-10 text-base"
+                                            placeholder="(usa tarifa base)"
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
