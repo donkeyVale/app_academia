@@ -980,12 +980,12 @@ export default function SchedulePage() {
     if (scope === 'today') {
       const start = new Date(now);
       start.setHours(0, 0, 0, 0);
-      const end = new Date(now);
-      end.setHours(23, 59, 59, 999);
 
       const toLocalInput = (d: Date) => d.toISOString().slice(0, 16);
       setFilterFrom(toLocalInput(start));
-      setFilterTo(toLocalInput(end));
+      // No limitamos "Hasta" a hoy, porque si no se ocultan las clases de mañana.
+      // El filtro "Desde" sirve para enfocarse en clases de hoy en adelante.
+      setFilterTo('');
       setShowUpcomingSection(true);
     } else if (scope === 'week') {
       const weekStart = new Date(now);
@@ -2594,7 +2594,7 @@ export default function SchedulePage() {
         )}
       </div>
 
-      {role !== 'student' && recentClasses.length > 0 && (
+      {role !== 'student' && (
         <div className="border rounded-lg bg-white shadow-sm overflow-hidden">
           <button
             type="button"
@@ -2618,64 +2618,70 @@ export default function SchedulePage() {
                 className="p-4 space-y-4 origin-top"
               >
                 <p className="text-xs text-gray-500">
-                  Usá esta lista para marcar asistencia en clases que ya terminaron pero aún son recientes (últimas 6 horas).
+                  Usá esta lista para marcar asistencia en clases que ya terminaron pero aún son recientes (últimas 24 horas).
                 </p>
-                <ul className="space-y-3">
-                {(showAllRecent ? recentClasses : recentClasses.slice(0, 5)).map((cls) => {
-                  const d = new Date(cls.date);
-                  const yyyy = d.getFullYear();
-                  const mm = String(d.getMonth() + 1).padStart(2, '0');
-                  const dd = String(d.getDate()).padStart(2, '0');
-                  const hh = String(d.getHours()).padStart(2, '0');
-                  const min = String(d.getMinutes()).padStart(2, '0');
-                  const court = cls.court_id ? courtsMap[cls.court_id] : undefined;
-                  const studentIds = studentsByClass[cls.id] ?? [];
-                  const studentsCountLabel = studentIds.length === 0 ? '-' : `${studentIds.length}`;
-                  return (
-                    <li
-                      key={cls.id}
-                      className="max-w-full overflow-hidden rounded-lg border bg-white p-3 text-xs shadow-sm transition hover:border-[#dbeafe] hover:shadow-md sm:text-sm"
-                    >
-                      <div className="flex max-w-full flex-col items-start justify-between gap-2 sm:flex-row">
-                        <div className="min-w-0 space-y-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="inline-flex items-center rounded-full bg-[#e0f2fe] px-2 py-0.5 text-[11px] font-medium text-[#075985]">
-                              {dd}/{mm}/{yyyy} • {hh}:{min}
-                            </span>
-                            <span className="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200">
-                              Cancha: {court?.name ?? '-'}
-                            </span>
-                            <span className="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200">
-                              Alumnos: {studentsCountLabel}
-                            </span>
+                {recentClasses.length === 0 ? (
+                  <p className="text-sm text-gray-600">
+                    No hay clases recientes para marcar asistencia.
+                  </p>
+                ) : (
+                  <ul className="space-y-3">
+                    {(showAllRecent ? recentClasses : recentClasses.slice(0, 5)).map((cls) => {
+                      const d = new Date(cls.date);
+                      const yyyy = d.getFullYear();
+                      const mm = String(d.getMonth() + 1).padStart(2, '0');
+                      const dd = String(d.getDate()).padStart(2, '0');
+                      const hh = String(d.getHours()).padStart(2, '0');
+                      const min = String(d.getMinutes()).padStart(2, '0');
+                      const court = cls.court_id ? courtsMap[cls.court_id] : undefined;
+                      const studentIds = studentsByClass[cls.id] ?? [];
+                      const studentsCountLabel = studentIds.length === 0 ? '-' : `${studentIds.length}`;
+                      return (
+                        <li
+                          key={cls.id}
+                          className="max-w-full overflow-hidden rounded-lg border bg-white p-3 text-xs shadow-sm transition hover:border-[#dbeafe] hover:shadow-md sm:text-sm"
+                        >
+                          <div className="flex max-w-full flex-col items-start justify-between gap-2 sm:flex-row">
+                            <div className="min-w-0 space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="inline-flex items-center rounded-full bg-[#e0f2fe] px-2 py-0.5 text-[11px] font-medium text-[#075985]">
+                                  {dd}/{mm}/{yyyy} • {hh}:{min}
+                                </span>
+                                <span className="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200">
+                                  Cancha: {court?.name ?? '-'}
+                                </span>
+                                <span className="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200">
+                                  Alumnos: {studentsCountLabel}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex w-full items-center justify-start gap-2 sm:w-auto sm:justify-end">
+                              <button
+                                type="button"
+                                className="text-[11px] px-3 py-1 rounded bg-[#3cadaf] text-white hover:bg-[#31435d] sm:text-xs"
+                                onClick={() => openAttendance(cls)}
+                              >
+                                Asistencia
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                        <div className="flex w-full items-center justify-start gap-2 sm:w-auto sm:justify-end">
-                          <button
-                            type="button"
-                            className="text-[11px] px-3 py-1 rounded bg-[#3cadaf] text-white hover:bg-[#31435d] sm:text-xs"
-                            onClick={() => openAttendance(cls)}
-                          >
-                            Asistencia
-                          </button>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
-              {recentClasses.length > 5 && (
-                <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
-                  {!showAllRecent && <p>Mostrando las 5 clases recientes más cercanas.</p>}
-                  <button
-                    type="button"
-                    className="text-[#3cadaf] hover:underline"
-                    onClick={() => setShowAllRecent((v) => !v)}
-                  >
-                    {showAllRecent ? 'Ver menos' : 'Ver más'}
-                  </button>
-                </div>
-              )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                {recentClasses.length > 5 && (
+                  <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+                    {!showAllRecent && <p>Mostrando las 5 clases recientes más cercanas.</p>}
+                    <button
+                      type="button"
+                      className="text-[#3cadaf] hover:underline"
+                      onClick={() => setShowAllRecent((v) => !v)}
+                    >
+                      {showAllRecent ? 'Ver menos' : 'Ver más'}
+                    </button>
+                  </div>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

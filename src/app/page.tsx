@@ -241,6 +241,75 @@ export default function HomePage() {
 
         // Cargar academias asignadas al usuario (para selector de academia actual)
         try {
+          if (isSuperAdmin) {
+            const { data: acadRows, error: acadErr } = await supabase
+              .from('academies')
+              .select('id,name')
+              .order('name');
+
+            if (acadErr) {
+              setHasAcademies(false);
+              setAcademyOptions([]);
+              setSelectedAcademyId(null);
+              if (typeof window !== 'undefined') {
+                window.localStorage.removeItem('selectedAcademyId');
+              }
+            } else {
+              const options = (acadRows as { id: string; name: string | null }[]).map((a) => ({
+                id: a.id,
+                name: a.name ?? a.id,
+              }));
+              setAcademyOptions(options);
+              setHasAcademies(options.length > 0);
+
+              let stored: string | null = null;
+              if (typeof window !== 'undefined') {
+                stored = window.localStorage.getItem('selectedAcademyId');
+              }
+              const validIds = options.map((o) => o.id);
+
+              const profileDefault = (profile as any)?.default_academy_id as string | null | undefined;
+              let initial: string | null = null;
+              if (profileDefault && validIds.includes(profileDefault)) {
+                initial = profileDefault;
+              } else if (stored && validIds.includes(stored)) {
+                initial = stored;
+              } else {
+                initial = validIds[0] ?? null;
+              }
+
+              setSelectedAcademyId(initial);
+              if (initial && typeof window !== 'undefined') {
+                window.localStorage.setItem('selectedAcademyId', initial);
+              }
+            }
+
+            // super_admin: acceso global, no depende de user_academies
+            // por lo tanto no aplicamos bloqueo por inactividad.
+            // seguimos con el resto del flujo (avatar, nombre, etc.)
+            const meta = (user?.user_metadata ?? {}) as any;
+            if (!displayName) {
+              const fn = (meta.first_name as string | null) ?? '';
+              const ln = (meta.last_name as string | null) ?? '';
+              const fullFromMeta = `${fn} ${ln}`.trim();
+              if (fullFromMeta) {
+                displayName = fullFromMeta;
+              }
+            }
+            if (!displayName) {
+              displayName = user?.email ?? null;
+            }
+            const avatarMeta = (meta.avatar_url as string | null) ?? null;
+            setAvatarUrl(avatarMeta);
+            const offX = Number(meta.avatar_offset_x ?? 0);
+            const offY = Number(meta.avatar_offset_y ?? 0);
+            setAvatarOffsetX(Number.isFinite(offX) ? offX : 0);
+            setAvatarOffsetY(Number.isFinite(offY) ? offY : 0);
+            setUserName(displayName);
+            setLoading(false);
+            return;
+          }
+
           const { data: uaRows, error: uaErr } = await supabase
             .from('user_academies')
             .select('academy_id, is_active')
