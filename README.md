@@ -1,36 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# App Academia
 
-## Getting Started
+Aplicación de gestión multi-academia (Next.js + Supabase) para:
+- agenda de clases
+- alumnos/planes/pagos
+- reportes (ingresos/egresos)
+- administración de usuarios y roles
 
-First, run the development server:
+## Stack
+- Next.js (App Router)
+- TypeScript
+- Supabase (Auth + DB)
+- UI: shadcn/ui (componentes) + Tailwind
 
+## Scripts
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run build
+npm run start
+npm run lint
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Variables de entorno
+Configurar en `.env.local`:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (solo server)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Roles y multi-academia
+- Los roles principales viven en `profiles.role`.
+- Roles adicionales viven en `user_roles`.
+- Relación usuario <-> academia vive en `user_academies`.
+- Estado activo/inactivo por academia: `user_academies.is_active`.
+- El rol `super_admin` tiene acceso global (no depende de `user_academies`).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Documentación
+- Notas de release: `docs/release-notes-2025-12-28.md`
+- Estructura DB (snapshot): `docs/db-estructura-28-12-2025.md`
