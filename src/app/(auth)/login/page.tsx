@@ -12,16 +12,17 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
+  const inactiveMsg = 'Tu usuario está inactivo en todas tus academias. Comunicate con el administrador.';
+  const getInactiveInfoFromUrl = () => {
+    if (typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.search);
+    return params.get('inactive') === '1' ? inactiveMsg : null;
+  };
+  const [info, setInfo] = useState<string | null>(() => getInactiveInfoFromUrl());
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('inactive') === '1') {
-      const msg = 'Tu usuario está inactivo en todas tus academias. Comunicate con el administrador.';
-      setInfo(msg);
-      toast.error(msg);
-    }
+    const msg = getInactiveInfoFromUrl();
+    if (msg) toast.error(msg);
   }, []);
 
   const onSubmit = async (e: React.FormEvent) => {
