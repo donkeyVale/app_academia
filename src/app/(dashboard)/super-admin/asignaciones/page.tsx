@@ -158,9 +158,11 @@ export default function AssignmentsPage() {
   const availableAcademies = useMemo(() => {
     if (!academies.length) return [] as Academy[];
     if (!assignments.length) return academies;
-    const assignedIds = new Set(assignments.map((a) => a.academy_id));
-    return academies.filter((a) => !assignedIds.has(a.id));
-  }, [academies, assignments]);
+    // Permitir asignar múltiples roles para una misma academia.
+    // Solo bloqueamos si ya existe exactamente la tupla (academy_id, role).
+    const assignedPairs = new Set(assignments.map((a) => `${a.academy_id}:${a.role}`));
+    return academies.filter((a) => !assignedPairs.has(`${a.id}:${newRole}`));
+  }, [academies, assignments, newRole]);
 
   const onSelectUser = (userId: string) => {
     setSelectedUserId(userId);
@@ -173,6 +175,14 @@ export default function AssignmentsPage() {
     setSaving(true);
     setError(null);
     try {
+      const alreadyExists = assignments.some(
+        (a) => a.academy_id === newAcademyId && a.role === newRole
+      );
+      if (alreadyExists) {
+        setError("Ese usuario ya tiene ese rol en esa academia.");
+        return;
+      }
+
       const { data, error: insErr } = await supabase
         .from("user_academies")
         .insert({
