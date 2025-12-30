@@ -48,6 +48,32 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+type RentMode = "per_student" | "per_hour" | "both";
+
+function getLocalHmFromIso(iso: string, timeZone: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "00:00";
+  const fmt = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  return fmt.format(d);
+}
+
+function getLocalYmdFromIso(iso: string, timeZone: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "1970-01-01";
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return fmt.format(d);
+}
+
 interface PaymentReportRow {
   id: string;
   student_id: string;
@@ -58,6 +84,13 @@ interface PaymentReportRow {
   payment_date: string;
   method: string;
 }
+
+type ClassSessionRow = {
+  id: string;
+  date: string;
+  coach_id: string | null;
+  court_id: string | null;
+};
 
 interface StudentSummaryRow {
   student_id: string;
@@ -294,26 +327,192 @@ export default function ReportsPage() {
   const [rentExpensesTotal, setRentExpensesTotal] = useState(0);
   const [hasAutoRunFromPreset, setHasAutoRunFromPreset] = useState(false);
 
+  const sanitizeFileName = (value: string) => {
+    return value
+      .replace(/[\\/]/g, "-")
+      .replace(/[:*?"<>|]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  };
+
+  const buildReportFileName = (
+    reportTitle: string,
+    from: string | null | undefined,
+    to: string | null | undefined,
+    ext: "xlsx" | "pdf",
+  ) => {
+    const rangePart = from && to ? ` - ${from} a ${to}` : "";
+    return sanitizeFileName(`Agendo - Reporte ${reportTitle}${rangePart}.${ext}`);
+  };
+
+  const getLogoPngInfo = async () => {
+    const res = await fetch("/icons/LogoAgendo1024.png");
+    if (!res.ok) throw new Error("No se pudo cargar el logo");
+    const blob = await res.blob();
+    const base64: string = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result ?? ""));
+      reader.onerror = () => reject(new Error("Error leyendo logo"));
+      reader.readAsDataURL(blob);
+    });
+
+    const objectUrl = URL.createObjectURL(blob);
+    try {
+      const { width, height } = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+        const img = document.createElement("img");
+        img.onload = () => resolve({ width: img.naturalWidth || img.width, height: img.naturalHeight || img.height });
+        img.onerror = () => reject(new Error("Error cargando dimensiones del logo"));
+        img.src = objectUrl;
+      });
+      return { base64, width, height };
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  };
+
+  const downloadBlob = (blob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const safeRangeLabel = (from: string | null | undefined, to: string | null | undefined) => {
+    if (from && to) return `Rango: ${from} a ${to}`;
+    return "Rango: -";
+  };
+
   const exportToExcel = async (
     fileName: string,
     sheetName: string,
-    rows: any[]
+    rows: any[],
+    rangeFrom?: string | null,
+    rangeTo?: string | null,
   ) => {
     if (!rows || rows.length === 0) return;
     try {
-      const XLSX = await import("xlsx");
-      const worksheet = XLSX.utils.json_to_sheet(rows);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-      const wbout = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+      const ExcelJS = await import("exceljs");
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = "Agendo";
+      workbook.created = new Date();
 
-      const blob = new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      a.click();
-      URL.revokeObjectURL(url);
+      const ws = workbook.addWorksheet(sheetName);
+
+      const { base64: logoBase64, width: logoW, height: logoH } = await getLogoPngInfo();
+      const logoId = workbook.addImage({
+        base64: logoBase64,
+        extension: "png",
+      });
+
+      // Header area
+      ws.mergeCells("A1:D3");
+      const excelLogoTargetHeight = 55;
+      const excelLogoTargetWidth = Math.round((excelLogoTargetHeight * (logoW || 1)) / (logoH || 1));
+      ws.addImage(logoId, {
+        tl: { col: 0, row: 0 },
+        ext: { width: excelLogoTargetWidth, height: excelLogoTargetHeight },
+      });
+
+      ws.mergeCells("E1:K1");
+      ws.getCell("E1").value = `Agendo - ${sheetName}`;
+      ws.getCell("E1").font = { bold: true, size: 16, color: { argb: "FF31435D" } };
+
+      ws.mergeCells("E2:K2");
+      ws.getCell("E2").value = safeRangeLabel(rangeFrom, rangeTo);
+      ws.getCell("E2").font = { size: 10, color: { argb: "FF64748B" } };
+
+      ws.mergeCells("E3:K3");
+      ws.getCell("E3").value = `Generado: ${new Date().toLocaleString()}`;
+      ws.getCell("E3").font = { size: 10, color: { argb: "FF64748B" } };
+
+      // Data
+      const keys = Object.keys(rows[0] ?? {});
+      const headerRowIndex = 5;
+      const dataStartRow = headerRowIndex + 1;
+
+      ws.getRow(headerRowIndex).values = ["", ...keys];
+      ws.getRow(headerRowIndex).font = { bold: true, color: { argb: "FFFFFFFF" } };
+      ws.getRow(headerRowIndex).fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FF31435D" },
+      };
+      ws.getRow(headerRowIndex).alignment = { vertical: "middle", horizontal: "center" };
+      ws.getRow(headerRowIndex).height = 18;
+
+      ws.views = [{ state: "frozen", ySplit: headerRowIndex }];
+
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i];
+        const excelRow = ws.getRow(dataStartRow + i);
+        excelRow.values = ["", ...keys.map((k) => r[k])];
+        excelRow.font = { size: 10, color: { argb: "FF0F172A" } };
+        excelRow.alignment = { vertical: "middle", horizontal: "left", wrapText: true };
+
+        if (i % 2 === 1) {
+          excelRow.eachCell((cell, colNumber) => {
+            if (colNumber === 1) return;
+            cell.fill = {
+              type: "pattern",
+              pattern: "solid",
+              fgColor: { argb: "FFF8FAFC" },
+            };
+          });
+        }
+
+        excelRow.eachCell((cell, colNumber) => {
+          if (colNumber === 1) return;
+          if (typeof cell.value === "number") {
+            cell.numFmt = "#,##0";
+            cell.alignment = { vertical: "middle", horizontal: "right" };
+          }
+        });
+      }
+
+      // Column widths (based on data)
+      const columnWidths = keys.map((k) => {
+        let maxLen = String(k).length;
+        for (const row of rows) {
+          const v = (row as any)?.[k];
+          const len = v === null || v === undefined ? 0 : String(v).length;
+          if (len > maxLen) maxLen = len;
+        }
+        return Math.min(55, Math.max(12, maxLen + 2));
+      });
+      ws.columns = [{ key: "_pad", width: 2 }, ...keys.map((k, idx) => ({ key: k, width: columnWidths[idx] }))];
+
+      // Border for table
+      const lastRow = dataStartRow + rows.length - 1;
+      for (let r = headerRowIndex; r <= lastRow; r++) {
+        const row = ws.getRow(r);
+        row.eachCell((cell, colNumber) => {
+          if (colNumber === 1) return;
+          cell.border = {
+            top: { style: "thin", color: { argb: "FFE2E8F0" } },
+            left: { style: "thin", color: { argb: "FFE2E8F0" } },
+            bottom: { style: "thin", color: { argb: "FFE2E8F0" } },
+            right: { style: "thin", color: { argb: "FFE2E8F0" } },
+          };
+        });
+      }
+
+      ws.getRow(headerRowIndex).eachCell((cell, colNumber) => {
+        if (colNumber === 1) return;
+        cell.border = {
+          top: { style: "thin", color: { argb: "FFCBD5E1" } },
+          left: { style: "thin", color: { argb: "FFCBD5E1" } },
+          bottom: { style: "thin", color: { argb: "FFCBD5E1" } },
+          right: { style: "thin", color: { argb: "FFCBD5E1" } },
+        };
+      });
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      });
+      downloadBlob(blob, fileName);
       toast.success("Exportación a Excel lista");
     } catch (e) {
       console.error(e);
@@ -335,24 +534,88 @@ export default function ReportsPage() {
     fileName: string,
     title: string,
     headers: string[],
-    rows: any[][]
+    rows: any[][],
+    rangeFrom?: string | null,
+    rangeTo?: string | null,
   ) => {
     if (!rows || rows.length === 0) return;
     try {
       const { jsPDF } = await import("jspdf");
       const autoTable = (await import("jspdf-autotable")).default as any;
 
-      const doc = new jsPDF();
-      doc.setFontSize(14);
-      doc.text(title, 14, 16);
+      const doc = new jsPDF({ format: "a4", orientation: "portrait" });
+
+      const { base64: logoBase64, width: logoW, height: logoH } = await getLogoPngInfo();
+      const rangeTxt = safeRangeLabel(rangeFrom, rangeTo);
+      const generatedTxt = `Generado: ${new Date().toLocaleString()}`;
+
+      const drawHeader = () => {
+        const headerY = 10;
+        const leftX = 14;
+        let logoWidth = 0;
+
+        try {
+          const pdfLogoTargetHeight = 12;
+          const pdfLogoTargetWidth = (pdfLogoTargetHeight * (logoW || 1)) / (logoH || 1);
+          logoWidth = pdfLogoTargetWidth;
+          doc.addImage(logoBase64, "PNG", leftX, headerY, pdfLogoTargetWidth, pdfLogoTargetHeight);
+        } catch {
+          logoWidth = 0;
+        }
+
+        const textX = leftX + (logoWidth ? logoWidth + 4 : 0);
+        doc.setFontSize(14);
+        doc.setTextColor(49, 67, 93);
+        doc.text(`Agendo - ${title}`, textX, 16);
+
+        doc.setFontSize(9);
+        doc.setTextColor(100, 116, 139);
+        doc.text(rangeTxt, textX, 21);
+        doc.text(generatedTxt, textX, 25);
+
+        doc.setDrawColor(226, 232, 240);
+        doc.line(14, 29, 196, 29);
+      };
+
+      const drawFooter = (page: number, total: number) => {
+        const pageW = doc.internal.pageSize.getWidth();
+        const pageH = doc.internal.pageSize.getHeight();
+
+        doc.setFontSize(9);
+        doc.setTextColor(100, 116, 139);
+        const footerText = `Página ${page} de ${total}`;
+        doc.text(footerText, pageW - 14, pageH - 10, { align: "right" });
+      };
+
+      // Draw header on page 1 before table
+      drawHeader();
 
       autoTable(doc, {
         head: [headers],
         body: rows,
-        startY: 22,
-        styles: { fontSize: 8 },
-        headStyles: { fillColor: [49, 67, 93] },
+        startY: 32,
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [49, 67, 93], textColor: [255, 255, 255] },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        didDrawPage: () => {
+          drawHeader();
+        },
+        didParseCell: (data: any) => {
+          // Alinear números a la derecha
+          if (data.section === "body") {
+            const raw = data.cell?.raw;
+            if (typeof raw === "number") {
+              data.cell.styles.halign = "right";
+            }
+          }
+        },
       });
+
+      const totalPages = doc.getNumberOfPages();
+      for (let p = 1; p <= totalPages; p++) {
+        doc.setPage(p);
+        drawFooter(p, totalPages);
+      }
 
       doc.save(fileName);
       toast.success("Exportación a PDF lista");
@@ -1402,11 +1665,36 @@ export default function ReportsPage() {
       if (classes.length === 0) {
         setCoachExpenses([]);
         setCoachExpensesTotal(0);
+        setRentExpenses([]);
+        setRentExpensesTotal(0);
+        return;
+      }
+
+      // 2b) Filtrar solo clases con al menos 1 booking (mismo criterio que alquiler)
+      const classIds = classes.map((c) => c.id);
+      const { data: bookingsData, error: bookingsErr } = await supabase
+        .from('bookings')
+        .select('class_id')
+        .in('class_id', classIds);
+      if (bookingsErr) throw bookingsErr;
+
+      const bookedClassIds = new Set<string>();
+      for (const row of (bookingsData ?? []) as any[]) {
+        const cid = row?.class_id as string | undefined;
+        if (cid) bookedClassIds.add(cid);
+      }
+
+      const classesWithStudents: ClassSessionRow[] = classes.filter((c) => bookedClassIds.has(c.id));
+      if (classesWithStudents.length === 0) {
+        setCoachExpenses([]);
+        setCoachExpensesTotal(0);
+        setRentExpenses([]);
+        setRentExpensesTotal(0);
         return;
       }
 
       const coachIds = Array.from(
-        new Set(classes.map((c) => c.coach_id).filter((id): id is string => !!id)),
+        new Set(classesWithStudents.map((c) => c.coach_id).filter((id): id is string => !!id)),
       );
       if (coachIds.length === 0) {
         setCoachExpenses([]);
@@ -1502,8 +1790,31 @@ export default function ReportsPage() {
     }
 
     setCoachExpensesLoading(true);
+    setRentExpensesLoading(true);
     setError(null);
     try {
+      // Rent mode
+      let rentMode: RentMode = "per_student";
+      try {
+        const { data: acad, error: acadErr } = await supabase
+          .from('academies')
+          .select('rent_mode')
+          .eq('id', selectedAcademyId)
+          .maybeSingle();
+        if (!acadErr) {
+          const m = (acad as any)?.rent_mode as RentMode | null | undefined;
+          if (m === 'per_student' || m === 'per_hour' || m === 'both') rentMode = m;
+        }
+      } catch {
+        // default per_student
+      }
+
+      // Para timestamptz: incluir todo el rango de días (toDate inclusive)
+      const fromInclusive = new Date(fromDate + 'T00:00:00.000Z').toISOString();
+      const toExclusiveDate = new Date(toDate + 'T00:00:00.000Z');
+      toExclusiveDate.setUTCDate(toExclusiveDate.getUTCDate() + 1);
+      const toExclusive = toExclusiveDate.toISOString();
+
       // 1) Obtener canchas asociadas a las sedes de la academia seleccionada
       const { data: courtsData, error: courtsErr } = await supabase
         .from('courts')
@@ -1524,25 +1835,52 @@ export default function ReportsPage() {
       const { data: clsData, error: clsErr } = await supabase
         .from('class_sessions')
         .select('id,date,coach_id,court_id')
-        .gte('date', fromDate)
-        .lte('date', toDate)
+        .gte('date', fromInclusive)
+        .lt('date', toExclusive)
         .in('court_id', allowedCourtIds)
         .not('coach_id', 'is', null);
       if (clsErr) throw clsErr;
 
-      const classes = (clsData ?? []) as { id: string; date: string; coach_id: string | null; court_id: string | null }[];
+      const classes = (clsData ?? []) as ClassSessionRow[];
       if (classes.length === 0) {
         setCoachExpenses([]);
         setCoachExpensesTotal(0);
+        setRentExpenses([]);
+        setRentExpensesTotal(0);
+        return;
+      }
+
+      // Filtrar solo clases con al menos 1 booking (mismo criterio que Home/alquiler)
+      const classIds = classes.map((c) => c.id);
+      const { data: bookingsData, error: bookingsErr } = await supabase
+        .from('bookings')
+        .select('class_id')
+        .in('class_id', classIds);
+      if (bookingsErr) throw bookingsErr;
+
+      const bookedClassIds = new Set<string>();
+      for (const row of (bookingsData ?? []) as any[]) {
+        const cid = row?.class_id as string | undefined;
+        if (cid) bookedClassIds.add(cid);
+      }
+
+      const classesWithStudents = classes.filter((c) => bookedClassIds.has(c.id));
+      if (classesWithStudents.length === 0) {
+        setCoachExpenses([]);
+        setCoachExpensesTotal(0);
+        setRentExpenses([]);
+        setRentExpensesTotal(0);
         return;
       }
 
       const coachIds = Array.from(
-        new Set(classes.map((c) => c.coach_id).filter((id): id is string => !!id)),
+        new Set(classesWithStudents.map((c) => c.coach_id).filter((id): id is string => !!id)),
       );
       if (coachIds.length === 0) {
         setCoachExpenses([]);
         setCoachExpensesTotal(0);
+        setRentExpenses([]);
+        setRentExpensesTotal(0);
         return;
       }
 
@@ -1594,7 +1932,7 @@ export default function ReportsPage() {
 
       // 5) Agregar clases y calcular egresos
       const byCoach: Record<string, CoachExpenseRow> = {};
-      classes.forEach((c) => {
+      classesWithStudents.forEach((c) => {
         const coachId = c.coach_id as string | null;
         if (!coachId) return;
         const fee = feeMap[coachId] ?? 0;
@@ -1616,30 +1954,183 @@ export default function ReportsPage() {
       setCoachExpenses(rows);
       setCoachExpensesTotal(total);
 
-      // Egresos por alquiler (RPC)
-      try {
-        const { data: rentRows, error: rentErr } = await supabase.rpc('get_rent_expenses', {
-          academy_id: selectedAcademyId,
-          from_date: fromDate,
-          to_date: toDate,
-        });
+      // 6) Egresos por alquiler (según rent_mode)
+      let rentPerHourTotal = 0;
+      let rentPerStudentTotal = 0;
+      let rentPerHourRows: RentExpenseRow[] = [];
 
-        if (rentErr) throw rentErr;
+      if (rentMode === 'per_hour' || rentMode === 'both') {
+        try {
+          const { data: rentRows, error: rentErr } = await supabase.rpc('get_rent_expenses', {
+            academy_id: selectedAcademyId,
+            from_date: fromDate,
+            to_date: toDate,
+          });
 
-        const mappedRent = ((rentRows ?? []) as any[]).map((r) => ({
-          location_id: r.location_id as string,
-          location_name: (r.location_name as string | null) ?? null,
-          classes_count: Number(r.classes_count ?? 0),
-          rent_total: Number(r.rent_total ?? 0),
-        })) as RentExpenseRow[];
+          if (rentErr) throw rentErr;
 
-        setRentExpenses(mappedRent);
-        setRentExpensesTotal(mappedRent.reduce((acc, r) => acc + (r.rent_total || 0), 0));
-      } catch (rpcErr: any) {
-        console.error('Error cargando alquiler (RPC get_rent_expenses)', rpcErr);
-        setRentExpenses([]);
-        setRentExpensesTotal(0);
+          const mappedRent = ((rentRows ?? []) as any[]).map((r) => ({
+            location_id: r.location_id as string,
+            location_name: (r.location_name as string | null) ?? null,
+            classes_count: Number(r.classes_count ?? 0),
+            rent_total: Number(r.rent_total ?? 0),
+          })) as RentExpenseRow[];
+
+          rentPerHourRows = mappedRent;
+          rentPerHourTotal = mappedRent.reduce((acc, r) => acc + (r.rent_total || 0), 0);
+        } catch (rpcErr: any) {
+          console.error('Error cargando alquiler (RPC get_rent_expenses)', rpcErr);
+          rentPerHourTotal = 0;
+          rentPerHourRows = [];
+        }
       }
+
+      if (rentMode === 'per_student' || rentMode === 'both') {
+        try {
+          const TZ = 'America/Asuncion';
+
+          // contar alumnos por clase via plan_usages
+          const studentsCountByClass: Record<string, number> = {};
+          const classIdsForCount = classesWithStudents.map((c) => c.id);
+          if (classIdsForCount.length > 0) {
+            const { data: usageRows, error: usageErr } = await supabase
+              .from('plan_usages')
+              .select('class_id')
+              .in('class_id', classIdsForCount);
+            if (usageErr) throw usageErr;
+            for (const r of (usageRows ?? []) as any[]) {
+              const cid = r?.class_id as string | undefined;
+              if (!cid) continue;
+              studentsCountByClass[cid] = (studentsCountByClass[cid] ?? 0) + 1;
+            }
+          }
+
+          // load active timebands per_student
+          const [locBandsRes, courtBandsRes] = await Promise.all([
+            supabase
+              .from('location_rent_fees_per_student')
+              .select('location_id, fee_per_student, valid_from, valid_to, time_from, time_to')
+              .eq('academy_id', selectedAcademyId)
+              .is('valid_to', null),
+            supabase
+              .from('court_rent_fees_per_student')
+              .select('court_id, fee_per_student, valid_from, valid_to, time_from, time_to')
+              .eq('academy_id', selectedAcademyId)
+              .is('valid_to', null),
+          ]);
+
+          if (locBandsRes.error) throw locBandsRes.error;
+          if (courtBandsRes.error) throw courtBandsRes.error;
+
+          const locationBands: Record<string, { time_from: string; time_to: string; fee: number; valid_from: string }[]> = {};
+          for (const r of (locBandsRes.data ?? []) as any[]) {
+            const lid = r.location_id as string | undefined;
+            const fee = Number(r.fee_per_student);
+            const vf = r.valid_from as string | undefined;
+            const tf = String(r.time_from ?? '').slice(0, 5);
+            const tt = String(r.time_to ?? '').slice(0, 5);
+            if (!lid || !vf || !tf || !tt || Number.isNaN(fee) || fee < 0) continue;
+            (locationBands[lid] ||= []).push({ time_from: tf, time_to: tt, fee, valid_from: vf });
+          }
+
+          const courtBands: Record<string, { time_from: string; time_to: string; fee: number; valid_from: string }[]> = {};
+          for (const r of (courtBandsRes.data ?? []) as any[]) {
+            const cid = r.court_id as string | undefined;
+            const fee = Number(r.fee_per_student);
+            const vf = r.valid_from as string | undefined;
+            const tf = String(r.time_from ?? '').slice(0, 5);
+            const tt = String(r.time_to ?? '').slice(0, 5);
+            if (!cid || !vf || !tf || !tt || Number.isNaN(fee) || fee < 0) continue;
+            (courtBands[cid] ||= []).push({ time_from: tf, time_to: tt, fee, valid_from: vf });
+          }
+
+          // helpers
+          const courtToLocation: Record<string, string | null> = {};
+          for (const c of courts) courtToLocation[c.id] = c.location_id ?? null;
+
+          const findBandFee = (
+            rows: { time_from: string; time_to: string; fee: number; valid_from: string }[],
+            classDay: string,
+            hm: string,
+          ) => {
+            const candidates = (rows ?? [])
+              .filter((r) => r.valid_from <= classDay)
+              .filter((r) => r.time_from <= hm && hm < r.time_to)
+              .sort((a, b) => b.valid_from.localeCompare(a.valid_from));
+            return candidates[0]?.fee ?? 0;
+          };
+
+          // aggregate per location
+          const rentByLocation: Record<string, { classes: number; total: number }> = {};
+          for (const cls of classesWithStudents) {
+            const classId = cls.id;
+            const students = studentsCountByClass[classId] ?? 0;
+            if (students <= 0) continue;
+            const courtId = cls.court_id as string | null;
+            if (!courtId) continue;
+            const locationId = courtToLocation[courtId] ?? null;
+            if (!locationId) continue;
+
+            const classDay = getLocalYmdFromIso(cls.date, TZ);
+            const hm = getLocalHmFromIso(cls.date, TZ);
+
+            const feeCourt = findBandFee(courtBands[courtId] ?? [], classDay, hm);
+            const feeLoc = feeCourt > 0 ? feeCourt : findBandFee(locationBands[locationId] ?? [], classDay, hm);
+            if (feeLoc <= 0) continue;
+
+            const cost = students * feeLoc;
+            rentPerStudentTotal += cost;
+            if (!rentByLocation[locationId]) rentByLocation[locationId] = { classes: 0, total: 0 };
+            rentByLocation[locationId].classes += 1;
+            rentByLocation[locationId].total += cost;
+          }
+
+          // map location names
+          const { data: locNames, error: locNamesErr } = await supabase
+            .from('locations')
+            .select('id,name')
+            .in('id', Object.keys(rentByLocation));
+          if (locNamesErr) throw locNamesErr;
+          const nameMap: Record<string, string | null> = {};
+          (locNames ?? []).forEach((l: any) => {
+            if (!l?.id) return;
+            nameMap[l.id as string] = (l.name as string | null) ?? null;
+          });
+
+          const mapped = Object.entries(rentByLocation)
+            .map(([locationId, v]) => ({
+              location_id: locationId,
+              location_name: nameMap[locationId] ?? null,
+              classes_count: v.classes,
+              rent_total: v.total,
+            }))
+            .sort((a, b) => (b.rent_total || 0) - (a.rent_total || 0));
+
+          // si rentMode es per_student, este es el reporte principal
+          if (rentMode === 'per_student') {
+            setRentExpenses(mapped);
+          }
+        } catch (e: any) {
+          console.error('Error calculando alquiler per_student', e);
+          rentPerStudentTotal = 0;
+          if (rentMode === 'per_student') setRentExpenses([]);
+        }
+      }
+
+      // Mostrar detalle de alquiler según modo
+      if (rentMode === 'per_hour' || rentMode === 'both') {
+        // per_hour/both: mantenemos el detalle por sede que devuelve la RPC
+        setRentExpenses(rentPerHourRows);
+      }
+
+      const rentTotal =
+        rentMode === 'per_student'
+          ? rentPerStudentTotal
+          : rentMode === 'per_hour'
+            ? rentPerHourTotal
+            : rentPerHourTotal + rentPerStudentTotal;
+
+      setRentExpensesTotal(rentTotal);
     } catch (e: any) {
       const msg = e?.message ?? 'Error cargando egresos por profesor.';
       setError(msg);
@@ -1653,10 +2144,13 @@ export default function ReportsPage() {
     }
   };
 
+  // ...
+
   return (
     <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4 overflow-x-hidden">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-2">
+          {/* ... */}
           <BarChart3 className="h-5 w-5 text-[#3cadaf] flex-shrink-0" />
           <div className="space-y-0.5">
             <h1 className="text-2xl font-semibold text-[#31435d]">Reportes</h1>
@@ -1805,7 +2299,7 @@ export default function ReportsPage() {
                             className="w-full px-3 py-1 text-left hover:bg-gray-50"
                             onClick={() => {
                               exportToExcel(
-                                `ingresos-${fromDate || ""}-${toDate || ""}.xlsx`,
+                                buildReportFileName("Ingresos", fromDate, toDate, "xlsx"),
                                 "Ingresos",
                                 rows.map((r) => ({
                                   Fecha: new Date(r.payment_date).toLocaleDateString(),
@@ -1814,7 +2308,9 @@ export default function ReportsPage() {
                                   Metodo: r.method,
                                   Monto: r.amount,
                                   Moneda: r.currency,
-                                }))
+                                })),
+                                fromDate,
+                                toDate,
                               );
                               setExportMenu((m) => ({ ...m, income: false }));
                             }}
@@ -1826,7 +2322,7 @@ export default function ReportsPage() {
                             className="w-full px-3 py-1 text-left hover:bg-gray-50"
                             onClick={() => {
                               exportToPdf(
-                                `ingresos-${fromDate || ""}-${toDate || ""}.pdf`,
+                                buildReportFileName("Ingresos", fromDate, toDate, "pdf"),
                                 "Ingresos",
                                 ["Fecha", "Alumno", "Plan", "Metodo", "Monto", "Moneda"],
                                 rows.map((r) => [
@@ -1836,7 +2332,9 @@ export default function ReportsPage() {
                                   r.method,
                                   String(r.amount),
                                   r.currency,
-                                ])
+                                ]),
+                                fromDate,
+                                toDate,
                               );
                               setExportMenu((m) => ({ ...m, income: false }));
                             }}
@@ -2047,9 +2545,11 @@ export default function ReportsPage() {
                                   ];
 
                                   exportToExcel(
-                                    `egresos-${fromDate || ""}-${toDate || ""}.xlsx`,
+                                    buildReportFileName("Egresos", fromDate, toDate, "xlsx"),
                                     "Egresos",
                                     rowsToExport,
+                                    fromDate,
+                                    toDate,
                                   );
                                   setExportMenu((m) => ({ ...m, expenses: false }));
                                 }}
@@ -2080,7 +2580,7 @@ export default function ReportsPage() {
                                   ];
 
                                   exportToPdf(
-                                    `egresos-${fromDate || ""}-${toDate || ""}.pdf`,
+                                    buildReportFileName("Egresos", fromDate, toDate, "pdf"),
                                     "Egresos",
                                     [
                                       'Categoria',
@@ -2090,7 +2590,16 @@ export default function ReportsPage() {
                                       'Egreso total',
                                       'Moneda',
                                     ],
-                                    rowsToExport,
+                                    rowsToExport.map((r) => [
+                                      r[0],
+                                      r[1],
+                                      String(r[2]),
+                                      String(r[3] ?? ''),
+                                      String(r[4] ?? ''),
+                                      String(r[5] ?? ''),
+                                    ]),
+                                    fromDate,
+                                    toDate,
                                   );
                                   setExportMenu((m) => ({ ...m, expenses: false }));
                                 }}
@@ -2444,15 +2953,17 @@ export default function ReportsPage() {
                             className="w-full px-3 py-1 text-left hover:bg-gray-50"
                             onClick={() => {
                               exportToExcel(
-                                "asistencia-por-alumno.xlsx",
-                                "Asistencia alumno",
+                                buildReportFileName("Asistencia por alumno", attendanceFrom, attendanceTo, "xlsx"),
+                                "Asistencia por alumno",
                                 attendanceRows.map((r) => ({
                                   Fecha: new Date(r.date).toLocaleString(),
                                   Sede: r.location_name ?? "-",
                                   Cancha: r.court_name ?? "-",
                                   Profesor: r.coach_name ?? "-",
                                   Estado: r.present ? "Presente" : "Ausente",
-                                }))
+                                })),
+                                attendanceFrom,
+                                attendanceTo,
                               );
                               setExportMenu((m) => ({
                                 ...m,
@@ -2467,7 +2978,7 @@ export default function ReportsPage() {
                             className="w-full px-3 py-1 text-left hover:bg-gray-50"
                             onClick={() => {
                               exportToPdf(
-                                "asistencia-por-alumno.pdf",
+                                buildReportFileName("Asistencia por alumno", attendanceFrom, attendanceTo, "pdf"),
                                 "Asistencia por alumno",
                                 ["Fecha", "Sede", "Cancha", "Profesor", "Estado"],
                                 attendanceRows.map((r) => [
@@ -2476,7 +2987,9 @@ export default function ReportsPage() {
                                   r.court_name ?? "-",
                                   r.coach_name ?? "-",
                                   r.present ? "Presente" : "Ausente",
-                                ])
+                                ]),
+                                attendanceFrom,
+                                attendanceTo,
                               );
                               setExportMenu((m) => ({
                                 ...m,
@@ -2745,15 +3258,17 @@ export default function ReportsPage() {
                             className="w-full px-3 py-1 text-left hover:bg-gray-50"
                             onClick={() => {
                               exportToExcel(
-                                "asistencia-por-profesor.xlsx",
-                                "Asistencia profesor",
+                                buildReportFileName("Asistencia por profesor", coachFrom, coachTo, "xlsx"),
+                                "Asistencia por profesor",
                                 coachRows.map((r) => ({
                                   Fecha: new Date(r.date).toLocaleString(),
                                   Sede: r.location_name ?? "-",
                                   Cancha: r.court_name ?? "-",
                                   Presentes: r.present_count,
                                   Ausentes: r.absent_count,
-                                }))
+                                })),
+                                coachFrom,
+                                coachTo,
                               );
                               setExportMenu((m) => ({ ...m, attendanceCoach: false }));
                             }}
@@ -2765,7 +3280,7 @@ export default function ReportsPage() {
                             className="w-full px-3 py-1 text-left hover:bg-gray-50"
                             onClick={() => {
                               exportToPdf(
-                                "asistencia-por-profesor.pdf",
+                                buildReportFileName("Asistencia por profesor", coachFrom, coachTo, "pdf"),
                                 "Asistencia por profesor",
                                 ["Fecha", "Sede", "Cancha", "Presentes", "Ausentes"],
                                 coachRows.map((r) => [
@@ -2774,7 +3289,9 @@ export default function ReportsPage() {
                                   r.court_name ?? "-",
                                   String(r.present_count),
                                   String(r.absent_count),
-                                ])
+                                ]),
+                                coachFrom,
+                                coachTo,
                               );
                               setExportMenu((m) => ({ ...m, attendanceCoach: false }));
                             }}
@@ -3047,8 +3564,8 @@ export default function ReportsPage() {
                             className="w-full px-3 py-1 text-left hover:bg-gray-50"
                             onClick={() => {
                               exportToExcel(
-                                "asistencia-por-sede-cancha.xlsx",
-                                "Asistencia sede/cancha",
+                                buildReportFileName("Asistencia por sede-cancha", locationFrom, locationTo, "xlsx"),
+                                "Asistencia por sede/cancha",
                                 locationRows.map((r) => ({
                                   Fecha: new Date(r.date).toLocaleString(),
                                   Sede: r.location_name ?? "-",
@@ -3056,7 +3573,9 @@ export default function ReportsPage() {
                                   Profesor: r.coach_name ?? "-",
                                   Presentes: r.present_count,
                                   Ausentes: r.absent_count,
-                                }))
+                                })),
+                                locationFrom,
+                                locationTo,
                               );
                               setExportMenu((m) => ({ ...m, attendanceLocation: false }));
                             }}
@@ -3068,7 +3587,7 @@ export default function ReportsPage() {
                             className="w-full px-3 py-1 text-left hover:bg-gray-50"
                             onClick={() => {
                               exportToPdf(
-                                "asistencia-por-sede-cancha.pdf",
+                                buildReportFileName("Asistencia por sede-cancha", locationFrom, locationTo, "pdf"),
                                 "Asistencia por sede/cancha",
                                 ["Fecha", "Sede", "Cancha", "Profesor", "Presentes", "Ausentes"],
                                 locationRows.map((r) => [
@@ -3078,7 +3597,9 @@ export default function ReportsPage() {
                                   r.coach_name ?? "-",
                                   String(r.present_count),
                                   String(r.absent_count),
-                                ])
+                                ]),
+                                locationFrom,
+                                locationTo,
                               );
                               setExportMenu((m) => ({ ...m, attendanceLocation: false }));
                             }}

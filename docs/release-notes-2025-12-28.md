@@ -6,21 +6,43 @@ Este documento resume lo implementado/ajustado en esta iteración.
 
 ### Qué se agregó
 - Se incorporó el egreso por **alquiler de cancha** dentro de los cálculos de finanzas.
+- Se agregó el modo de cálculo configurable por academia `academies.rent_mode`:
+  - `per_student`: alquiler por alumno por clase (bandas horarias)
+  - `per_hour`: alquiler por clase (60 min)
+  - `both`: suma ambos (útil para transición)
 - Se contempla tarifa base por **sede (location)** y override por **cancha (court)**.
-- Se contempla **vigencia** de tarifa.
+- Se contempla **vigencia** (histórico) de tarifas.
 
 ### Tablas involucradas
-- `location_rent_fees` (tarifa por sede)
-- `court_rent_fees` (tarifa por cancha)
+- Por hora (por clase):
+  - `location_rent_fees` (tarifa por sede)
+  - `court_rent_fees` (tarifa por cancha)
+- Por alumno (bandas horarias):
+  - `location_rent_fees_per_student`
+  - `court_rent_fees_per_student`
 
 ### Reglas de cálculo (alto nivel)
-- Para cada clase, se intenta aplicar primero la tarifa por cancha.
-- Si no hay tarifa por cancha aplicable, se usa la tarifa por sede.
-- Solo se consideran tarifas activas y vigentes para la fecha de la clase.
+- Para cada clase:
+  - se filtra que exista al menos 1 booking
+  - se calcula cantidad de alumnos usando `plan_usages` (alumnos consumiendo clase)
+- Para tarifas por alumno:
+  - se determina la banda horaria según horario local `America/Asuncion`
+  - se intenta aplicar primero tarifa por cancha (override)
+  - si no aplica, se usa la tarifa por sede
+  - se usa la tarifa vigente para la fecha (`valid_from`/`valid_to`)
+- Para tarifas por hora:
+  - se mantiene el cálculo previo (por clase de 60 min) vía RPC.
 
 ### Impacto
 - Reportes: egresos incluyen profesores + alquiler.
 - Home (admin/super-admin): card “Ingresos vs egresos” incluye alquiler.
+
+### Configuración (Settings)
+- Nueva UI para configurar alquiler por alumno con bandas horarias:
+  - presets (horas muertas / pico)
+  - agregado manual de bandas
+  - eliminación de bandas (persistente al guardar)
+- Selector de modo `rent_mode`.
 
 ## 2) Reportes: mejoras de UI / export
 
@@ -29,6 +51,13 @@ Este documento resume lo implementado/ajustado en esta iteración.
   - egresos por profesor
   - egresos por alquiler de cancha
 - Se ajustaron detalles de UI/UX para que el reporte sea más claro y con menos ruido visual.
+
+### Export (Excel / PDF)
+- Export unificado con:
+  - nombres de archivos estándar (`Agendo - Reporte ... - desde a hasta`)
+  - logo Agendo
+  - Excel: freeze header, anchos automáticos, zebra rows
+  - PDF: A4 portrait, header/footer en todas las páginas, paginado
 
 ## 3) Agenda (Schedule): clases recientes para asistencia
 
@@ -76,6 +105,14 @@ Permitir que el estado activo/inactivo sea **por academia**, ya que un usuario p
 
 - Se agregó componente `Switch` en `src/components/ui/switch.tsx`.
 - Se ajustó `tsconfig.json` agregando `baseUrl` para mejorar resolución del alias `@/*`.
+
+## 8) Checklist de despliegue/migración (alto nivel)
+
+- Aplicar migraciones SQL (tablas/columnas relacionadas a alquiler por alumno y `rent_mode`).
+- Verificar que `academies.rent_mode` tenga default `per_student`.
+- Validar cálculos contra DB con queries de verificación (ingresos, egresos por profesor, egresos por alquiler por alumno/por hora).
+- `npm install` y `npm audit` sin vulnerabilidades.
+- `npm run build` exitoso.
 
 ## 7) Infra / Planes (Supabase y Vercel)
 

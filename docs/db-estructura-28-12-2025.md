@@ -12,6 +12,8 @@ Fuente: `supabase/db_cluster-28-12-2025@05-21-37.backup`
   - `name` (text, not null)
   - `slug` (text)
   - `created_at` (timestamptz, default `now()`, not null)
+  - `rent_mode` (text, default `'per_student'`, not null)
+    - valores: `per_student` | `per_hour` | `both`
 
 ### `academy_locations`
 - Relación academia <-> sede.
@@ -135,6 +137,30 @@ Fuente: `supabase/db_cluster-28-12-2025@05-21-37.backup`
   - `created_at` (timestamptz, default `now()`)
   - `updated_at` (timestamptz, default `now()`)
 
+### `location_rent_fees_per_student`
+- Tarifa de alquiler **por alumno** por sede, con **bandas horarias**.
+- **Campos** (conceptual):
+  - `id` (uuid, PK)
+  - `academy_id` (uuid, not null)
+  - `location_id` (uuid, not null)
+  - `time_from` (time, not null)
+  - `time_to` (time, not null)
+  - `fee_per_student` (numeric, not null)
+  - `valid_from` (date, not null)
+  - `valid_to` (date, nullable)
+
+### `court_rent_fees_per_student`
+- Tarifa de alquiler **por alumno** por cancha, con **bandas horarias** (override sobre sede).
+- **Campos** (conceptual):
+  - `id` (uuid, PK)
+  - `academy_id` (uuid, not null)
+  - `court_id` (uuid, not null)
+  - `time_from` (time, not null)
+  - `time_to` (time, not null)
+  - `fee_per_student` (numeric, not null)
+  - `valid_from` (date, not null)
+  - `valid_to` (date, nullable)
+
 ### `profiles`
 - Perfil por usuario.
 - **Campos**:
@@ -184,11 +210,11 @@ Fuente: `supabase/db_cluster-28-12-2025@05-21-37.backup`
 - Hoy el dominio de finanzas incluye:
   - Ingresos: `payments` asociados a `student_plans` / `plans` por `academy_id`.
   - Egresos: existe `coach_academy_fees` para calcular pago a profesores por clase.
-- No aparece una tabla nativa para **alquiler de cancha** (costo al complejo) en este backup.
+- El alquiler de canchas ahora soporta:
+  - **por hora** (por clase de 60 min): `location_rent_fees` / `court_rent_fees`
+  - **por alumno** (por clase): `location_rent_fees_per_student` / `court_rent_fees_per_student`
+  - selección del modo vía `academies.rent_mode`
 
 ## Próximo paso sugerido
 
-- Agregar soporte de “alquiler de cancha” como egreso por clase (60 min):
-  - tarifa por sede con override por cancha
-  - con vigencia (histórico de cambios)
-  - y que **no compute** si la clase se elimina por quedarse sin alumnos (flujo actual elimina `class_sessions` cuando el último alumno cancela).
+- Este documento es un snapshot del backup; la implementación actual ya incluye alquiler de cancha por hora y por alumno.

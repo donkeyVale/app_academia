@@ -9,6 +9,32 @@ import { Banknote, TrendingUp, TrendingDown } from "lucide-react";
 
 type Role = "super_admin" | "admin" | "coach" | "student" | null;
 
+type RentMode = "per_student" | "per_hour" | "both";
+
+function getLocalHmFromIso(iso: string, timeZone: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "00:00";
+  const fmt = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  return fmt.format(d);
+}
+
+function getLocalYmdFromIso(iso: string, timeZone: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "1970-01-01";
+  const fmt = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return fmt.format(d); // YYYY-MM-DD
+}
+
 export default function AdminHomeIncomeExpensesCard() {
   const supabase = createClientBrowser();
   const router = useRouter();
@@ -79,12 +105,36 @@ export default function AdminHomeIncomeExpensesCard() {
       setError(null);
 
       try {
+        // Rent mode: define qué cálculo aplicar
+        let rentMode: RentMode = "per_student";
+        try {
+          const { data: acad, error: acadErr } = await supabase
+            .from("academies")
+            .select("rent_mode")
+            .eq("id", selectedAcademyId)
+            .maybeSingle();
+          if (!acadErr) {
+            const m = (acad as any)?.rent_mode as RentMode | null | undefined;
+            if (m === "per_student" || m === "per_hour" || m === "both") rentMode = m;
+          }
+        } catch {
+          // si falla, dejamos per_student
+        }
+
         // Rango últimos 30 días
         const today = new Date();
         const toDateIso = today.toISOString().slice(0, 10);
         const from = new Date(today);
         from.setDate(from.getDate() - 29);
         const fromDateIso = from.toISOString().slice(0, 10);
+
+        // Para timestamptz: incluir todo el rango de días.
+        // fromInclusive = YYYY-MM-DDT00:00:00.000Z
+        // toExclusive = (toDate + 1)T00:00:00.000Z
+        const fromInclusive = new Date(fromDateIso + "T00:00:00.000Z").toISOString();
+        const toExclusiveDate = new Date(toDateIso + "T00:00:00.000Z");
+        toExclusiveDate.setUTCDate(toExclusiveDate.getUTCDate() + 1);
+        const toExclusive = toExclusiveDate.toISOString();
 
         setFromDateLabel(new Date(fromDateIso + "T00:00:00").toLocaleDateString());
         setToDateLabel(new Date(toDateIso + "T00:00:00").toLocaleDateString());
@@ -148,8 +198,8 @@ export default function AdminHomeIncomeExpensesCard() {
               .select("id,date,coach_id,court_id")
               .in("court_id", courtIds)
               .not("coach_id", "is", null)
-              .gte("date", fromDateIso)
-              .lte("date", toDateIso);
+              .gte("date", fromInclusive)
+              .lt("date", toExclusive);
             if (clsErr) throw clsErr;
 
             const classes = (classesData ?? []) as {
@@ -200,9 +250,13 @@ export default function AdminHomeIncomeExpensesCard() {
                   return acc + (fee || 0);
                 }, 0);
 
-                // Alquiler de cancha: por sede (base) y override por cancha
+                // Alquiler de cancha por clase (per_hour): por sede (base) y override por cancha
                 const activeLocationFeeMap: Record<string, { fee: number; valid_from: string }> = {};
                 const activeCourtFeeMap: Record<string, { fee: number; valid_from: string }> = {};
+
+                // Alquiler de cancha por alumno (per_student): por sede (base) y override por cancha, con bandas horarias
+                const locationBandsPerStudent: Record<string, { time_from: string; time_to: string; fee: number; valid_from: string }[]> = {};
+                const courtBandsPerStudent: Record<string, { time_from: string; time_to: string; fee: number; valid_from: string }[]> = {};
 
                 try {
                   const { data: locFees, error: locFeesErr } = await supabase
@@ -234,6 +288,40 @@ export default function AdminHomeIncomeExpensesCard() {
                     if (vt != null) continue;
                     activeCourtFeeMap[cid] = { fee, valid_from: vf };
                   }
+
+                  const { data: locBands, error: locBandsErr } = await supabase
+                    .from('location_rent_fees_per_student')
+                    .select('location_id, fee_per_student, valid_from, valid_to, time_from, time_to')
+                    .eq('academy_id', selectedAcademyId);
+                  if (locBandsErr) throw locBandsErr;
+                  for (const r of (locBands ?? []) as any[]) {
+                    const lid = r.location_id as string | undefined;
+                    const fee = Number(r.fee_per_student);
+                    const vf = r.valid_from as string | undefined;
+                    const vt = r.valid_to as string | null | undefined;
+                    const tf = String(r.time_from ?? '').slice(0, 5);
+                    const tt = String(r.time_to ?? '').slice(0, 5);
+                    if (!lid || !vf || !tf || !tt || Number.isNaN(fee) || fee < 0) continue;
+                    if (vt != null) continue;
+                    (locationBandsPerStudent[lid] ||= []).push({ time_from: tf, time_to: tt, fee, valid_from: vf });
+                  }
+
+                  const { data: courtBands, error: courtBandsErr } = await supabase
+                    .from('court_rent_fees_per_student')
+                    .select('court_id, fee_per_student, valid_from, valid_to, time_from, time_to')
+                    .eq('academy_id', selectedAcademyId);
+                  if (courtBandsErr) throw courtBandsErr;
+                  for (const r of (courtBands ?? []) as any[]) {
+                    const cid = r.court_id as string | undefined;
+                    const fee = Number(r.fee_per_student);
+                    const vf = r.valid_from as string | undefined;
+                    const vt = r.valid_to as string | null | undefined;
+                    const tf = String(r.time_from ?? '').slice(0, 5);
+                    const tt = String(r.time_to ?? '').slice(0, 5);
+                    if (!cid || !vf || !tf || !tt || Number.isNaN(fee) || fee < 0) continue;
+                    if (vt != null) continue;
+                    (courtBandsPerStudent[cid] ||= []).push({ time_from: tf, time_to: tt, fee, valid_from: vf });
+                  }
                 } catch {
                   // si falla cargar fees, no rompemos el card: alquiler=0
                 }
@@ -241,7 +329,7 @@ export default function AdminHomeIncomeExpensesCard() {
                 const courtToLocation: Record<string, string | null> = {};
                 for (const c of courts) courtToLocation[c.id] = c.location_id ?? null;
 
-                const rentExpenses = classesWithStudents.reduce((acc, cls) => {
+                const rentExpensesPerHour = classesWithStudents.reduce((acc, cls) => {
                   const courtId = cls.court_id as string | null;
                   if (!courtId) return acc;
 
@@ -263,7 +351,69 @@ export default function AdminHomeIncomeExpensesCard() {
                   return acc;
                 }, 0);
 
-                totalExpenses = teacherExpenses + rentExpenses;
+                let rentExpensesPerStudent = 0;
+                if (rentMode === 'per_student' || rentMode === 'both') {
+                  const classIds = classesWithStudents.map((c) => c.id);
+                  const studentsCountByClass: Record<string, number> = {};
+                  if (classIds.length > 0) {
+                    // Usamos plan_usages para contar alumnos por clase (1 registro por alumno en esa clase)
+                    const { data: usageRows, error: usageErr } = await supabase
+                      .from('plan_usages')
+                      .select('class_id')
+                      .in('class_id', classIds);
+                    if (!usageErr) {
+                      for (const r of (usageRows ?? []) as any[]) {
+                        const cid = r?.class_id as string | undefined;
+                        if (!cid) continue;
+                        studentsCountByClass[cid] = (studentsCountByClass[cid] ?? 0) + 1;
+                      }
+                    }
+                  }
+
+                  const TZ = 'America/Asuncion';
+                  const findBandFee = (
+                    rows: { time_from: string; time_to: string; fee: number; valid_from: string }[],
+                    classDay: string,
+                    hm: string,
+                  ) => {
+                    const candidates = (rows ?? [])
+                      .filter((r) => r.valid_from <= classDay)
+                      .filter((r) => r.time_from <= hm && hm < r.time_to)
+                      .sort((a, b) => b.valid_from.localeCompare(a.valid_from));
+                    return candidates[0]?.fee ?? 0;
+                  };
+
+                  rentExpensesPerStudent = classesWithStudents.reduce((acc, cls) => {
+                    const classId = cls.id;
+                    const studentCount = studentsCountByClass[classId] ?? 0;
+                    if (studentCount <= 0) return acc;
+
+                    const courtId = cls.court_id as string | null;
+                    if (!courtId) return acc;
+
+                    const classDay = getLocalYmdFromIso(cls.date, TZ);
+                    const hm = getLocalHmFromIso(cls.date, TZ);
+
+                    const courtFee = findBandFee(courtBandsPerStudent[courtId] ?? [], classDay, hm);
+                    if (courtFee > 0) return acc + studentCount * courtFee;
+
+                    const locationId = courtToLocation[courtId] ?? null;
+                    if (!locationId) return acc;
+                    const locFee = findBandFee(locationBandsPerStudent[locationId] ?? [], classDay, hm);
+                    if (locFee > 0) return acc + studentCount * locFee;
+
+                    return acc;
+                  }, 0);
+                }
+
+                const rentTotal =
+                  rentMode === 'per_student'
+                    ? rentExpensesPerStudent
+                    : rentMode === 'per_hour'
+                      ? rentExpensesPerHour
+                      : rentExpensesPerHour + rentExpensesPerStudent;
+
+                totalExpenses = teacherExpenses + rentTotal;
               }
             }
           }

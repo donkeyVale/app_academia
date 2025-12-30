@@ -75,7 +75,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: courtErr.message }, { status: 500 });
     }
 
-    return NextResponse.json({ locationFees: locationFees ?? [], courtFees: courtFees ?? [] });
+    const { data: locationFeesPerStudent, error: locPsErr } = await supabaseAdmin
+      .from('location_rent_fees_per_student')
+      .select('id, academy_id, location_id, fee_per_student, currency, valid_from, valid_to, time_from, time_to')
+      .eq('academy_id', academyId)
+      .is('valid_to', null);
+
+    if (locPsErr) {
+      return NextResponse.json({ error: locPsErr.message }, { status: 500 });
+    }
+
+    const { data: courtFeesPerStudent, error: courtPsErr } = await supabaseAdmin
+      .from('court_rent_fees_per_student')
+      .select('id, academy_id, court_id, fee_per_student, currency, valid_from, valid_to, time_from, time_to')
+      .eq('academy_id', academyId)
+      .is('valid_to', null);
+
+    if (courtPsErr) {
+      return NextResponse.json({ error: courtPsErr.message }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      locationFees: locationFees ?? [],
+      courtFees: courtFees ?? [],
+      locationFeesPerStudent: locationFeesPerStudent ?? [],
+      courtFeesPerStudent: courtFeesPerStudent ?? [],
+    });
   } catch (err: any) {
     console.error('Error en /api/admin/get-rent-fees', err);
     return NextResponse.json(

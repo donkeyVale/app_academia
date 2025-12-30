@@ -10,8 +10,17 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Calendar as CalendarIcon, ChevronDown, ChevronRight } from "lucide-react";
+import { toast } from "sonner";
 
 type AppRole = "super_admin" | "admin" | "coach" | "student" | null;
+type RentMode = "per_student" | "per_hour" | "both";
+
+type RentBand = {
+  timeFrom: string;
+  timeTo: string;
+  feePerStudent: string;
+  validFrom: string;
+};
 
 type DatePickerFieldProps = {
   value: string;
@@ -81,6 +90,9 @@ export default function SettingsPage() {
   const [role, setRole] = useState<AppRole>(null);
   const [academyOptions, setAcademyOptions] = useState<{ id: string; name: string }[]>([]);
   const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
+  const [rentMode, setRentMode] = useState<RentMode>("per_student");
+  const [rentModeSaving, setRentModeSaving] = useState(false);
+  const [rentModeError, setRentModeError] = useState<string | null>(null);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [rentLoading, setRentLoading] = useState(false);
@@ -95,6 +107,9 @@ export default function SettingsPage() {
     Record<string, { feePerClass: string; validFrom: string }>
   >({});
   const [rentOpenLocations, setRentOpenLocations] = useState<Record<string, boolean>>({});
+
+  const [rentLocationBands, setRentLocationBands] = useState<Record<string, RentBand[]>>({});
+  const [rentCourtBands, setRentCourtBands] = useState<Record<string, RentBand[]>>({});
 
   useEffect(() => {
     (async () => {
@@ -194,15 +209,40 @@ export default function SettingsPage() {
       if (!currentUserId) return;
       if (role !== 'admin' && role !== 'super_admin') return;
       if (!selectedAcademyId) {
+        setRentMode("per_student");
+        setRentModeError(null);
         setRentLocations([]);
         setRentCourts([]);
         setRentLocationValues({});
         setRentCourtValues({});
+        setRentLocationBands({});
+        setRentCourtBands({});
         return;
       }
 
       setRentLoading(true);
       try {
+        setRentModeError(null);
+        // Cargar modo de alquiler de la academia
+        try {
+          const { data: acadRow, error: acadErr } = await supabase
+            .from('academies')
+            .select('rent_mode')
+            .eq('id', selectedAcademyId)
+            .maybeSingle();
+
+          if (acadErr) throw acadErr;
+
+          const mode = (acadRow as any)?.rent_mode as RentMode | null | undefined;
+          if (mode === 'per_student' || mode === 'per_hour' || mode === 'both') {
+            setRentMode(mode);
+          } else {
+            setRentMode('per_student');
+          }
+        } catch {
+          setRentMode('per_student');
+        }
+
         const { data: alRows, error: alErr } = await supabase
           .from('academy_locations')
           .select('location_id')
@@ -263,6 +303,8 @@ export default function SettingsPage() {
         const feesJson = (await feesRes.json().catch(() => null)) as any;
         const locationFees = (feesJson?.locationFees ?? []) as any[];
         const courtFees = (feesJson?.courtFees ?? []) as any[];
+        const locationFeesPerStudent = (feesJson?.locationFeesPerStudent ?? []) as any[];
+        const courtFeesPerStudent = (feesJson?.courtFeesPerStudent ?? []) as any[];
 
         const nextLocValues: Record<string, { feePerClass: string; validFrom: string }> = {};
         for (const l of locs) {
@@ -284,59 +326,168 @@ export default function SettingsPage() {
 
         setRentLocationValues(nextLocValues);
         setRentCourtValues(nextCourtValues);
-      } catch (e: any) {
-        setRentError(e?.message ?? 'Error cargando configuración de alquiler.');
-      } finally {
-        setRentLoading(false);
-      }
-    })();
-  }, [currentUserId, role, selectedAcademyId, supabase]);
 
-  const onSaveRentFees = async () => {
-    if (!currentUserId) return;
-    if (role !== 'admin' && role !== 'super_admin') return;
-    if (!selectedAcademyId) return;
+        const nextLocBands: Record<string, RentBand[]> = {};
+        for (const l of locs) {
+          const bands = locationFeesPerStudent
+            .filter((x) => x.location_id === l.id)
+            .map((x) => ({
+              timeFrom: String(x.time_from ?? '').slice(0, 5),
+              timeTo: String(x.time_to ?? '').slice(0, 5),
+              feePerStudent: x.fee_per_student != null ? String(x.fee_per_student) : '',
+              validFrom: x.valid_from ? String(x.valid_from) : new Date().toISOString().slice(0, 10),
+            }))
+            .filter((b) => !!b.timeFrom && !!b.timeTo);
+          nextLocBands[l.id] = bands;
+        }
 
-    setRentSaving(true);
-    setRentError(null);
-    try {
-      const locationFeesPayload = Object.entries(rentLocationValues)
-        .map(([locationId, v]) => ({
-          locationId,
-          feePerClass: Number(v.feePerClass),
-          validFrom: v.validFrom,
-        }))
-        .filter((x) => Number.isFinite(x.feePerClass) && x.feePerClass >= 0 && !!x.validFrom);
+        const nextCourtBands: Record<string, RentBand[]> = {};
+        for (const c of courts) {
+          const bands = courtFeesPerStudent
+            .filter((x) => x.court_id === c.id)
+            .map((x) => ({
+              timeFrom: String(x.time_from ?? '').slice(0, 5),
+              timeTo: String(x.time_to ?? '').slice(0, 5),
+              feePerStudent: x.fee_per_student != null ? String(x.fee_per_student) : '',
+              validFrom: x.valid_from ? String(x.valid_from) : new Date().toISOString().slice(0, 10),
+            }))
+            .filter((b) => !!b.timeFrom && !!b.timeTo);
+          nextCourtBands[c.id] = bands;
+        }
 
-      const courtFeesPayload = Object.entries(rentCourtValues)
-        .map(([courtId, v]) => ({
-          courtId,
-          feePerClass: Number(v.feePerClass),
-          validFrom: v.validFrom,
-        }))
-        .filter((x) => Number.isFinite(x.feePerClass) && x.feePerClass >= 0 && !!x.validFrom);
-
-      const res = await fetch('/api/admin/update-rent-fees', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          currentUserId,
-          academyId: selectedAcademyId,
-          locationFees: locationFeesPayload,
-          courtFees: courtFeesPayload,
-        }),
-      });
-
-      if (!res.ok) {
-        const txt = await res.text().catch(() => '');
-        throw new Error(txt || 'No se pudo guardar la configuración de alquiler.');
-      }
+        setRentLocationBands(nextLocBands);
+        setRentCourtBands(nextCourtBands);
     } catch (e: any) {
-      setRentError(e?.message ?? 'Error guardando configuración de alquiler.');
+      setRentError(e?.message ?? 'Error cargando configuración de alquiler.');
     } finally {
-      setRentSaving(false);
+      setRentLoading(false);
     }
-  };
+  })();
+}, [currentUserId, role, selectedAcademyId, supabase]);
+
+const onSaveRentMode = async (nextMode: RentMode) => {
+  if (!currentUserId) return;
+  if (role !== 'admin' && role !== 'super_admin') return;
+  if (!selectedAcademyId) return;
+
+  setRentModeSaving(true);
+  setRentModeError(null);
+  try {
+    const res = await fetch('/api/admin/update-rent-mode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        currentUserId,
+        academyId: selectedAcademyId,
+        rentMode: nextMode,
+      }),
+    });
+
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '');
+      throw new Error(txt || 'No se pudo guardar el modo de alquiler.');
+    }
+
+    setRentMode(nextMode);
+    toast.success('Modo de cobro actualizado');
+  } catch (e: any) {
+    setRentModeError(e?.message ?? 'Error guardando el modo de alquiler.');
+    toast.error(e?.message ?? 'Error guardando el modo de alquiler.');
+  } finally {
+    setRentModeSaving(false);
+  }
+};
+
+const onSaveRentFees = async () => {
+  if (!currentUserId) return;
+  if (role !== 'admin' && role !== 'super_admin') return;
+  if (!selectedAcademyId) return;
+
+  setRentSaving(true);
+  setRentError(null);
+  try {
+    const locationFeesPayload = Object.entries(rentLocationValues)
+      .map(([locationId, v]) => ({
+        locationId,
+        feePerClass: Number(v.feePerClass),
+        validFrom: v.validFrom,
+      }))
+      .filter((x) => Number.isFinite(x.feePerClass) && x.feePerClass >= 0 && !!x.validFrom);
+
+    const courtFeesPayload = Object.entries(rentCourtValues)
+      .map(([courtId, v]) => ({
+        courtId,
+        feePerClass: Number(v.feePerClass),
+        validFrom: v.validFrom,
+      }))
+      .filter((x) => Number.isFinite(x.feePerClass) && x.feePerClass >= 0 && !!x.validFrom);
+
+    const locationFeesPerStudentPayload = Object.entries(rentLocationBands)
+      .flatMap(([locationId, bands]) =>
+        (bands ?? []).map((b) => ({
+          locationId,
+          feePerStudent: Number(b.feePerStudent),
+          validFrom: b.validFrom,
+          timeFrom: b.timeFrom,
+          timeTo: b.timeTo,
+        })),
+      )
+      .filter(
+        (row) =>
+          !!row.locationId &&
+          !!row.validFrom &&
+          !!row.timeFrom &&
+          !!row.timeTo &&
+          !Number.isNaN(row.feePerStudent),
+      );
+
+    const courtFeesPerStudentPayload = Object.entries(rentCourtBands)
+      .flatMap(([courtId, bands]) =>
+        (bands ?? []).map((b) => ({
+          courtId,
+          feePerStudent: Number(b.feePerStudent),
+          validFrom: b.validFrom,
+          timeFrom: b.timeFrom,
+          timeTo: b.timeTo,
+        })),
+      )
+      .filter(
+        (row) =>
+          !!row.courtId &&
+          !!row.validFrom &&
+          !!row.timeFrom &&
+          !!row.timeTo &&
+          !Number.isNaN(row.feePerStudent),
+      );
+
+    const feesRes = await fetch('/api/admin/update-rent-fees', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        currentUserId,
+        academyId: selectedAcademyId,
+        locationFees: rentMode === 'per_hour' || rentMode === 'both' ? locationFeesPayload : [],
+        courtFees: rentMode === 'per_hour' || rentMode === 'both' ? courtFeesPayload : [],
+        locationFeesPerStudent:
+          rentMode === 'per_student' || rentMode === 'both' ? locationFeesPerStudentPayload : [],
+        courtFeesPerStudent:
+          rentMode === 'per_student' || rentMode === 'both' ? courtFeesPerStudentPayload : [],
+      }),
+    });
+
+    if (!feesRes.ok) {
+      const txt = await feesRes.text().catch(() => '');
+      throw new Error(txt || 'No se pudo guardar la configuración de alquiler.');
+    }
+
+    toast.success('Configuración de alquiler guardada');
+  } catch (e: any) {
+    setRentError(e?.message ?? 'Error guardando configuración de alquiler.');
+    toast.error(e?.message ?? 'Error guardando configuración de alquiler.');
+  } finally {
+    setRentSaving(false);
+  }
+};
 
   const onToggleNotify = async () => {
     setSaving(true);
@@ -559,6 +710,27 @@ export default function SettingsPage() {
 
           <div className="px-4 py-4 space-y-3 text-sm">
             {rentError && <p className="text-xs text-red-600">{rentError}</p>}
+            {rentModeError && <p className="text-xs text-red-600">{rentModeError}</p>}
+
+            <div className="flex flex-col gap-1 max-w-xs">
+              <label className="text-xs font-medium text-gray-700">Modo de cobro del complejo</label>
+              <select
+                value={rentMode}
+                onChange={(e) => {
+                  const v = (e.target.value as RentMode) ?? 'per_student';
+                  onSaveRentMode(v);
+                }}
+                disabled={rentModeSaving || rentLoading || !selectedAcademyId}
+                className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#3cadaf] focus:border-[#3cadaf] bg-white disabled:opacity-60"
+              >
+                <option value="per_student">Por alumno por clase (recomendado)</option>
+                <option value="per_hour">Por clase/hora (fijo)</option>
+                <option value="both">Ambos</option>
+              </select>
+              <p className="text-[11px] text-gray-500">
+                El modo define qué configuración se usa para calcular egresos.
+              </p>
+            </div>
 
             {!selectedAcademyId ? (
               <p className="text-xs text-gray-600">
@@ -568,7 +740,361 @@ export default function SettingsPage() {
               <p className="text-xs text-gray-600">Cargando sedes y canchas...</p>
             ) : rentLocations.length === 0 ? (
               <p className="text-xs text-gray-600">No hay sedes vinculadas a esta academia.</p>
+            ) : rentMode === 'per_student' ? (
+              <div className="space-y-4">
+                {rentLocations.map((loc) => {
+                  const isOpen = !!rentOpenLocations[loc.id];
+                  const bands = rentLocationBands[loc.id] ?? [];
+                  const courtsForLoc = rentCourts.filter((c) => c.location_id === loc.id);
+
+                  const addLocationBand = (preset?: { timeFrom: string; timeTo: string }) => {
+                    const nextBand: RentBand = {
+                      timeFrom: preset?.timeFrom ?? '06:00',
+                      timeTo: preset?.timeTo ?? '18:00',
+                      feePerStudent: '',
+                      validFrom: new Date().toISOString().slice(0, 10),
+                    };
+
+                    const exists = (rentLocationBands[loc.id] ?? []).some(
+                      (b) => b.timeFrom === nextBand.timeFrom && b.timeTo === nextBand.timeTo,
+                    );
+                    if (exists) {
+                      toast.info('Esa banda horaria ya existe en esta sede.');
+                      return;
+                    }
+                    setRentLocationBands((prev) => ({
+                      ...prev,
+                      [loc.id]: [...(prev[loc.id] ?? []), nextBand],
+                    }));
+
+                    if (preset) {
+                      toast.success(`Banda agregada (${nextBand.timeFrom}–${nextBand.timeTo})`);
+                    } else {
+                      toast.success('Banda manual agregada');
+                    }
+                  };
+
+                  return (
+                    <div key={loc.id} className="border rounded-md p-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setRentOpenLocations((prev) => ({
+                            ...prev,
+                            [loc.id]: !prev[loc.id],
+                          }))
+                        }
+                        className="w-full flex items-center justify-between gap-3 text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          {isOpen ? (
+                            <ChevronDown className="w-4 h-4 text-gray-500" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-gray-500" />
+                          )}
+                          <div>
+                            <p className="text-sm font-semibold text-[#31435d]">{loc.name ?? loc.id}</p>
+                            <p className="text-xs text-gray-500">Canchas: {courtsForLoc.length}</p>
+                          </div>
+                        </div>
+                        <div className="text-xs text-gray-600">Bandas: {bands.length}</div>
+                      </button>
+
+                      {isOpen && (
+                        <div className="mt-3 space-y-3">
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => addLocationBand({ timeFrom: '06:00', timeTo: '18:00' })}
+                              className="h-9"
+                            >
+                              Agregar horas muertas (06–18)
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => addLocationBand({ timeFrom: '18:00', timeTo: '23:00' })}
+                              className="h-9"
+                            >
+                              Agregar horas pico (18–23)
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => addLocationBand()}
+                              className="h-9"
+                            >
+                              Agregar banda manual
+                            </Button>
+                          </div>
+
+                          {bands.length === 0 ? (
+                            <p className="text-xs text-gray-600">Sin bandas configuradas para esta sede.</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {bands.map((b, idx) => (
+                                <div key={`${loc.id}-${idx}`} className="border rounded-md p-2">
+                                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                    <div className="flex flex-col gap-1">
+                                      <label className="text-sm text-gray-600">Desde</label>
+                                      <Input
+                                        type="time"
+                                        value={b.timeFrom}
+                                        onChange={(e) => {
+                                          const v = e.target.value;
+                                          setRentLocationBands((prev) => {
+                                            const next = [...(prev[loc.id] ?? [])];
+                                            next[idx] = { ...next[idx], timeFrom: v };
+                                            return { ...prev, [loc.id]: next };
+                                          });
+                                        }}
+                                        className="h-10 text-base"
+                                      />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                      <label className="text-sm text-gray-600">Hasta</label>
+                                      <Input
+                                        type="time"
+                                        value={b.timeTo}
+                                        onChange={(e) => {
+                                          const v = e.target.value;
+                                          setRentLocationBands((prev) => {
+                                            const next = [...(prev[loc.id] ?? [])];
+                                            next[idx] = { ...next[idx], timeTo: v };
+                                            return { ...prev, [loc.id]: next };
+                                          });
+                                        }}
+                                        className="h-10 text-base"
+                                      />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                      <label className="text-sm text-gray-600">Vigente desde</label>
+                                      <DatePickerField
+                                        value={b.validFrom}
+                                        onChange={(value) => {
+                                          setRentLocationBands((prev) => {
+                                            const next = [...(prev[loc.id] ?? [])];
+                                            next[idx] = { ...next[idx], validFrom: value };
+                                            return { ...prev, [loc.id]: next };
+                                          });
+                                        }}
+                                      />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                      <label className="text-sm text-gray-600">Monto por alumno</label>
+                                      <Input
+                                        type="number"
+                                        inputMode="decimal"
+                                        value={b.feePerStudent}
+                                        onChange={(e) => {
+                                          const v = e.target.value;
+                                          setRentLocationBands((prev) => {
+                                            const next = [...(prev[loc.id] ?? [])];
+                                            next[idx] = { ...next[idx], feePerStudent: v };
+                                            return { ...prev, [loc.id]: next };
+                                          });
+                                        }}
+                                        className="h-10 text-base"
+                                        placeholder="0"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-2 flex justify-end">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      onClick={() => {
+                                        setRentLocationBands((prev) => {
+                                          const next = [...(prev[loc.id] ?? [])];
+                                          next.splice(idx, 1);
+                                          return { ...prev, [loc.id]: next };
+                                        });
+                                        toast.success('Banda eliminada (pendiente de guardar)');
+                                      }}
+                                      className="h-9"
+                                    >
+                                      Quitar
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {courtsForLoc.length > 0 && (
+                            <div className="mt-3 space-y-2">
+                              <p className="text-sm font-semibold text-gray-700">Overrides por cancha (opcional)</p>
+                              <div className="space-y-2">
+                                {courtsForLoc.map((c) => {
+                                  const courtBands = rentCourtBands[c.id] ?? [];
+
+                                  const addCourtBand = (preset?: { timeFrom: string; timeTo: string }) => {
+                                    const nextBand: RentBand = {
+                                      timeFrom: preset?.timeFrom ?? '06:00',
+                                      timeTo: preset?.timeTo ?? '18:00',
+                                      feePerStudent: '',
+                                      validFrom: new Date().toISOString().slice(0, 10),
+                                    };
+
+                                    const exists = (rentCourtBands[c.id] ?? []).some(
+                                      (b) => b.timeFrom === nextBand.timeFrom && b.timeTo === nextBand.timeTo,
+                                    );
+                                    if (exists) {
+                                      toast.info('Esa banda horaria ya existe en esta cancha.');
+                                      return;
+                                    }
+                                    setRentCourtBands((prev) => ({
+                                      ...prev,
+                                      [c.id]: [...(prev[c.id] ?? []), nextBand],
+                                    }));
+
+                                    if (preset) {
+                                      toast.success(`Override agregado (${nextBand.timeFrom}–${nextBand.timeTo})`);
+                                    } else {
+                                      toast.success('Override manual agregado');
+                                    }
+                                  };
+
+                                  return (
+                                    <div key={c.id} className="border rounded-md p-2">
+                                      <p className="text-sm font-medium text-[#31435d]">{c.name ?? c.id}</p>
+
+                                      <div className="mt-2 flex flex-wrap gap-2">
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          onClick={() => addCourtBand({ timeFrom: '06:00', timeTo: '18:00' })}
+                                          className="h-9"
+                                        >
+                                          Horas muertas
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          onClick={() => addCourtBand({ timeFrom: '18:00', timeTo: '23:00' })}
+                                          className="h-9"
+                                        >
+                                          Horas pico
+                                        </Button>
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          onClick={() => addCourtBand()}
+                                          className="h-9"
+                                        >
+                                          Banda manual
+                                        </Button>
+                                      </div>
+
+                                      {courtBands.length === 0 ? (
+                                        <p className="mt-2 text-xs text-gray-600">Sin overrides configurados.</p>
+                                      ) : (
+                                        <div className="mt-2 space-y-2">
+                                          {courtBands.map((b, idx) => (
+                                            <div key={`${c.id}-${idx}`} className="border rounded-md p-2">
+                                              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                                <div className="flex flex-col gap-1">
+                                                  <label className="text-sm text-gray-600">Desde</label>
+                                                  <Input
+                                                    type="time"
+                                                    value={b.timeFrom}
+                                                    onChange={(e) => {
+                                                      const v = e.target.value;
+                                                      setRentCourtBands((prev) => {
+                                                        const next = [...(prev[c.id] ?? [])];
+                                                        next[idx] = { ...next[idx], timeFrom: v };
+                                                        return { ...prev, [c.id]: next };
+                                                      });
+                                                    }}
+                                                    className="h-10 text-base"
+                                                  />
+                                                </div>
+                                                <div className="flex flex-col gap-1">
+                                                  <label className="text-sm text-gray-600">Hasta</label>
+                                                  <Input
+                                                    type="time"
+                                                    value={b.timeTo}
+                                                    onChange={(e) => {
+                                                      const v = e.target.value;
+                                                      setRentCourtBands((prev) => {
+                                                        const next = [...(prev[c.id] ?? [])];
+                                                        next[idx] = { ...next[idx], timeTo: v };
+                                                        return { ...prev, [c.id]: next };
+                                                      });
+                                                    }}
+                                                    className="h-10 text-base"
+                                                  />
+                                                </div>
+                                                <div className="flex flex-col gap-1">
+                                                  <label className="text-sm text-gray-600">Vigente desde</label>
+                                                  <DatePickerField
+                                                    value={b.validFrom}
+                                                    onChange={(value) => {
+                                                      setRentCourtBands((prev) => {
+                                                        const next = [...(prev[c.id] ?? [])];
+                                                        next[idx] = { ...next[idx], validFrom: value };
+                                                        return { ...prev, [c.id]: next };
+                                                      });
+                                                    }}
+                                                  />
+                                                </div>
+                                                <div className="flex flex-col gap-1">
+                                                  <label className="text-sm text-gray-600">Monto por alumno</label>
+                                                  <Input
+                                                    type="number"
+                                                    inputMode="decimal"
+                                                    value={b.feePerStudent}
+                                                    onChange={(e) => {
+                                                      const v = e.target.value;
+                                                      setRentCourtBands((prev) => {
+                                                        const next = [...(prev[c.id] ?? [])];
+                                                        next[idx] = { ...next[idx], feePerStudent: v };
+                                                        return { ...prev, [c.id]: next };
+                                                      });
+                                                    }}
+                                                    className="h-10 text-base"
+                                                    placeholder="(usa sede)"
+                                                  />
+                                                </div>
+                                              </div>
+
+                                              <div className="mt-2 flex justify-end">
+                                                <Button
+                                                  type="button"
+                                                  variant="outline"
+                                                  onClick={() => {
+                                                    setRentCourtBands((prev) => {
+                                                      const next = [...(prev[c.id] ?? [])];
+                                                      next.splice(idx, 1);
+                                                      return { ...prev, [c.id]: next };
+                                                    });
+                                                    toast.success('Override eliminado (pendiente de guardar)');
+                                                  }}
+                                                  className="h-9"
+                                                >
+                                                  Quitar
+                                                </Button>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             ) : (
+              // per_hour o both: mostrar configuración actual por clase
               <div className="space-y-4">
                 {rentLocations.map((loc) => {
                   const locValue = rentLocationValues[loc.id] ?? {
