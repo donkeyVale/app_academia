@@ -2,11 +2,15 @@
   "crons": [
     {
       "path": "/api/cron/payment-pending",
-      "schedule": "0 9 * * *"
+      "schedule": "0 12 * * *"
     },
     {
       "path": "/api/cron/balance-reminder",
-      "schedule": "0 6 * * *"
+      "schedule": "0 10,22 * * *"
+    },
+    {
+      "path": "/api/cron/class-reminder",
+      "schedule": "0 10,22 * * *"
     }
   ]
 }
