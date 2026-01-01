@@ -28,13 +28,36 @@ La mayoría de endpoints, si `webPush.sendNotification` rechaza con status `404`
 ## Anti-spam de notificaciones automáticas
 
 ### Tabla `notification_events`
-Se usa para evitar enviar varias veces la misma notificación automática para el mismo plan:
+Se usa para evitar enviar varias veces la misma notificación automática.
 
-- Clave lógica: `(student_plan_id, event_type)`
-- Debe existir índice único/constraint equivalente:
-  - `unique(student_plan_id, event_type)`
+Casos actuales:
+
+- **Planes (pagos/saldos)**
+  - Clave lógica: `(student_plan_id, event_type)`
+  - Debe existir índice único/constraint equivalente:
+    - `unique(student_plan_id, event_type)`
+
+- **Recordatorios de clase (hoy/mañana)**
+  - Clave lógica: `(student_id, class_id, event_type)`
+  - Requiere:
+    - columna `class_id uuid`
+    - `student_plan_id` debe permitir `NULL` (porque en recordatorios de clase no aplica)
+    - índice único/constraint equivalente:
+      - `unique(student_id, class_id, event_type)`
 
 Los crons primero hacen `upsert` en `notification_events` y **solo envían push** a los registros que se insertaron recién.
+
+SQL sugerido para soportar recordatorios de clase:
+```sql
+alter table public.notification_events
+  add column if not exists class_id uuid;
+
+alter table public.notification_events
+  alter column student_plan_id drop not null;
+
+create unique index if not exists notification_events_student_class_event_uidx
+  on public.notification_events (student_id, class_id, event_type);
+```
 
 ---
 
@@ -145,6 +168,8 @@ Los `cambios` intentan incluir:
   - `profiles.notifications_enabled != false`
   - Debe tener suscripción en `push_subscriptions`
 
+> Nota: el filtro por **academia** y por `user_academies.is_active=true` se aplica en los endpoints **cron** (ver abajo).
+
 ### Payload
 ```json
 {
@@ -153,6 +178,29 @@ Los `cambios` intentan incluir:
   "data": { "url": "/schedule", "classId": "...", "dateIso": "..." }
 }
 ```
+
+Input adicional opcional:
+
+- `bodyText` (string): permite variar el texto desde el cron.
+
+### Crons (decisión + anti-spam)
+
+Se generan desde crons separados (para mantener copy y rangos claros):
+
+- `POST /api/cron/class-reminder-today`
+  - **Horario**: 07:00 Asunción (UTC-3) = 10:00 UTC
+  - **Qué busca**: clases del **día de hoy** (en Asunción)
+  - **Texto**: el general (por defecto)
+  - **Filtro por academia**: resuelve `academy_id` vía `academy_locations` usando el `location_id` de la cancha
+  - **Filtro de actividad**: requiere `user_academies.is_active=true` para el `academy_id` de la clase
+  - **Anti-spam**: registra `event_type = 'class_reminder_today'` y deduplica por `(student_id, class_id, event_type)`
+
+- `POST /api/cron/class-reminder-tomorrow`
+  - **Horario**: 19:00 Asunción (UTC-3) = 22:00 UTC
+  - **Qué busca**: clases de **mañana** (en Asunción)
+  - **Texto**: copy específico de “mañana” (vía `bodyText`)
+  - **Filtro por academia** y **actividad**: igual que el cron de hoy
+  - **Anti-spam**: registra `event_type = 'class_reminder_tomorrow'` y deduplica por `(student_id, class_id, event_type)`
 
 ---
 
@@ -319,5 +367,5 @@ Todos los endpoints push requieren:
 # Notas / mejoras futuras
 
 - Consolidar textos (“copy”) para consistencia.
-- Agregar anti-spam también a `class-reminder` si se ejecuta por cron repetido.
+- Definir textos (“copy”) por tipo de recordatorio (hoy vs mañana) si se quiere más consistencia.
 - Eliminar índice único duplicado en `notification_events` (solo dejar uno en `(student_plan_id,event_type)` para no duplicar overhead).
