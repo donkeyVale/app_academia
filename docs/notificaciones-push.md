@@ -206,7 +206,12 @@ Se generan desde crons separados (para mantener copy y rangos claros):
 
 ## 4b) Cumpleaños (alumno + aviso a admins)
 
-Se basa en la fecha de nacimiento guardada en `auth.users.user_metadata.birth_date` en formato `DD/MM/YYYY`.
+Se basa en la fecha de nacimiento guardada en `auth.users.user_metadata.birth_date`.
+
+Formatos soportados:
+
+- `DD/MM/YYYY`
+- `YYYY-MM-DD`
 
 ### Alumno (en su día)
 

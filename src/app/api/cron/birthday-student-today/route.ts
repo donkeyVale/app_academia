@@ -33,18 +33,39 @@ function getLocalYmdUtcMinus3(now: Date) {
   return { y: local.getUTCFullYear(), m: local.getUTCMonth() + 1, d: local.getUTCDate() };
 }
 
-function parseBirthDateDdMmYyyy(value: any): { d: number; m: number; y: number } | null {
+function parseBirthDate(value: any): { d: number; m: number; y: number } | null {
   if (typeof value !== 'string') return null;
   const s = value.trim();
-  const m = /^([0-3]?\d)\/([0-1]?\d)\/(\d{4})$/.exec(s);
-  if (!m) return null;
-  const dd = Number(m[1]);
-  const mm = Number(m[2]);
-  const yy = Number(m[3]);
-  if (!dd || !mm || !yy) return null;
-  if (dd < 1 || dd > 31) return null;
-  if (mm < 1 || mm > 12) return null;
-  return { d: dd, m: mm, y: yy };
+
+  // DD/MM/YYYY
+  {
+    const m = /^([0-3]?\d)\/([0-1]?\d)\/(\d{4})$/.exec(s);
+    if (m) {
+      const dd = Number(m[1]);
+      const mm = Number(m[2]);
+      const yy = Number(m[3]);
+      if (!dd || !mm || !yy) return null;
+      if (dd < 1 || dd > 31) return null;
+      if (mm < 1 || mm > 12) return null;
+      return { d: dd, m: mm, y: yy };
+    }
+  }
+
+  // YYYY-MM-DD
+  {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    if (m) {
+      const yy = Number(m[1]);
+      const mm = Number(m[2]);
+      const dd = Number(m[3]);
+      if (!dd || !mm || !yy) return null;
+      if (dd < 1 || dd > 31) return null;
+      if (mm < 1 || mm > 12) return null;
+      return { d: dd, m: mm, y: yy };
+    }
+  }
+
+  return null;
 }
 
 async function listAllAuthUsers() {
@@ -107,7 +128,7 @@ export async function POST(req: NextRequest) {
       const uid = u?.id as string | undefined;
       if (!uid || !studentUserIds.has(uid)) continue;
 
-      const birthDate = parseBirthDateDdMmYyyy(u?.user_metadata?.birth_date);
+      const birthDate = parseBirthDate(u?.user_metadata?.birth_date);
       if (!birthDate) continue;
       if (birthDate.d === d && birthDate.m === m) {
         birthdayUserIds.push(uid);
