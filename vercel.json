@@ -9,8 +9,12 @@
       "schedule": "0 10,22 * * *"
     },
     {
-      "path": "/api/cron/class-reminder",
-      "schedule": "0 10,22 * * *"
+      "path": "/api/cron/class-reminder-today",
+      "schedule": "0 10 * * *"
+    },
+    {
+      "path": "/api/cron/class-reminder-tomorrow",
+      "schedule": "0 22 * * *"
     }
   ]
 }

@@ -41,7 +41,7 @@ async function sendToSubs(subs: SubscriptionRow[], payload: string) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { studentId, classId, dateIso } = body || {};
+    const { studentId, classId, dateIso, bodyText } = body || {};
 
     if (!studentId || typeof studentId !== 'string') {
       return NextResponse.json({ error: 'Falta studentId.' }, { status: 400 });
@@ -53,6 +53,10 @@ export async function POST(req: NextRequest) {
 
     if (!dateIso || typeof dateIso !== 'string') {
       return NextResponse.json({ error: 'Falta dateIso.' }, { status: 400 });
+    }
+
+    if (bodyText != null && typeof bodyText !== 'string') {
+      return NextResponse.json({ error: 'bodyText inválido.' }, { status: 400 });
     }
 
     const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -106,7 +110,7 @@ export async function POST(req: NextRequest) {
 
     const payload = JSON.stringify({
       title: 'Recordatorio',
-      body: 'Recordá que tenés clases agendadas, revisá tu agenda!!',
+      body: bodyText ?? 'Recordá que tenés clases agendadas, revisá tu agenda!!',
       data: { url: '/schedule', classId, dateIso },
     });
 
