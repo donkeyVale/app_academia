@@ -15,6 +15,14 @@
     {
       "path": "/api/cron/class-reminder-tomorrow",
       "schedule": "0 22 * * *"
+    },
+    {
+      "path": "/api/cron/birthday-student-today",
+      "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/birthday-admin-tomorrow",
+      "schedule": "0 21 * * *"
     }
   ]
 }

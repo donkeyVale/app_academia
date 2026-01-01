@@ -204,6 +204,44 @@ Se generan desde crons separados (para mantener copy y rangos claros):
 
 ---
 
+## 4b) Cumpleaños (alumno + aviso a admins)
+
+Se basa en la fecha de nacimiento guardada en `auth.users.user_metadata.birth_date` en formato `DD/MM/YYYY`.
+
+### Alumno (en su día)
+
+- **Cron**: `POST /api/cron/birthday-student-today`
+  - **Horario**: 09:00 Asunción (UTC-3) = 12:00 UTC
+  - **Candidatos**: usuarios con `user_academies.role = 'student'` y `is_active = true`
+  - **Filtro**: debe estar activo en al menos una academia
+  - **Anti-spam**: registra `event_type = 'birthday_student_today'` y deduplica por `(user_id, event_type, event_date)`
+- **Push**: `POST /api/push/birthday-student`
+  - **Destinatario**: `userId`
+  - **Payload**:
+    - title: `Feliz cumpleaños`
+    - body: `Feliz cumpleaños! ... de parte de AGENDO!!`
+    - url: `/schedule`
+
+### Admins (aviso para mañana)
+
+- **Cron**: `POST /api/cron/birthday-admin-tomorrow`
+  - **Horario**: 18:00 Asunción (UTC-3) = 21:00 UTC
+  - **Candidatos**: alumnos activos por academia (`user_academies.role='student'` + `is_active=true`)
+  - **Anti-spam**: registra `event_type = 'birthday_admin_tomorrow'` y deduplica por `(academy_id, event_type, event_date)`
+- **Push**: `POST /api/push/birthday-admins`
+  - **Destinatarios**: admins activos de la academia (`user_academies.role in ('admin','super_admin')` y `is_active=true`)
+  - **Payload**: incluye una lista (hasta 3) de nombres de cumpleañeros del día siguiente
+
+### Requisitos DB (anti-spam cumpleaños)
+
+Para soportar deduplicación de cumpleaños, `notification_events` debe incluir:
+
+- `user_id uuid` (nullable)
+- `event_date date`
+- unique index:
+  - `(user_id, event_type, event_date)`
+  - `(academy_id, event_type, event_date)`
+
 ## 5) Pago pendiente
 
 ### Cron (decisión + anti-spam)
