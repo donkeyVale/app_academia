@@ -33,10 +33,11 @@ function getLocalYmdUtcMinus3(now: Date) {
   return { y: local.getUTCFullYear(), m: local.getUTCMonth(), d: local.getUTCDate() };
 }
 
-function getUtcRangeForLocalDayUtcMinus3(y: number, m: number, d: number) {
+function getUtcRangeForLocalDayUtcMinus3(y: number, m: number, d: number, addDays: number) {
   // Local midnight (UTC-3) == UTC 03:00
-  const startUtcMs = Date.UTC(y, m, d, 3, 0, 0, 0);
-  const endUtcMs = Date.UTC(y, m, d + 1, 2, 59, 59, 999);
+  const baseStartUtcMs = Date.UTC(y, m, d, 3, 0, 0, 0);
+  const startUtcMs = baseStartUtcMs + addDays * 24 * 60 * 60 * 1000;
+  const endUtcMs = startUtcMs + 24 * 60 * 60 * 1000 - 1;
   return { startIso: new Date(startUtcMs).toISOString(), endIso: new Date(endUtcMs).toISOString() };
 }
 
@@ -50,8 +51,7 @@ export async function POST(req: NextRequest) {
 
     const now = new Date();
     const { y, m, d } = getLocalYmdUtcMinus3(now);
-    const tomorrowD = d + 1;
-    const { startIso, endIso } = getUtcRangeForLocalDayUtcMinus3(y, m, tomorrowD);
+    const { startIso, endIso } = getUtcRangeForLocalDayUtcMinus3(y, m, d, 1);
 
     const { data: bookings, error: bookingsErr } = await supabaseAdmin
       .from('bookings')
@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
     if (rows.length === 0) {
       return NextResponse.json({
         ok: true,
+        mode: 'tomorrow',
         checked: 0,
         candidates: 0,
         inserted: 0,
@@ -136,6 +137,7 @@ export async function POST(req: NextRequest) {
     if (candidates.length === 0) {
       return NextResponse.json({
         ok: true,
+        mode: 'tomorrow',
         checked: 0,
         candidates: rows.length,
         inserted: 0,
@@ -169,6 +171,7 @@ export async function POST(req: NextRequest) {
     if (activeCandidates.length === 0) {
       return NextResponse.json({
         ok: true,
+        mode: 'tomorrow',
         checked: 0,
         candidates: candidates.length,
         inserted: 0,
@@ -257,6 +260,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
+      mode: 'tomorrow',
       checked: targets.length,
       candidates: rows.length,
       inserted: insertedKeys.size,
