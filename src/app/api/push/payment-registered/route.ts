@@ -62,8 +62,9 @@ export async function POST(req: NextRequest) {
     // Destinatarios: admins asignados a esta academia
     const { data: uaRows, error: uaErr } = await supabaseAdmin
       .from('user_academies')
-      .select('user_id, role')
-      .eq('academy_id', academyId);
+      .select('user_id, role, is_active')
+      .eq('academy_id', academyId)
+      .eq('is_active', true);
 
     if (uaErr) {
       return NextResponse.json({ error: uaErr.message }, { status: 500 });

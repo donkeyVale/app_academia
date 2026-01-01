@@ -211,11 +211,15 @@ export async function POST(req: NextRequest) {
         checked: rows.length,
         pending: 0,
         notified: 0,
+        classReminderChecked: classReminderTargets.length,
+        classReminderNotified,
         debug: debug
           ? {
               force,
               candidates: rows.length,
               candidatePlanIds: rows.slice(0, 20).map((r) => r.id),
+              classReminderWindow: { nowIso, windowEndIso },
+              classReminderPushResponses,
             }
           : undefined,
       });

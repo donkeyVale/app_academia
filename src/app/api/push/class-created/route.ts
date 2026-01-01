@@ -90,6 +90,7 @@ export async function POST(req: NextRequest) {
         .from('user_academies')
         .select('user_id')
         .eq('academy_id', academyId)
+        .eq('is_active', true)
         .in('user_id', Array.from(allowedUserIds));
 
       if (uaErr) {

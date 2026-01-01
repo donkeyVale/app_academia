@@ -84,6 +84,7 @@ export async function POST(req: NextRequest) {
         .select('user_id')
         .eq('academy_id', academyId)
         .eq('user_id', studentUserId)
+        .eq('is_active', true)
         .maybeSingle();
 
       if (uaErr) {

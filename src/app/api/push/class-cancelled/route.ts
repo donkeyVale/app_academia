@@ -79,7 +79,8 @@ export async function POST(req: NextRequest) {
     const { data: uaRows, error: uaErr } = await supabaseAdmin
       .from('user_academies')
       .select('user_id, role')
-      .eq('academy_id', academyId);
+      .eq('academy_id', academyId)
+      .eq('is_active', true);
 
     if (uaErr) {
       return NextResponse.json({ error: uaErr.message }, { status: 500 });
@@ -143,6 +144,7 @@ export async function POST(req: NextRequest) {
         .from('user_academies')
         .select('user_id')
         .eq('academy_id', academyId)
+        .eq('is_active', true)
         .in('user_id', Array.from(allowedUserIds));
 
       if (uaErr2) {
