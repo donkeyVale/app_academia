@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Agendo</string>
+    <string name="title_activity_main">Agendo</string>
+    <string name="package_name">com.nativatech.agendo</string>
+    <string name="custom_url_scheme">com.nativatech.agendo</string>
+</resources>
