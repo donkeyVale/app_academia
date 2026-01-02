@@ -2,7 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
 
 export const config = {
-  matcher: ['/((?!_next|api|manifest\\.json|icons|sw\\.js|login|favicon\\.ico|\\.well-known|apple-app-site-association).*)'],
+  matcher: ['/((?!_next|api|manifest\\.json|icons|sw\\.js|login|privacy-policy|support|favicon\\.ico|\\.well-known|apple-app-site-association).*)'],
 };
 
 export default async function middleware(req: NextRequest) {
