@@ -60,6 +60,10 @@ jobs:
           keyPassword=${ANDROID_KEY_PASSWORD}
           EOF
 
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+        working-directory: mobile/android
+
       - name: Build APK (debug)
         run: ./gradlew :app:assembleDebug
         working-directory: mobile/android
