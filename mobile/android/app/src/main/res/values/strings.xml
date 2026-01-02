@@ -3,5 +3,5 @@
     <string name="app_name">Agendo</string>
     <string name="title_activity_main">Agendo</string>
     <string name="package_name">com.nativatech.agendo</string>
-    <string name="custom_url_scheme">com.nativatech.agendo</string>
+    <string name="custom_url_scheme">agendo</string>
 </resources>
