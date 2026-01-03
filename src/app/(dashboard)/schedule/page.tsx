@@ -769,9 +769,11 @@ export default function SchedulePage() {
 
       const createdClassIds: string[] = [];
       const createdClassDates: string[] = [];
+      const createdBookingsByStudent: Record<string, number> = {};
       let skippedCourt = 0;
       let skippedStudents = 0;
       let searchCursor = new Date(`${day}T00:00:00`);
+      let summaryToastShown = false;
 
       const createOneSession = async (sessionIso: string, sessionIndex: number) => {
         const studentsToBook = selectedStudents.filter((sid) => (remainingForStudent[sid] ?? 0) >= sessionIndex + 1);
@@ -852,6 +854,10 @@ export default function SchedulePage() {
         }));
         const { error: bookingsErr } = await supabase.from('bookings').insert(bookingRows);
         if (bookingsErr) throw bookingsErr;
+
+        for (const sid of studentsToBook) {
+          createdBookingsByStudent[sid] = (createdBookingsByStudent[sid] ?? 0) + 1;
+        }
 
         // plan_usages
         for (const sid of studentsToBook) {
@@ -961,12 +967,26 @@ export default function SchedulePage() {
         }
       }
 
-      if (extraCreated > 0) {
+      if (recurringEnabled) {
+        const perStudent = selectedStudents
+          .map((sid) => {
+            const label = getStudentLabel(sid);
+            const count = createdBookingsByStudent[sid] ?? 0;
+            return { sid, label, count };
+          })
+          .filter((x) => x.count > 0);
+
+        const perStudentTxt = perStudent.length
+          ? ` Reservas: ${perStudent.map((x) => `${x.label}: ${x.count}`).join(' | ')}.`
+          : '';
+
         const skippedMsgParts: string[] = [];
         if (skippedCourt > 0) skippedMsgParts.push(`${skippedCourt} por cancha ocupada`);
         if (skippedStudents > 0) skippedMsgParts.push(`${skippedStudents} por alumnos ocupados`);
         const skippedTxt = skippedMsgParts.length ? ` (omitidas: ${skippedMsgParts.join(', ')})` : '';
-        toast.success(`Se crearon ${createdClassIds.length} clases (incluyendo las recurrentes)${skippedTxt}.`);
+
+        toast.success(`Se crearon ${createdClassIds.length} clases${skippedTxt}.${perStudentTxt}`);
+        summaryToastShown = true;
       }
 
       setDay('');
@@ -979,10 +999,7 @@ export default function SchedulePage() {
       setRecurringEnabled(false);
       setRecurringWeekdays([]);
       setRecurringTimesByWeekday({});
-      if (extraCreated > 0) {
-        // El toast de resumen se muestra antes; dejamos este como fallback.
-        toast.success(`Se crearon ${1 + extraCreated} clases (incluyendo las recurrentes).`);
-      } else {
+      if (!summaryToastShown) {
         toast.success('Clase creada correctamente');
       }
     } catch (err: any) {
