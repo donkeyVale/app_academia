@@ -153,7 +153,6 @@ export default function SchedulePage() {
   const [notes, setNotes] = useState<string>('');
   const [recurringEnabled, setRecurringEnabled] = useState(false);
   const [recurringWeekdays, setRecurringWeekdays] = useState<number[]>([]);
-  const [recurringMaxCount, setRecurringMaxCount] = useState<string>('');
 
   // Filters for list
   const [filterLocationId, setFilterLocationId] = useState<string>('');
@@ -499,11 +498,17 @@ export default function SchedulePage() {
     e.preventDefault();
     setSaving(true);
     setError(null);
-    const extraCreated = 0;
+    let extraCreated = 0;
     try {
       if (!courtId || !coachId || !day || !time) {
         const msg = 'Completa cancha, fecha y hora, y profesor';
         toast.error(msg);
+        setSaving(false);
+        return;
+      }
+
+      if (recurringEnabled && recurringWeekdays.length === 0) {
+        toast.error('Seleccioná al menos un día de la semana para las clases recurrentes.');
         setSaving(false);
         return;
       }
@@ -590,6 +595,7 @@ export default function SchedulePage() {
 
       // Validar que cada alumno tenga saldo disponible en su plan antes de crear la clase
       const planForStudent: Record<string, string> = {};
+      const remainingForStudent: Record<string, number> = {};
       for (const sid of selectedStudents) {
         const { data: plans, error: planErr } = await supabase
           .from('student_plans')
@@ -612,6 +618,7 @@ export default function SchedulePage() {
         }
 
         let chosenPlan: any = null;
+        let chosenPlanRemaining: number | null = null;
         for (const p of plans as any[]) {
           const { count: usedCount, error: usageCountErr } = await supabase
             .from('plan_usages')
@@ -625,14 +632,24 @@ export default function SchedulePage() {
             return;
           }
           const used = usedCount ?? 0;
-          if (used < (p.remaining_classes as number)) {
+          const totalFromPlan = (p.remaining_classes as number) ?? 0;
+          const remaining = Math.max(0, totalFromPlan - used);
+          if (remaining > 0) {
             chosenPlan = p;
+            chosenPlanRemaining = remaining;
             break;
           }
         }
 
         if (!chosenPlan) {
           const msg = 'El alumno seleccionado ya no tiene clases disponibles en su plan.';
+          toast.error(msg);
+          setSaving(false);
+          return;
+        }
+
+        if (chosenPlanRemaining == null) {
+          const msg = 'No se pudo determinar el saldo del plan del alumno.';
           toast.error(msg);
           setSaving(false);
           return;
@@ -666,6 +683,7 @@ export default function SchedulePage() {
         }
 
         planForStudent[sid] = chosenPlan.id as string;
+        remainingForStudent[sid] = chosenPlanRemaining;
       }
 
       // V4: Validar que ningún alumno tenga otra clase en el mismo horario (en cualquier sede/cancha)
@@ -698,102 +716,204 @@ export default function SchedulePage() {
         }
       }
 
-      // Crear la clase principal
-      const { data: inserted, error: insErr } = await supabase
-        .from('class_sessions')
-        .insert({
-          date: iso,
+      const weekdaysSet = new Set(recurringWeekdays);
+      const maxRemaining = Math.max(...Object.values(remainingForStudent));
+      const desiredTotalSessions = recurringEnabled ? maxRemaining : 1;
+
+      const createdClassIds: string[] = [];
+      const createdClassDates: string[] = [];
+      let skippedCourt = 0;
+      let skippedStudents = 0;
+      let searchCursor = new Date(`${day}T${time}:00`);
+
+      const createOneSession = async (sessionIso: string, sessionIndex: number) => {
+        const studentsToBook = selectedStudents.filter((sid) => (remainingForStudent[sid] ?? 0) >= sessionIndex + 1);
+        if (studentsToBook.length === 0) return;
+
+        // Anti-race: misma cancha y misma hora
+        {
+          const { data: clash, error: clashErr } = await supabase
+            .from('class_sessions')
+            .select('id')
+            .eq('court_id', courtId)
+            .eq('date', sessionIso)
+            .limit(1);
+          if (clashErr) throw clashErr;
+          if ((clash ?? []).length > 0) {
+            skippedCourt += 1;
+            return;
+          }
+        }
+
+        // Warning: coach con clase en mismo horario
+        {
+          const { data: coachClash, error: coachClashErr } = await supabase
+            .from('class_sessions')
+            .select('id')
+            .eq('coach_id', coachId)
+            .eq('date', sessionIso)
+            .limit(1);
+          if (coachClashErr) throw coachClashErr;
+          if ((coachClash ?? []).length > 0) {
+            const coachName = coachesMap[coachId]?.full_name ?? 'el profesor seleccionado';
+            toast.warning(`${coachName} ya tiene una clase en ese horario.`);
+          }
+        }
+
+        // Bloqueo: alumnos con clase en el mismo horario
+        {
+          const { data: conflicts, error: conflictsErr } = await supabase
+            .from('bookings')
+            .select('student_id, class_sessions!inner(id,date)')
+            .in('student_id', studentsToBook)
+            .eq('class_sessions.date', sessionIso);
+
+          if (conflictsErr) throw conflictsErr;
+          if ((conflicts ?? []).length > 0) {
+            skippedStudents += 1;
+            return;
+          }
+        }
+
+        const capacityForSession = studentsToBook.length;
+        const typeForSession: 'individual' | 'grupal' = capacityForSession === 1 ? 'individual' : 'grupal';
+
+        const { data: inserted, error: insErr } = await supabase
+          .from('class_sessions')
+          .insert({
+            date: sessionIso,
+            court_id: courtId,
+            coach_id: coachId,
+            capacity: capacityForSession,
+            type: typeForSession,
+            // price_cents y currency pueden tener defaults en la DB; si no, se agregan luego.
+          })
+          .select('*')
+          .maybeSingle();
+        if (insErr) throw insErr;
+        if (!inserted) throw new Error('No se pudo crear la clase (verifica permisos RLS para INSERT).');
+
+        const createdClassId = (inserted as any).id as string;
+        createdClassIds.push(createdClassId);
+        createdClassDates.push((inserted as any).date as string);
+
+        // bookings
+        const bookingRows = studentsToBook.map((sid) => ({
+          class_id: createdClassId,
+          student_id: sid,
+          status: 'reserved',
+        }));
+        const { error: bookingsErr } = await supabase.from('bookings').insert(bookingRows);
+        if (bookingsErr) throw bookingsErr;
+
+        // plan_usages
+        for (const sid of studentsToBook) {
+          const planId = planForStudent[sid];
+          if (!planId) continue;
+          const { error: usageUpsertErr } = await supabase.from('plan_usages').upsert(
+            {
+              student_plan_id: planId,
+              class_id: createdClassId,
+              student_id: sid,
+            },
+            { onConflict: 'student_id,class_id' }
+          );
+          if (usageUpsertErr) {
+            console.error('Error registrando plan_usages en Agenda (create)', usageUpsertErr.message);
+          }
+        }
+
+        await logAudit('create', 'class_session', createdClassId, {
+          date: sessionIso,
           court_id: courtId,
           coach_id: coachId,
-          capacity: derivedCapacity,
-          type: derivedType,
-          // price_cents y currency pueden tener defaults en la DB; si no, se agregan luego.
-        })
-        .select('*')
-        .maybeSingle();
+          capacity: capacityForSession,
+          type: typeForSession,
+          students: [...studentsToBook],
+          recurring_enabled: recurringEnabled,
+        });
 
-      if (insErr) {
-        const msg = insErr.message || 'No se pudo crear la clase.';
-        toast.error(msg);
+        // UI sync
+        const newClass = inserted as unknown as ClassSession;
+        setClasses((prev) => [...prev, newClass].sort((a, b) => a.date.localeCompare(b.date)));
+        setBookingsCount((prev) => ({ ...prev, [createdClassId]: studentsToBook.length }));
+        setStudentsByClass((prev) => ({
+          ...prev,
+          [createdClassId]: [...studentsToBook],
+        }));
+
+        // Push solo para la primera clase creada
+        if (sessionIndex === 0 && selectedAcademyId) {
+          try {
+            await fetch('/api/push/class-created', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                classId: createdClassId,
+                coachId,
+                studentIds: [...studentsToBook],
+                dateIso: sessionIso,
+                academyId: selectedAcademyId,
+              }),
+            });
+          } catch (pushErr) {
+            console.error('Error enviando notificación de clase creada', pushErr);
+          }
+        }
+      };
+
+      // Crear la primera clase (siempre)
+      await createOneSession(iso, 0);
+      if (createdClassIds.length === 0) {
+        toast.error('No se pudo crear la clase. Verificá disponibilidad y reintentá.');
         setSaving(false);
         return;
       }
-      if (!inserted) {
-        const msg = 'No se pudo crear la clase (verifica permisos RLS para INSERT).';
-        toast.error(msg);
-        setSaving(false);
-        return;
-      }
 
-      const createdClassId = (inserted as any).id as string;
+      // Crear clases recurrentes adicionales
+      if (recurringEnabled && desiredTotalSessions > 1) {
+        const targetTotal = desiredTotalSessions;
+        const maxSearchDays = 730;
+        let searchedDays = 0;
 
-      // Crear bookings para todos los alumnos seleccionados
-      const bookingRows = selectedStudents.map((sid) => ({
-        class_id: createdClassId,
-        student_id: sid,
-        status: 'reserved',
-      }));
+        // arrancamos desde el día siguiente al de la primera clase
+        searchCursor = new Date(searchCursor.getTime() + 24 * 60 * 60 * 1000);
 
-      const { error: bookingsErr } = await supabase.from('bookings').insert(bookingRows);
-      if (bookingsErr) {
-        const msg = bookingsErr.message || 'La clase se creó, pero hubo un problema al registrar las reservas.';
-        toast.error(msg);
-        setSaving(false);
-        return;
-      }
+        while (createdClassIds.length < targetTotal && searchedDays < maxSearchDays) {
+          const wd = searchCursor.getDay();
+          if (weekdaysSet.has(wd)) {
+            const yyyy = searchCursor.getFullYear();
+            const mm = String(searchCursor.getMonth() + 1).padStart(2, '0');
+            const dd = String(searchCursor.getDate()).padStart(2, '0');
+            const isoCandidate = new Date(`${yyyy}-${mm}-${dd}T${time}:00`).toISOString();
+            try {
+              await createOneSession(isoCandidate, createdClassIds.length);
+              if (createdClassIds.length > 1) {
+                extraCreated = createdClassIds.length - 1;
+              }
+            } catch (recErr: any) {
+              const msg = recErr?.message || 'Error creando clases recurrentes.';
+              console.error('Error creando clase recurrente', msg);
+              toast.error(msg);
+              setSaving(false);
+              return;
+            }
+          }
+          searchCursor = new Date(searchCursor.getTime() + 24 * 60 * 60 * 1000);
+          searchedDays += 1;
+        }
 
-      // Crear usos de plan para cada alumno usando planForStudent validado arriba
-      for (const sid of selectedStudents) {
-        const planId = planForStudent[sid];
-        if (!planId) continue;
-        const { error: usageUpsertErr } = await supabase.from('plan_usages').upsert(
-          {
-            student_plan_id: planId,
-            class_id: createdClassId,
-            student_id: sid,
-          },
-          { onConflict: 'student_id,class_id' }
-        );
-        if (usageUpsertErr) {
-          console.error('Error registrando plan_usages en Agenda (create)', usageUpsertErr.message);
+        if (searchedDays >= maxSearchDays && createdClassIds.length < targetTotal) {
+          toast.warning('No se pudieron generar todas las clases recurrentes por falta de fechas disponibles.');
         }
       }
 
-      // Log de auditoría similar a update/delete
-      await logAudit('create', 'class_session', createdClassId, {
-        date: iso,
-        court_id: courtId,
-        coach_id: coachId,
-        capacity: derivedCapacity,
-        type: derivedType,
-        students: [...selectedStudents],
-      });
-
-      // Actualizar estado en memoria para que la UI refleje la nueva clase sin recargar
-      const newClass = inserted as unknown as ClassSession;
-      setClasses((prev) => [...prev, newClass].sort((a, b) => a.date.localeCompare(b.date)));
-      setBookingsCount((prev) => ({ ...prev, [createdClassId]: selectedStudents.length }));
-      setStudentsByClass((prev) => ({
-        ...prev,
-        [createdClassId]: [...selectedStudents],
-      }));
-
-      if (selectedAcademyId) {
-        try {
-          await fetch('/api/push/class-created', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              classId: createdClassId,
-              coachId,
-              studentIds: [...selectedStudents],
-              dateIso: iso,
-              academyId: selectedAcademyId,
-            }),
-          });
-        } catch (pushErr) {
-          console.error('Error enviando notificación de clase creada', pushErr);
-        }
+      if (extraCreated > 0) {
+        const skippedMsgParts: string[] = [];
+        if (skippedCourt > 0) skippedMsgParts.push(`${skippedCourt} por cancha ocupada`);
+        if (skippedStudents > 0) skippedMsgParts.push(`${skippedStudents} por alumnos ocupados`);
+        const skippedTxt = skippedMsgParts.length ? ` (omitidas: ${skippedMsgParts.join(', ')})` : '';
+        toast.success(`Se crearon ${createdClassIds.length} clases (incluyendo las recurrentes)${skippedTxt}.`);
       }
 
       setDay('');
@@ -805,8 +925,8 @@ export default function SchedulePage() {
       setNotes('');
       setRecurringEnabled(false);
       setRecurringWeekdays([]);
-      setRecurringMaxCount('');
       if (extraCreated > 0) {
+        // El toast de resumen se muestra antes; dejamos este como fallback.
         toast.success(`Se crearon ${1 + extraCreated} clases (incluyendo las recurrentes).`);
       } else {
         toast.success('Clase creada correctamente');
@@ -1796,7 +1916,6 @@ export default function SchedulePage() {
                         }
                       } else {
                         setRecurringWeekdays([]);
-                        setRecurringMaxCount('');
                       }
                     }}
                   />
@@ -1830,19 +1949,6 @@ export default function SchedulePage() {
                           </button>
                         );
                       })}
-                    </div>
-                    <div>
-                      <label className="block text-xs mb-1 text-gray-700">
-                        Máximo de clases a generar (opcional)
-                      </label>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={recurringMaxCount}
-                        onChange={(e) => setRecurringMaxCount(e.target.value)}
-                        className="h-9 text-sm max-w-[160px]"
-                        placeholder="Ej.: 8"
-                      />
                     </div>
                     <p className="text-[11px] text-gray-500">
                       Se creará primero la clase seleccionada y luego se intentarán crear más clases en los días
