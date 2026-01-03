@@ -84,16 +84,19 @@ La Agenda permite:
 
 Flujo típico:
 
-1. Elegí **Fecha** (`day`) y **Hora** (`time`).
+1. Elegí **Fecha** (`day`).
 2. Seleccioná **Sede** y **Cancha**.
-3. Seleccioná **Profesor**.
-4. Seleccioná **Alumno/s**.
+3. Elegí **Hora**.
+   - Si NO usás recurrencia: se elige una hora única.
+   - Si usás recurrencia: la hora se define por día de semana (ver 5.2).
+4. Seleccioná **Profesor**.
+5. Seleccioná **Alumno/s**.
    - El tipo se deriva automáticamente:
      - 1 alumno = `individual`
      - 2 a 4 alumnos = `grupal`
    - La capacidad se deriva de la cantidad de alumnos.
-5. Opcional: notas.
-6. Guardar.
+6. Opcional: notas.
+7. Guardar.
 
 Validaciones importantes:
 
@@ -103,9 +106,29 @@ Validaciones importantes:
 
 ### 5.2 Clases recurrentes
 
-- Existe soporte para crear clases recurrentes (según UI) con:
-  - días de semana
-  - cantidad máxima
+- Permite crear automáticamente una serie de clases futuras **hasta agotar el plan** de los alumnos seleccionados.
+- Se definen:
+  - días de la semana
+  - **hora por cada día de la semana** (ej.: Lunes 06:00, Viernes 18:00)
+
+Comportamiento:
+
+- Se crea siempre la primera clase en la fecha seleccionada.
+- Luego se intentan crear clases futuras en los días marcados.
+- En clases grupales, la recurrencia sigue una lógica “variable por alumno”:
+  - Si un alumno se queda sin saldo antes que otro, las clases posteriores se crean igual, pero con reservas solo para el/los alumnos que aún tengan saldo.
+
+Conflictos y validaciones:
+
+- Si la **cancha** ya está ocupada en una fecha/hora candidata, esa ocurrencia se omite y se busca la próxima.
+- Si un **alumno** ya tiene otra clase en ese horario, esa ocurrencia se omite y se busca la próxima.
+- Si el **profesor** ya tiene otra clase en ese horario, se muestra una advertencia (toast) pero no se bloquea.
+
+Al finalizar, la app muestra un **toast resumen** con:
+
+- cantidad de clases creadas
+- reservas creadas por alumno
+- cantidad de fechas omitidas (por cancha ocupada / alumnos ocupados)
 
 ### 5.3 Editar / reprogramar / cancelar
 

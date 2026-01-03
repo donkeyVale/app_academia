@@ -70,6 +70,19 @@ La Agenda es tu herramienta principal.
 
 - Se manejan notas asociadas a clases (según UI y permisos).
 
+### 5.5 Clases recurrentes (creación)
+
+- El profesor puede visualizar clases recurrentes creadas por admin/super admin.
+- Cuando se crean clases recurrentes, se pueden definir:
+  - días de la semana
+  - **hora por cada día** (ej.: Lunes 06:00, Viernes 18:00)
+
+Comportamiento relevante:
+
+- Se crean múltiples clases futuras hasta agotar el plan del/los alumnos.
+- En clases grupales, puede pasar que en algunas fechas haya menos alumnos, si alguno se quedó sin saldo antes.
+- Si el profesor ya tiene una clase en el mismo horario, el sistema puede mostrar una advertencia, pero no bloquea la creación.
+
 ---
 
 ## 6) Alumnos (`/students`)
