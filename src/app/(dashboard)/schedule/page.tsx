@@ -107,6 +107,7 @@ type ClassSession = {
   capacity: number;
   coach_id: string | null;
   court_id: string | null;
+  notes?: string | null;
   price_cents: number;
   currency: string;
 };
@@ -2143,6 +2144,12 @@ export default function SchedulePage() {
                               <p className="truncate">
                                 <span className="font-semibold text-slate-700">Alumnos en clase:</span> {alumnos}
                               </p>
+                              {!!(cls.notes || '').trim() && (
+                                <p className="text-xs text-gray-700 break-words whitespace-pre-wrap">
+                                  <span className="font-semibold text-slate-700">Nota de la clase:</span>{' '}
+                                  {cls.notes}
+                                </p>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -2610,6 +2617,11 @@ export default function SchedulePage() {
                             {alumnos}/{cls.capacity} alumnos
                           </button>
                         </div>
+                        {!!(cls.notes || '').trim() && (
+                          <p className="text-xs text-gray-700 break-words whitespace-pre-wrap pt-1">
+                            <span className="font-semibold text-slate-700">Nota de la clase:</span> {cls.notes}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="shrink-0 flex flex-col sm:flex-row gap-2 items-stretch sm:items-center w-full sm:w-auto">

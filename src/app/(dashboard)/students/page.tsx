@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { History, Users, StickyNote } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { createClientBrowser } from '@/lib/supabase';
 import { formatPyg } from '@/lib/formatters';
 
@@ -94,10 +95,27 @@ export default function StudentsPage() {
   const [myStudentIds, setMyStudentIds] = useState<string[]>([]);
   const [nextClassByStudent, setNextClassByStudent] = useState<Record<string, string | null>>({});
   const [classNotesByClass, setClassNotesByClass] = useState<
-    Record<string, { id: string; note: string }[]>
+    Record<
+      string,
+      {
+        id: string;
+        note: string;
+        coach_id: string | null;
+        visible_to_student: boolean | null;
+        visible_to_coach: boolean | null;
+      }[]
+    >
   >({});
   const [studentsWithNotes, setStudentsWithNotes] = useState<string[]>([]);
-  const [editingNote, setEditingNote] = useState<{ classId: string; draft: string } | null>(null);
+  const [editingNote, setEditingNote] = useState<
+    | {
+        classId: string;
+        draft: string;
+        visibleToStudent: boolean;
+        visibleToCoach: boolean;
+      }
+    | null
+  >(null);
   const [savingNote, setSavingNote] = useState(false);
   const [notesError, setNotesError] = useState<string | null>(null);
   const [coachIdForNotes, setCoachIdForNotes] = useState<string | null>(null);
@@ -701,21 +719,70 @@ export default function StudentsPage() {
       // Cargar notas de clase para este alumno y estas clases
       const classIds = items.map((i) => i.id);
       if (classIds.length) {
-        const { data: notesData, error: notesErr } = await supabase
+        let notesQuery = supabase
           .from('class_notes')
-          .select('id,class_id,student_id,coach_id,note')
+          .select('id,class_id,student_id,coach_id,note,visible_to_student,visible_to_coach')
           .eq('student_id', studentId)
           .in('class_id', classIds);
+
+        // Visibilidad:
+        // - student: solo lo visible al alumno
+        // - coach: ve sus propias notas y las del admin que estén marcadas visibles para coach
+        // - admin/super_admin: ve todo
+        if (role === 'student') {
+          notesQuery = notesQuery.eq('visible_to_student', true);
+        }
+        if (role === 'coach') {
+          if (coachIdForNotes) {
+            notesQuery = notesQuery.or(`coach_id.eq.${coachIdForNotes},visible_to_coach.eq.true`);
+          } else {
+            notesQuery = notesQuery.eq('visible_to_coach', true);
+          }
+        }
+
+        const { data: notesData, error: notesErr } = await notesQuery;
 
         if (notesErr) {
           console.error('Error cargando notas de clases', notesErr.message);
         } else {
-          const map: Record<string, { id: string; note: string }[]> = {};
+          const map: Record<
+            string,
+            {
+              id: string;
+              note: string;
+              coach_id: string | null;
+              visible_to_student: boolean | null;
+              visible_to_coach: boolean | null;
+            }[]
+          > = {};
           (notesData ?? []).forEach((n: any) => {
             const cid = n.class_id as string;
             if (!map[cid]) map[cid] = [];
-            map[cid].push({ id: n.id as string, note: n.note as string });
+            map[cid].push({
+              id: n.id as string,
+              note: n.note as string,
+              coach_id: (n.coach_id as string | null) ?? null,
+              visible_to_student: (n.visible_to_student as boolean | null) ?? null,
+              visible_to_coach: (n.visible_to_coach as boolean | null) ?? null,
+            });
           });
+
+          // Estabilizar cuál nota se usa como "primera" en UI
+          // - coach: prioriza su propia nota (si existe) y luego la del admin
+          if (role === 'coach' && coachIdForNotes) {
+            Object.keys(map).forEach((cid) => {
+              map[cid].sort((a, b) => {
+                const aIsMine = a.coach_id === coachIdForNotes;
+                const bIsMine = b.coach_id === coachIdForNotes;
+                if (aIsMine !== bIsMine) return aIsMine ? -1 : 1;
+                const aIsAdmin = !a.coach_id;
+                const bIsAdmin = !b.coach_id;
+                if (aIsAdmin !== bIsAdmin) return aIsAdmin ? -1 : 1;
+                return 0;
+              });
+            });
+          }
+
           setClassNotesByClass(map);
         }
       }
@@ -736,7 +803,13 @@ export default function StudentsPage() {
   };
 
   const handleStartEditNote = (classId: string, currentNote: string) => {
-    setEditingNote({ classId, draft: currentNote });
+    const existing = (classNotesByClass[classId] ?? [])[0] ?? null;
+    setEditingNote({
+      classId,
+      draft: currentNote,
+      visibleToStudent: existing?.visible_to_student ?? false,
+      visibleToCoach: existing?.visible_to_coach ?? true,
+    });
     setNotesError(null);
   };
 
@@ -747,45 +820,83 @@ export default function StudentsPage() {
 
   const handleSaveNote = async () => {
     if (!editingNote || !historyStudent) return;
-    if (!coachIdForNotes) {
+    if (role === 'coach' && !coachIdForNotes) {
       setNotesError('No se pudo identificar tu usuario como profesor para guardar la nota.');
       return;
     }
 
-    const { classId, draft } = editingNote;
+    const { classId, draft, visibleToStudent, visibleToCoach } = editingNote;
     const existing = (classNotesByClass[classId] ?? [])[0] ?? null;
+
+    const isAdminLike = role === 'admin' || role === 'super_admin';
+    const isCoach = role === 'coach';
 
     try {
       setSavingNote(true);
       setNotesError(null);
 
       if (existing) {
-        const { error } = await supabase
-          .from('class_notes')
-          .update({ note: draft })
-          .eq('id', existing.id);
+        const updatePayload: any = { note: draft };
+        if (isAdminLike) {
+          updatePayload.visible_to_student = visibleToStudent;
+          updatePayload.visible_to_coach = visibleToCoach;
+        } else if (isCoach) {
+          updatePayload.visible_to_student = visibleToStudent;
+          updatePayload.visible_to_coach = true;
+        }
+
+        const { error } = await supabase.from('class_notes').update(updatePayload).eq('id', existing.id);
         if (error) throw error;
         setClassNotesByClass((prev) => ({
           ...prev,
-          [classId]: [{ id: existing.id, note: draft }],
+          [classId]: [
+            {
+              id: existing.id,
+              note: draft,
+              coach_id: existing.coach_id ?? null,
+              visible_to_student: isAdminLike || isCoach ? visibleToStudent : existing.visible_to_student ?? null,
+              visible_to_coach: isAdminLike ? visibleToCoach : true,
+            },
+          ],
         }));
       } else {
+        const insertPayload: any = {
+          class_id: classId,
+          student_id: historyStudent.id,
+          note: draft,
+        };
+        if (isAdminLike) {
+          insertPayload.coach_id = null;
+          insertPayload.visible_to_student = visibleToStudent;
+          insertPayload.visible_to_coach = visibleToCoach;
+        } else {
+          insertPayload.coach_id = coachIdForNotes;
+          insertPayload.visible_to_student = visibleToStudent;
+          insertPayload.visible_to_coach = true;
+        }
+
         const { data, error } = await supabase
           .from('class_notes')
-          .insert({
-            class_id: classId,
-            student_id: historyStudent.id,
-            coach_id: coachIdForNotes,
-            note: draft,
-          })
-          .select('id,note')
+          .insert(insertPayload)
+          .select('id,note,coach_id,visible_to_student,visible_to_coach')
           .single();
         if (error) throw error;
         const newId = (data as any).id as string;
         const newNote = (data as any).note as string;
+        const newCoachId = ((data as any).coach_id as string | null) ?? null;
+        const newVisStudent = ((data as any).visible_to_student as boolean | null) ?? null;
+        const newVisCoach = ((data as any).visible_to_coach as boolean | null) ?? null;
         setClassNotesByClass((prev) => ({
           ...prev,
-          [classId]: [{ id: newId, note: newNote }],
+          [classId]: [
+            {
+              id: newId,
+              note: newNote,
+              coach_id: newCoachId,
+              visible_to_student: newVisStudent,
+              visible_to_coach: newVisCoach,
+            },
+          ],
         }));
       }
 
@@ -1317,6 +1428,8 @@ export default function StudentsPage() {
                             const isCoach = role === 'coach';
                             const isAdmin = role === 'admin' || role === 'super_admin';
                             const isStudent = role === 'student';
+                            const coachCanEditThisNote =
+                              !isCoach || !firstNote || (!!coachIdForNotes && firstNote.coach_id === coachIdForNotes);
 
                             return [
                               (
@@ -1348,6 +1461,19 @@ export default function StudentsPage() {
                                               }
                                               placeholder="Escribí una nota sobre el rendimiento del alumno en esta clase..."
                                             />
+                                            <div className="flex items-center justify-between gap-2">
+                                              <label className="text-[11px] text-gray-600">Visible para el alumno</label>
+                                              <Switch
+                                                checked={editingNote.visibleToStudent}
+                                                onCheckedChange={(checked) =>
+                                                  setEditingNote((prev) =>
+                                                    prev && prev.classId === item.id
+                                                      ? { ...prev, visibleToStudent: checked }
+                                                      : prev,
+                                                  )
+                                                }
+                                              />
+                                            </div>
                                             {notesError && (
                                               <p className="text-[11px] text-red-600">{notesError}</p>
                                             )}
@@ -1375,11 +1501,110 @@ export default function StudentsPage() {
                                             <p className="text-[12px] text-gray-700">
                                               {firstNote ? (
                                                 <>
-                                                  <span className="font-semibold">Tu nota:</span>{' '}
+                                                  <span className="font-semibold">
+                                                    {firstNote.coach_id ? 'Tu nota:' : 'Nota del admin:'}
+                                                  </span>{' '}
                                                   <span className="font-semibold">{firstNote.note}</span>
                                                 </>
                                               ) : (
                                                 'Aún no dejaste una nota para esta clase.'
+                                              )}
+                                            </p>
+                                            <button
+                                              type="button"
+                                              onClick={() =>
+                                                handleStartEditNote(item.id, firstNote ? firstNote.note : '')
+                                              }
+                                              disabled={!coachCanEditThisNote}
+                                              className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+                                            >
+                                              <StickyNote className="w-3.5 h-3.5 text-[#3cadaf]" />
+                                              {firstNote ? 'Editar nota' : 'Agregar nota'}
+                                            </button>
+                                            {!coachCanEditThisNote && (
+                                              <p className="text-[11px] text-gray-500">
+                                                Esta nota fue creada por un admin. No podés editarla.
+                                              </p>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ) : isAdmin ? (
+                                      <div className="space-y-1">
+                                        {editingNote && editingNote.classId === item.id ? (
+                                          <div className="space-y-2">
+                                            <label className="block text-xs text-gray-600">Nota para el alumno (en esta clase)</label>
+                                            <textarea
+                                              className="w-full border rounded-md px-2 py-1 text-base resize-y min-h-[60px]"
+                                              style={{ fontSize: '16px' }}
+                                              value={editingNote.draft}
+                                              onChange={(e) =>
+                                                setEditingNote((prev) =>
+                                                  prev && prev.classId === item.id
+                                                    ? { ...prev, draft: e.target.value }
+                                                    : prev,
+                                                )
+                                              }
+                                              placeholder="Escribí una nota para el alumno..."
+                                            />
+                                            <div className="flex items-center justify-between gap-2">
+                                              <label className="text-[11px] text-gray-600">Visible para el profesor</label>
+                                              <Switch
+                                                checked={editingNote.visibleToCoach}
+                                                onCheckedChange={(checked) =>
+                                                  setEditingNote((prev) =>
+                                                    prev && prev.classId === item.id
+                                                      ? { ...prev, visibleToCoach: checked }
+                                                      : prev,
+                                                  )
+                                                }
+                                              />
+                                            </div>
+                                            <div className="flex items-center justify-between gap-2">
+                                              <label className="text-[11px] text-gray-600">Visible para el alumno</label>
+                                              <Switch
+                                                checked={editingNote.visibleToStudent}
+                                                onCheckedChange={(checked) =>
+                                                  setEditingNote((prev) =>
+                                                    prev && prev.classId === item.id
+                                                      ? { ...prev, visibleToStudent: checked }
+                                                      : prev,
+                                                  )
+                                                }
+                                              />
+                                            </div>
+                                            {notesError && (
+                                              <p className="text-[11px] text-red-600">{notesError}</p>
+                                            )}
+                                            <div className="flex items-center gap-2">
+                                              <button
+                                                type="button"
+                                                onClick={handleSaveNote}
+                                                disabled={savingNote}
+                                                className="px-3 py-1 rounded-full bg-[#3cadaf] text-white text-[11px] font-semibold hover:bg-[#31435d] disabled:opacity-60"
+                                              >
+                                                {savingNote ? 'Guardando...' : 'Guardar nota'}
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={handleCancelEditNote}
+                                                disabled={savingNote}
+                                                className="px-3 py-1 rounded-full border border-slate-300 text-[11px] text-slate-700 bg-white hover:bg-slate-50"
+                                              >
+                                                Cancelar
+                                              </button>
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                            <p className="text-[12px] text-gray-700">
+                                              {firstNote ? (
+                                                <>
+                                                  <span className="font-semibold">Nota:</span>{' '}
+                                                  <span className="font-semibold">{firstNote.note}</span>
+                                                </>
+                                              ) : (
+                                                'Aún no hay nota para esta clase.'
                                               )}
                                             </p>
                                             <button
@@ -1395,7 +1620,7 @@ export default function StudentsPage() {
                                           </div>
                                         )}
                                       </div>
-                                    ) : (isStudent || isAdmin) && firstNote ? (
+                                    ) : isStudent && firstNote ? (
                                       <p className="text-[13px] text-gray-700">
                                         <span className="font-semibold">Nota del profesor:</span>{' '}
                                         <span className="font-semibold">{firstNote.note}</span>
