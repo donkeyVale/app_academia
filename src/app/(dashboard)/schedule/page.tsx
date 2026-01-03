@@ -584,9 +584,7 @@ export default function SchedulePage() {
         if ((coachClash ?? []).length > 0) {
           const coachName = coachesMap[coachId]?.full_name ?? 'el profesor seleccionado';
           const msg = `${coachName} ya tiene una clase en ese horario.`;
-          toast.error(msg);
-          setSaving(false);
-          return;
+          toast.warning(msg);
         }
       }
 
@@ -1345,9 +1343,7 @@ export default function SchedulePage() {
         }
         if ((coachClash ?? []).length > 0) {
           const coachName = coachesMap[editCoachId]?.full_name ?? 'el profesor seleccionado';
-          toast.error(`${coachName} ya tiene una clase en ese horario.`);
-          setSaving(false);
-          return;
+          toast.warning(`${coachName} ya tiene una clase en ese horario.`);
         }
       }
 
