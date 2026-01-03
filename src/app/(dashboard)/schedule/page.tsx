@@ -153,6 +153,7 @@ export default function SchedulePage() {
   const [notes, setNotes] = useState<string>('');
   const [recurringEnabled, setRecurringEnabled] = useState(false);
   const [recurringWeekdays, setRecurringWeekdays] = useState<number[]>([]);
+  const [recurringTimesByWeekday, setRecurringTimesByWeekday] = useState<Record<number, string>>({});
 
   // Filters for list
   const [filterLocationId, setFilterLocationId] = useState<string>('');
@@ -494,35 +495,81 @@ export default function SchedulePage() {
     })();
   }, [supabase, courtId, day]);
 
+  const recurringTimeCandidates = useMemo(() => {
+    const candidates: string[] = [];
+    for (let h = 6; h <= 23; h++) {
+      const hh = String(h).padStart(2, '0');
+      candidates.push(`${hh}:00`);
+    }
+    return candidates;
+  }, []);
+
   const onCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError(null);
     let extraCreated = 0;
     try {
-      if (!courtId || !coachId || !day || !time) {
-        const msg = 'Completa cancha, fecha y hora, y profesor';
+      if (!courtId || !coachId || !day) {
+        const msg = 'Completa cancha, fecha y profesor';
         toast.error(msg);
         setSaving(false);
         return;
       }
 
-      if (recurringEnabled && recurringWeekdays.length === 0) {
-        toast.error('Seleccioná al menos un día de la semana para las clases recurrentes.');
-        setSaving(false);
-        return;
+      let baseTime = time;
+      if (recurringEnabled) {
+        if (recurringWeekdays.length === 0) {
+          toast.error('Seleccioná al menos un día de la semana para las clases recurrentes.');
+          setSaving(false);
+          return;
+        }
+
+        const missingTimes = recurringWeekdays.filter((wd) => !recurringTimesByWeekday[wd]);
+        if (missingTimes.length > 0) {
+          toast.error('Seleccioná una hora para cada día de la semana marcado.');
+          setSaving(false);
+          return;
+        }
+
+        // validar rango horario permitido (06:00 a 23:00) para cada weekday
+        for (const wd of recurringWeekdays) {
+          const t = recurringTimesByWeekday[wd];
+          const hour = Number((t || '').split(':')[0] ?? 'NaN');
+          if (Number.isNaN(hour) || hour < 6 || hour > 23) {
+            toast.error('Horario inválido. Seleccioná una hora entre 06:00 y 23:00.');
+            setSaving(false);
+            return;
+          }
+        }
+
+        const baseDate = new Date(`${day}T00:00:00`);
+        const baseWd = baseDate.getDay();
+        baseTime = recurringTimesByWeekday[baseWd] || '';
+        if (!baseTime) {
+          toast.error('La fecha seleccionada debe tener una hora asignada en la recurrencia.');
+          setSaving(false);
+          return;
+        }
+      } else {
+        if (!time) {
+          const msg = 'Completa cancha, fecha, hora y profesor';
+          toast.error(msg);
+          setSaving(false);
+          return;
+        }
       }
 
       // Validar rango horario permitido (06:00 a 23:00)
       {
-        const hour = Number(time.split(':')[0] ?? 'NaN');
+        const hour = Number(baseTime.split(':')[0] ?? 'NaN');
         if (Number.isNaN(hour) || hour < 6 || hour > 23) {
           toast.error('Horario inválido. Seleccioná una hora entre 06:00 y 23:00.');
           setSaving(false);
           return;
         }
       }
-      const iso = new Date(`${day}T${time}:00`).toISOString();
+      const iso = new Date(`${day}T${baseTime}:00`).toISOString();
 
       // Revalidar disponibilidad (anti carrera): misma cancha y misma hora
       {
@@ -724,7 +771,7 @@ export default function SchedulePage() {
       const createdClassDates: string[] = [];
       let skippedCourt = 0;
       let skippedStudents = 0;
-      let searchCursor = new Date(`${day}T${time}:00`);
+      let searchCursor = new Date(`${day}T00:00:00`);
 
       const createOneSession = async (sessionIso: string, sessionIndex: number) => {
         const studentsToBook = selectedStudents.filter((sid) => (remainingForStudent[sid] ?? 0) >= sessionIndex + 1);
@@ -885,7 +932,13 @@ export default function SchedulePage() {
             const yyyy = searchCursor.getFullYear();
             const mm = String(searchCursor.getMonth() + 1).padStart(2, '0');
             const dd = String(searchCursor.getDate()).padStart(2, '0');
-            const isoCandidate = new Date(`${yyyy}-${mm}-${dd}T${time}:00`).toISOString();
+            const wdTime = recurringTimesByWeekday[wd];
+            if (!wdTime) {
+              searchCursor = new Date(searchCursor.getTime() + 24 * 60 * 60 * 1000);
+              searchedDays += 1;
+              continue;
+            }
+            const isoCandidate = new Date(`${yyyy}-${mm}-${dd}T${wdTime}:00`).toISOString();
             try {
               await createOneSession(isoCandidate, createdClassIds.length);
               if (createdClassIds.length > 1) {
@@ -925,6 +978,7 @@ export default function SchedulePage() {
       setNotes('');
       setRecurringEnabled(false);
       setRecurringWeekdays([]);
+      setRecurringTimesByWeekday({});
       if (extraCreated > 0) {
         // El toast de resumen se muestra antes; dejamos este como fallback.
         toast.success(`Se crearon ${1 + extraCreated} clases (incluyendo las recurrentes).`);
@@ -1733,12 +1787,14 @@ export default function SchedulePage() {
                 <Select
                   value={time}
                   onValueChange={(val) => setTime(val)}
-                  disabled={!courtId || !day || availableTimes.length === 0}
+                  disabled={recurringEnabled || !courtId || !day || availableTimes.length === 0}
                 >
                   <SelectTrigger className="w-full text-sm">
                     <SelectValue
                       placeholder={
-                        !courtId
+                        recurringEnabled
+                          ? 'En recurrencia se define hora por día'
+                          : !courtId
                           ? 'Selecciona una cancha'
                           : !day
                           ? 'Selecciona una fecha'
@@ -1913,9 +1969,13 @@ export default function SchedulePage() {
                           const baseDate = new Date(`${day}T00:00:00`);
                           const wd = baseDate.getDay();
                           setRecurringWeekdays((prev) => (prev.includes(wd) ? prev : [wd]));
+                          if (time) {
+                            setRecurringTimesByWeekday((prev) => (prev[wd] ? prev : { ...prev, [wd]: time }));
+                          }
                         }
                       } else {
                         setRecurringWeekdays([]);
+                        setRecurringTimesByWeekday({});
                       }
                     }}
                   />
@@ -1938,6 +1998,15 @@ export default function SchedulePage() {
                               setRecurringWeekdays((prev) =>
                                 prev.includes(wd) ? prev.filter((x) => x !== wd) : [...prev, wd]
                               );
+                              setRecurringTimesByWeekday((prev) => {
+                                if (active) {
+                                  const next = { ...prev };
+                                  delete next[wd];
+                                  return next;
+                                }
+                                const suggested = time || prev[wd] || recurringTimeCandidates[0] || '06:00';
+                                return { ...prev, [wd]: suggested };
+                              });
                             }}
                             className={`px-2 py-1 rounded text-xs border transition-colors ${
                               active
@@ -1949,6 +2018,39 @@ export default function SchedulePage() {
                           </button>
                         );
                       })}
+                    </div>
+
+                    <div className="space-y-2">
+                      {recurringWeekdays
+                        .slice()
+                        .sort((a, b) => a - b)
+                        .map((wd) => (
+                          <div key={`wd-time-${wd}`} className="flex items-center gap-2">
+                            <span className="text-xs text-gray-700 w-6">
+                              {['D', 'L', 'M', 'X', 'J', 'V', 'S'][wd]}
+                            </span>
+                            <Select
+                              value={recurringTimesByWeekday[wd] || ''}
+                              onValueChange={(val) =>
+                                setRecurringTimesByWeekday((prev) => ({
+                                  ...prev,
+                                  [wd]: val,
+                                }))
+                              }
+                            >
+                              <SelectTrigger className="w-full text-sm h-9">
+                                <SelectValue placeholder="Hora" />
+                              </SelectTrigger>
+                              <SelectContent className="max-h-60 overflow-y-auto">
+                                {recurringTimeCandidates.map((t) => (
+                                  <SelectItem key={`wd-${wd}-${t}`} value={t}>
+                                    {t}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ))}
                     </div>
                     <p className="text-[11px] text-gray-500">
                       Se creará primero la clase seleccionada y luego se intentarán crear más clases en los días
