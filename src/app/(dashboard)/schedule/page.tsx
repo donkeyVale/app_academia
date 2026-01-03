@@ -508,7 +508,6 @@ export default function SchedulePage() {
     e.preventDefault();
     setSaving(true);
     setError(null);
-    let extraCreated = 0;
     try {
       if (!courtId || !coachId || !day) {
         const msg = 'Completa cancha, fecha y profesor';
@@ -615,9 +614,6 @@ export default function SchedulePage() {
         setSaving(false);
         return;
       }
-
-      const derivedCapacity = selectedStudents.length;
-      const derivedType: 'individual' | 'grupal' = derivedCapacity === 1 ? 'individual' : 'grupal';
 
       // V4: Validar que el profesor no tenga otra clase en el mismo horario (en cualquier sede/cancha)
       {
@@ -947,9 +943,6 @@ export default function SchedulePage() {
             const isoCandidate = new Date(`${yyyy}-${mm}-${dd}T${wdTime}:00`).toISOString();
             try {
               await createOneSession(isoCandidate, createdClassIds.length);
-              if (createdClassIds.length > 1) {
-                extraCreated = createdClassIds.length - 1;
-              }
             } catch (recErr: any) {
               const msg = recErr?.message || 'Error creando clases recurrentes.';
               console.error('Error creando clase recurrente', msg);
