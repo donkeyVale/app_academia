@@ -5,9 +5,9 @@ const config: CapacitorConfig = {
   appName: 'Agendo',
   webDir: 'www',
   server: {
-    url: 'https://capacitor.nativatech.com.py',
+    url: 'https://agendo.nativatech.com.py',
     cleartext: false,
-    allowNavigation: ['capacitor.nativatech.com.py']
+    allowNavigation: ['agendo.nativatech.com.py']
   }
 };
 
