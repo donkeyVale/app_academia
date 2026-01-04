@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // @ts-ignore - web-push no tiene tipos instalados en este proyecto
 import webPush from 'web-push';
 import { supabaseAdmin } from '@/lib/supabase-service';
+import { createInAppNotifications } from '@/lib/in-app-notifications';
 
 export async function POST(req: NextRequest) {
   try {
@@ -263,6 +264,28 @@ export async function POST(req: NextRequest) {
       body: coachBody,
       data: { url: '/schedule' },
     });
+
+    // In-app notifications (mismos destinatarios que push)
+    try {
+      await createInAppNotifications([
+        ...Array.from(allowedStudentUserIds).map((userId) => ({
+          user_id: userId,
+          type: 'class_created_student',
+          title: 'Nueva clase creada',
+          body: studentBody,
+          data: { url: '/schedule', classId, dateIso, academyId },
+        })),
+        ...Array.from(allowedCoachUserIds).map((userId) => ({
+          user_id: userId,
+          type: 'class_created_coach',
+          title: 'Nueva clase creada',
+          body: coachBody,
+          data: { url: '/schedule', classId, dateIso, academyId },
+        })),
+      ]);
+    } catch (e) {
+      console.error('Error creando notificación in-app (class-created)', e);
+    }
 
     const studentSubs = subs.filter((s) => allowedStudentUserIds.has(s.user_id));
     const coachSubs = subs.filter((s) => allowedCoachUserIds.has(s.user_id));

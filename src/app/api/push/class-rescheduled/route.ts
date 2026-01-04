@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // @ts-ignore - web-push no tiene tipos instalados en este proyecto
 import webPush from 'web-push';
 import { supabaseAdmin } from '@/lib/supabase-service';
+import { createInAppNotifications } from '@/lib/in-app-notifications';
 
 function formatWhen(dateIso?: string | null) {
   if (!dateIso) return '';
@@ -344,6 +345,35 @@ export async function POST(req: NextRequest) {
       body: adminBody,
       data: { url: '/schedule' },
     });
+
+    // In-app notifications (mismos destinatarios que push)
+    try {
+      await createInAppNotifications([
+        ...Array.from(allowedStudentUserIds).map((userId) => ({
+          user_id: userId,
+          type: 'class_rescheduled_student',
+          title: 'Clase reprogramada',
+          body: studentBody,
+          data: { url: '/schedule', classId, academyId, oldDateIso, newDateIso },
+        })),
+        ...Array.from(allowedCoachUserIds).map((userId) => ({
+          user_id: userId,
+          type: 'class_rescheduled_coach',
+          title: 'Clase reprogramada',
+          body: coachBody,
+          data: { url: '/schedule', classId, academyId, oldDateIso, newDateIso },
+        })),
+        ...Array.from(allowedAdminUserIds).map((userId) => ({
+          user_id: userId,
+          type: 'class_rescheduled_admin',
+          title: 'Clase reprogramada',
+          body: adminBody,
+          data: { url: '/schedule', classId, academyId, oldDateIso, newDateIso },
+        })),
+      ]);
+    } catch (e) {
+      console.error('Error creando notificación in-app (class-rescheduled)', e);
+    }
 
     const studentSubs = subs.filter((s) => allowedStudentUserIds.has(s.user_id));
     const coachSubs = subs.filter((s) => allowedCoachUserIds.has(s.user_id));

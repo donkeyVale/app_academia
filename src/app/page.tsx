@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { FooterAvatarButton } from '@/components/footer-avatar-button';
 import { FooterNav } from '@/components/footer-nav';
 import { PwaInstallPrompt } from '@/components/pwa-install-prompt';
 import { PushPermissionPrompt } from '@/components/push-permission-prompt';
+import { NotificationsMenuItem } from '@/components/notifications-menu-item';
 import { AgendoLogo } from '@/components/agendo-logo';
 import AdminHomeIncomeExpensesCard from '@/app/(dashboard)/AdminHomeIncomeExpensesCard';
 import { useRouter } from 'next/navigation';
@@ -117,6 +118,9 @@ type AppRole = 'super_admin' | 'admin' | 'coach' | 'student' | null;
 export default function HomePage() {
   const supabase = createClientBrowser();
   const router = useRouter();
+  const avatarMenuRef = useRef<HTMLDivElement | null>(null);
+  const avatarButtonRef = useRef<HTMLButtonElement>(null);
+  const avatarMenuPanelRef = useRef<HTMLDivElement | null>(null);
   const [userName, setUserName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -126,6 +130,8 @@ export default function HomePage() {
   const [avatarOffsetX, setAvatarOffsetX] = useState(0);
   const [avatarOffsetY, setAvatarOffsetY] = useState(0);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [academyOptions, setAcademyOptions] = useState<{ id: string; name: string }[]>([]);
   const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
   const [hasAcademies, setHasAcademies] = useState<boolean | null>(null);
@@ -150,6 +156,133 @@ export default function HomePage() {
     await supabase.auth.signOut();
     window.location.href = '/login';
   };
+
+  const unreadLabel = useMemo(() => {
+    if (unreadCount <= 0) return '';
+    if (unreadCount > 99) return '99+';
+    return String(unreadCount);
+  }, [unreadCount]);
+
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      const nextUserId = (session?.user?.id as string | undefined) ?? null;
+      setUserId(nextUserId);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const loadUnread = async () => {
+      const { count } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .is('read_at', null);
+      setUnreadCount(count ?? 0);
+    };
+
+    loadUnread();
+
+    const channel = supabase
+      .channel(`notifications-count:home:${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          loadUnread();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, userId]);
+
+  useEffect(() => {
+    if (!avatarMenuOpen) return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+
+      if (target.closest('[data-slot="popover-content"]') || target.closest('[data-slot="popover-trigger"]')) {
+        return;
+      }
+
+      const root = avatarMenuRef.current;
+      if (!root) return;
+      if (!root.contains(target)) {
+        setAvatarMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('pointerdown', onPointerDown, { capture: true });
+    return () => window.removeEventListener('pointerdown', onPointerDown, true);
+  }, [avatarMenuOpen]);
+
+  useEffect(() => {
+    if (!avatarMenuOpen) return;
+
+    const t = window.setTimeout(() => {
+      const panel = avatarMenuPanelRef.current;
+      const first = panel?.querySelector<HTMLElement>('button, [href], [tabindex]:not([tabindex="-1"])');
+      first?.focus();
+    }, 0);
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setAvatarMenuOpen(false);
+        avatarButtonRef.current?.focus();
+        return;
+      }
+
+      if (e.key !== 'Tab') return;
+
+      const panel = avatarMenuPanelRef.current;
+      if (!panel) return;
+      const focusables = Array.from(
+        panel.querySelectorAll<HTMLElement>('button, [href], [tabindex]:not([tabindex="-1"])'),
+      ).filter((el) => !el.hasAttribute('disabled') && !el.getAttribute('aria-disabled'));
+
+      if (focusables.length === 0) return;
+
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const activeEl = document.activeElement as HTMLElement | null;
+
+      if (e.shiftKey) {
+        if (!activeEl || activeEl === first || !panel.contains(activeEl)) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (!activeEl || activeEl === last || !panel.contains(activeEl)) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [avatarMenuOpen]);
 
   useEffect(() => {
     async function setupPush() {
@@ -214,6 +347,7 @@ export default function HomePage() {
 
       const user = data.user;
       const userId = user?.id;
+      setUserId((userId as string | undefined) ?? null);
 
       // nombre del usuario: intentamos en este orden
       // 1) profiles.full_name
@@ -1150,18 +1284,30 @@ export default function HomePage() {
         canSeeSettings={role === 'admin' || role === 'coach' || role === 'student' || role === 'super_admin'}
         studentsLabel={role === 'student' ? 'Mi cuenta' : 'Alumnos'}
         rightSlot={(
-          <>
+          <div ref={avatarMenuRef} className="relative flex items-center">
             <FooterAvatarButton
+              ref={avatarButtonRef}
               avatarUrl={avatarUrl}
               initials={initials}
               avatarOffsetX={avatarOffsetX}
               avatarOffsetY={avatarOffsetY}
+              unreadBadgeText={unreadLabel}
+              hasUnread={unreadCount > 0}
+              isMenuOpen={avatarMenuOpen}
               onClick={() => setAvatarMenuOpen((v) => !v)}
             />
             {avatarMenuOpen && (
-              <div className="absolute bottom-12 right-0 w-48 rounded-md border bg-white shadow-lg text-xs sm:text-sm py-1.5 z-50">
+              <div
+                ref={avatarMenuPanelRef}
+                role="menu"
+                className="absolute bottom-12 right-0 w-48 rounded-md border bg-white shadow-lg text-xs sm:text-sm py-1.5 z-50"
+              >
+                {userId && (
+                  <NotificationsMenuItem userId={userId} onUnreadCountChange={setUnreadCount} />
+                )}
                 <button
                   type="button"
+                  role="menuitem"
                   className="w-full flex items-center gap-2 px-3.5 py-2 hover:bg-gray-50 text-left"
                   onClick={() => {
                     setAvatarMenuOpen(false);
@@ -1173,6 +1319,7 @@ export default function HomePage() {
                 </button>
                 <button
                   type="button"
+                  role="menuitem"
                   className="w-full flex items-center gap-2 px-3.5 py-2 hover:bg-red-50 text-left text-red-600"
                   onClick={() => {
                     setAvatarMenuOpen(false);
@@ -1184,7 +1331,7 @@ export default function HomePage() {
                 </button>
               </div>
             )}
-          </>
+          </div>
         )}
       />
     </section>

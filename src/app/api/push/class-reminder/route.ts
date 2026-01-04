@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // @ts-ignore - web-push no tiene tipos instalados en este proyecto
 import webPush from 'web-push';
 import { supabaseAdmin } from '@/lib/supabase-service';
+import { createInAppNotifications } from '@/lib/in-app-notifications';
 
 type SubscriptionRow = {
   user_id: string;
@@ -104,9 +105,6 @@ export async function POST(req: NextRequest) {
     if (subsErr) return NextResponse.json({ error: subsErr.message }, { status: 500 });
 
     const subs = (subsAll ?? []) as SubscriptionRow[];
-    if (subs.length === 0) {
-      return NextResponse.json({ error: 'No hay suscripciones registradas para el alumno.' }, { status: 404 });
-    }
 
     const payload = JSON.stringify({
       title: 'Recordatorio',
@@ -114,9 +112,30 @@ export async function POST(req: NextRequest) {
       data: { url: '/schedule', classId, dateIso },
     });
 
+    // In-app notification (student)
+    let inAppInserted = 0;
+    try {
+      const res = await createInAppNotifications([
+        {
+          user_id: studentUserId,
+          type: 'class_reminder',
+          title: 'Recordatorio',
+          body: bodyText ?? 'Recordá que tenés clases agendadas, revisá tu agenda!!',
+          data: { url: '/schedule', classId, dateIso },
+        },
+      ]);
+      inAppInserted = res.inserted;
+    } catch (e) {
+      console.error('Error creando notificación in-app (class-reminder)', e);
+    }
+
+    if (subs.length === 0) {
+      return NextResponse.json({ ok: 0, total: 0, in_app: inAppInserted, skipped: 'no_push_subscriptions' });
+    }
+
     const results = await sendToSubs(subs, payload);
     const ok = results.filter((r) => r.status === 'fulfilled').length;
-    return NextResponse.json({ ok, total: subs.length });
+    return NextResponse.json({ ok, total: subs.length, in_app: inAppInserted });
   } catch (e: any) {
     console.error('Error en /api/push/class-reminder', e);
     return NextResponse.json({ error: e?.message ?? 'Error enviando recordatorio de clase' }, { status: 500 });
