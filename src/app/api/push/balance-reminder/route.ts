@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // @ts-ignore - web-push no tiene tipos instalados en este proyecto
 import webPush from 'web-push';
 import { supabaseAdmin } from '@/lib/supabase-service';
+import { createInAppNotifications } from '@/lib/in-app-notifications';
 
 function formatGs(amount: number) {
   try {
@@ -206,6 +207,32 @@ export async function POST(req: NextRequest) {
       body: `${who}Le quedan ${remainingNum} clases en “${planName}” y tiene saldo pendiente de ${balanceText}.`,
       data: { url: '/finance' },
     });
+
+    // In-app notifications
+    try {
+      const inAppRows: any[] = [];
+      if (allowedStudent) {
+        inAppRows.push({
+          user_id: studentUserId,
+          type: 'balance_reminder_student',
+          title: 'Saldo pendiente',
+          body: `Te quedan ${remainingNum} clases en “${planName}”. Tenés un saldo pendiente de ${balanceText}.`,
+          data: { url: '/finance', academyId, studentId, studentPlanId, remainingClasses: remainingNum, balance: balanceNum },
+        });
+      }
+      for (const adminUserId of allowedAdminIds) {
+        inAppRows.push({
+          user_id: adminUserId,
+          type: 'balance_reminder_admin',
+          title: 'Saldo pendiente',
+          body: `${who}Le quedan ${remainingNum} clases en “${planName}” y tiene saldo pendiente de ${balanceText}.`,
+          data: { url: '/finance', academyId, studentId, studentPlanId, remainingClasses: remainingNum, balance: balanceNum },
+        });
+      }
+      await createInAppNotifications(inAppRows);
+    } catch (e) {
+      console.error('Error creando notificación in-app (balance-reminder)', e);
+    }
 
     const studentSubs = allowedStudent ? subs.filter((s) => s.user_id === studentUserId) : [];
     const adminSubs = subs.filter((s) => allowedAdminIds.includes(s.user_id));

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // @ts-ignore - web-push no tiene tipos instalados en este proyecto
 import webPush from 'web-push';
 import { supabaseAdmin } from '@/lib/supabase-service';
+import { createInAppNotifications } from '@/lib/in-app-notifications';
 
 type SubscriptionRow = {
   user_id: string;
@@ -113,6 +114,21 @@ export async function POST(req: NextRequest) {
       body: bodyText ?? 'Recordá que tenés clases agendadas, revisá tu agenda!!',
       data: { url: '/schedule', classId, dateIso },
     });
+
+    // In-app notification (student)
+    try {
+      await createInAppNotifications([
+        {
+          user_id: studentUserId,
+          type: 'class_reminder',
+          title: 'Recordatorio',
+          body: bodyText ?? 'Recordá que tenés clases agendadas, revisá tu agenda!!',
+          data: { url: '/schedule', classId, dateIso },
+        },
+      ]);
+    } catch (e) {
+      console.error('Error creando notificación in-app (class-reminder)', e);
+    }
 
     const results = await sendToSubs(subs, payload);
     const ok = results.filter((r) => r.status === 'fulfilled').length;

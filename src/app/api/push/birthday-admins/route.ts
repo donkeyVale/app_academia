@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // @ts-ignore - web-push no tiene tipos instalados en este proyecto
 import webPush from 'web-push';
 import { supabaseAdmin } from '@/lib/supabase-service';
+import { createInAppNotifications } from '@/lib/in-app-notifications';
 
 type SubscriptionRow = {
   user_id: string;
@@ -115,6 +116,21 @@ export async function POST(req: NextRequest) {
       body: bodyText,
       data: { url: '/students' },
     });
+
+    // In-app notifications
+    try {
+      await createInAppNotifications(
+        Array.from(allowedUserIds).map((userId) => ({
+          user_id: userId,
+          type: 'birthday_admins',
+          title: 'Cumpleaños',
+          body: bodyText,
+          data: { url: '/students', academyId },
+        }))
+      );
+    } catch (e) {
+      console.error('Error creando notificación in-app (birthday-admins)', e);
+    }
 
     const { data: subsAll, error: subsErr } = await supabaseAdmin
       .from('push_subscriptions')

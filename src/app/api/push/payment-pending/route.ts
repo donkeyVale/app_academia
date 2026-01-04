@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // @ts-ignore - web-push no tiene tipos instalados en este proyecto
 import webPush from 'web-push';
 import { supabaseAdmin } from '@/lib/supabase-service';
+import { createInAppNotifications } from '@/lib/in-app-notifications';
 
 function formatWhen(iso?: string | null) {
   if (!iso) return '';
@@ -200,6 +201,32 @@ export async function POST(req: NextRequest) {
       body: `${who}Plan “${planName}” asignado${purchasedAtText ? ` el ${purchasedAtText}` : ''} y aún no se registró ningún pago.`,
       data: { url: '/finance' },
     });
+
+    // In-app notifications
+    try {
+      const inAppRows: any[] = [];
+      if (allowedStudent) {
+        inAppRows.push({
+          user_id: studentUserId,
+          type: 'payment_pending_student',
+          title: 'Pago pendiente',
+          body: `Se asignó el plan “${planName}” y aún no se registró el pago. Si ya pagaste, avisá al admin para que lo registre.`,
+          data: { url: '/finance', academyId, studentId, studentPlanId },
+        });
+      }
+      for (const adminUserId of allowedAdminIds) {
+        inAppRows.push({
+          user_id: adminUserId,
+          type: 'payment_pending_admin',
+          title: 'Pago pendiente',
+          body: `${who}Plan “${planName}” asignado${purchasedAtText ? ` el ${purchasedAtText}` : ''} y aún no se registró ningún pago.`,
+          data: { url: '/finance', academyId, studentId, studentPlanId },
+        });
+      }
+      await createInAppNotifications(inAppRows);
+    } catch (e) {
+      console.error('Error creando notificación in-app (payment-pending)', e);
+    }
 
     const studentSubs = allowedStudent ? subs.filter((s) => s.user_id === studentUserId) : [];
     const adminSubs = subs.filter((s) => allowedAdminIds.includes(s.user_id));

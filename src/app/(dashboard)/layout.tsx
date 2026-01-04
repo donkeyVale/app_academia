@@ -10,6 +10,7 @@ import { FooterAvatarButton } from '@/components/footer-avatar-button';
 import { FooterNav } from '@/components/footer-nav';
 import { PwaInstallPrompt } from '@/components/pwa-install-prompt';
 import { PushPermissionPrompt } from '@/components/push-permission-prompt';
+import { NotificationsBell } from '@/components/notifications-bell';
 
 const iconColor = '#3cadaf';
 
@@ -312,6 +313,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         studentsLabel={role === 'student' ? 'Mi cuenta' : 'Alumnos'}
         rightSlot={(
           <>
+            <NotificationsBell />
             <FooterAvatarButton
               avatarUrl={avatarUrl}
               initials={initials}

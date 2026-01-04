@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // @ts-ignore - web-push no tiene tipos instalados en este proyecto
 import webPush from 'web-push';
 import { supabaseAdmin } from '@/lib/supabase-service';
+import { createInAppNotifications } from '@/lib/in-app-notifications';
 
 function formatGs(amount: number) {
   try {
@@ -189,6 +190,21 @@ export async function POST(req: NextRequest) {
       body: bodyText,
       data: { url: '/finance' },
     });
+
+    // In-app notifications (admins)
+    try {
+      await createInAppNotifications(
+        Array.from(allowedUserIds).map((userId) => ({
+          user_id: userId,
+          type: title === 'Cuenta cancelada' ? 'payment_completed_admin' : 'payment_registered_admin',
+          title,
+          body: bodyText,
+          data: { url: '/finance', academyId, studentId, studentPlanId, amount: amountNum, currency, paymentDate },
+        }))
+      );
+    } catch (e) {
+      console.error('Error creando notificación in-app (payment-registered)', e);
+    }
 
     const { data: subs, error: subsError } = await supabaseAdmin
       .from('push_subscriptions')
