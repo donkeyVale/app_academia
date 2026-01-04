@@ -118,8 +118,9 @@ export async function POST(req: NextRequest) {
     });
 
     // In-app notifications
+    let inAppInserted = 0;
     try {
-      await createInAppNotifications(
+      const res = await createInAppNotifications(
         Array.from(allowedUserIds).map((userId) => ({
           user_id: userId,
           type: 'birthday_admins',
@@ -128,6 +129,7 @@ export async function POST(req: NextRequest) {
           data: { url: '/students', academyId },
         }))
       );
+      inAppInserted = res.inserted;
     } catch (e) {
       console.error('Error creando notificación in-app (birthday-admins)', e);
     }
@@ -141,12 +143,12 @@ export async function POST(req: NextRequest) {
 
     const subs = (subsAll ?? []) as SubscriptionRow[];
     if (subs.length === 0) {
-      return NextResponse.json({ error: 'No hay suscripciones registradas para admins.' }, { status: 404 });
+      return NextResponse.json({ ok: 0, total: 0, in_app: inAppInserted, skipped: 'no_push_subscriptions' });
     }
 
     const results = await sendToSubs(subs, payload);
     const ok = results.filter((r) => r.status === 'fulfilled').length;
-    return NextResponse.json({ ok, total: subs.length });
+    return NextResponse.json({ ok, total: subs.length, in_app: inAppInserted });
   } catch (e: any) {
     console.error('Error en /api/push/birthday-admins', e);
     return NextResponse.json({ error: e?.message ?? 'Error enviando notificación de cumpleaños a admins' }, { status: 500 });

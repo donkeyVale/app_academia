@@ -179,8 +179,9 @@ export async function POST(req: NextRequest) {
     });
 
     // In-app notification (student)
+    let inAppInserted = 0;
     try {
-      await createInAppNotifications([
+      const res = await createInAppNotifications([
         {
           user_id: studentUserId,
           type: title === 'Cuenta cancelada' ? 'payment_completed_student' : 'payment_registered_student',
@@ -189,6 +190,7 @@ export async function POST(req: NextRequest) {
           data: { url: '/finance', academyId, studentId, studentPlanId, amount: amountNum, currency, paymentDate },
         },
       ]);
+      inAppInserted = res.inserted;
     } catch (e) {
       console.error('Error creando notificación in-app (payment-student)', e);
     }
@@ -203,7 +205,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!subs || subs.length === 0) {
-      return NextResponse.json({ error: 'El alumno no tiene suscripciones push registradas.' }, { status: 404 });
+      return NextResponse.json({ ok: 0, total: 0, in_app: inAppInserted, skipped: 'no_push_subscriptions', balance, totalPaid, finalPrice });
     }
 
     const results = await Promise.allSettled(
@@ -232,7 +234,7 @@ export async function POST(req: NextRequest) {
     );
 
     const ok = results.filter((r) => r.status === 'fulfilled').length;
-    return NextResponse.json({ ok, total: subs.length, balance, totalPaid, finalPrice });
+    return NextResponse.json({ ok, total: subs.length, in_app: inAppInserted, balance, totalPaid, finalPrice });
   } catch (e: any) {
     console.error('Error en /api/push/payment-student', e);
     return NextResponse.json({ error: e?.message ?? 'Error enviando notificación de pago al alumno' }, { status: 500 });

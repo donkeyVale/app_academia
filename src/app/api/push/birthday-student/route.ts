@@ -71,6 +71,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: 0, total: 0, skipped: 'notifications_disabled' });
     }
 
+    const payload = JSON.stringify({
+      title: 'Feliz cumpleaños',
+      body: 'Feliz cumpleaños! Te deseamos un gran día de parte de AGENDO!!',
+      data: { url: '/schedule' },
+    });
+
+    // In-app notification
+    let inAppInserted = 0;
+    try {
+      const res = await createInAppNotifications([
+        {
+          user_id: userId,
+          type: 'birthday_student',
+          title: 'Feliz cumpleaños',
+          body: 'Feliz cumpleaños! Te deseamos un gran día de parte de AGENDO!!',
+          data: { url: '/schedule' },
+        },
+      ]);
+      inAppInserted = res.inserted;
+    } catch (e) {
+      console.error('Error creando notificación in-app (birthday-student)', e);
+    }
+
     const { data: subsAll, error: subsErr } = await supabaseAdmin
       .from('push_subscriptions')
       .select('*')
@@ -80,33 +103,12 @@ export async function POST(req: NextRequest) {
 
     const subs = (subsAll ?? []) as SubscriptionRow[];
     if (subs.length === 0) {
-      return NextResponse.json({ error: 'No hay suscripciones registradas para el usuario.' }, { status: 404 });
-    }
-
-    const payload = JSON.stringify({
-      title: 'Feliz cumpleaños',
-      body: 'Feliz cumpleaños! Te deseamos un gran día de parte de AGENDO!!',
-      data: { url: '/schedule' },
-    });
-
-    // In-app notification
-    try {
-      await createInAppNotifications([
-        {
-          user_id: userId,
-          type: 'birthday_student',
-          title: 'Feliz cumpleaños',
-          body: 'Feliz cumpleaños! Te deseamos un gran día de parte de AGENDO!!',
-          data: { url: '/schedule' },
-        },
-      ]);
-    } catch (e) {
-      console.error('Error creando notificación in-app (birthday-student)', e);
+      return NextResponse.json({ ok: 0, total: 0, in_app: inAppInserted, skipped: 'no_push_subscriptions' });
     }
 
     const results = await sendToSubs(subs, payload);
     const ok = results.filter((r) => r.status === 'fulfilled').length;
-    return NextResponse.json({ ok, total: subs.length });
+    return NextResponse.json({ ok, total: subs.length, in_app: inAppInserted });
   } catch (e: any) {
     console.error('Error en /api/push/birthday-student', e);
     return NextResponse.json({ error: e?.message ?? 'Error enviando notificación de cumpleaños' }, { status: 500 });
