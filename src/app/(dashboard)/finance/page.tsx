@@ -597,8 +597,9 @@ export default function FinancePage() {
                         if (classIds.length) {
                           const { data: notesData, error: notesErr } = await supabase
                             .from('class_notes')
-                            .select('class_id,note')
+                            .select('class_id,note,visible_to_student')
                             .eq('student_id', studentId)
+                            .eq('visible_to_student', true)
                             .in('class_id', classIds);
 
                           if (!notesErr) {

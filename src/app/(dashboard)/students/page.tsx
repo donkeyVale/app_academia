@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { createClientBrowser } from '@/lib/supabase';
 import { formatPyg } from '@/lib/formatters';
+import { toast } from 'sonner';
 
 const iconColor = '#3cadaf';
 
@@ -901,8 +902,10 @@ export default function StudentsPage() {
       }
 
       setEditingNote(null);
+      toast.success('Nota guardada correctamente.');
     } catch (err: any) {
       setNotesError(err?.message ?? 'No se pudo guardar la nota.');
+      toast.error(err?.message ?? 'No se pudo guardar la nota.');
     } finally {
       setSavingNote(false);
     }
