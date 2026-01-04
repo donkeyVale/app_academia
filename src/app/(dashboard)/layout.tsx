@@ -115,8 +115,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [role, setRole] = useState<AppRole>(null);
   const [academyOptions, setAcademyOptions] = useState<{ id: string; name: string }[]>([]);
   const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
+
   const [userId, setUserId] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    // Al iniciar sesión, Supabase puede hidratar la sesión async; esto asegura que
+    // el userId (y por ende el badge) se setee apenas la sesión esté disponible.
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      const nextUserId = (session?.user?.id as string | undefined) ?? null;
+      setUserId(nextUserId);
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
 
   const unreadLabel = useMemo(() => {
     if (unreadCount <= 0) return '';
