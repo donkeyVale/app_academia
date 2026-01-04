@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CalendarDays, Users, CreditCard, UserCog, BarChart3, LogOut, UserCircle2, Smartphone } from 'lucide-react';
 import { createClientBrowser } from '@/lib/supabase';
@@ -10,7 +10,7 @@ import { FooterAvatarButton } from '@/components/footer-avatar-button';
 import { FooterNav } from '@/components/footer-nav';
 import { PwaInstallPrompt } from '@/components/pwa-install-prompt';
 import { PushPermissionPrompt } from '@/components/push-permission-prompt';
-import { NotificationsBell } from '@/components/notifications-bell';
+import { NotificationsMenuItem } from '@/components/notifications-menu-item';
 
 const iconColor = '#3cadaf';
 
@@ -112,6 +112,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [role, setRole] = useState<AppRole>(null);
   const [academyOptions, setAcademyOptions] = useState<{ id: string; name: string }[]>([]);
   const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const unreadLabel = useMemo(() => {
+    if (unreadCount <= 0) return '';
+    if (unreadCount > 99) return '99+';
+    return String(unreadCount);
+  }, [unreadCount]);
 
   useEffect(() => {
     async function setupPush() {
@@ -137,6 +145,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         const { data } = await supabase.auth.getUser();
         const userId = data.user?.id as string | undefined;
         if (!userId) return;
+        setUserId(userId);
 
         let registration: ServiceWorkerRegistration;
         try {
@@ -167,6 +176,41 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     setupPush();
   }, [supabase]);
 
+  useEffect(() => {
+    if (!userId) return;
+
+    const loadUnread = async () => {
+      const { count } = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .is('read_at', null);
+      setUnreadCount(count ?? 0);
+    };
+
+    loadUnread();
+
+    const channel = supabase
+      .channel(`notifications-count:${userId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          loadUnread();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [supabase, userId]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     window.location.href = '/login';
@@ -180,6 +224,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       const user = data.user;
       const userId = user?.id;
+      if (userId) setUserId(userId);
 
       let displayName: string | null = null;
 
@@ -313,16 +358,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         studentsLabel={role === 'student' ? 'Mi cuenta' : 'Alumnos'}
         rightSlot={(
           <>
-            <NotificationsBell />
             <FooterAvatarButton
               avatarUrl={avatarUrl}
               initials={initials}
               avatarOffsetX={avatarOffsetX}
               avatarOffsetY={avatarOffsetY}
+              unreadBadgeText={unreadLabel}
+              hasUnread={unreadCount > 0}
               onClick={() => setAvatarMenuOpen((v) => !v)}
             />
             {avatarMenuOpen && (
               <div className="absolute bottom-12 right-0 w-48 rounded-md border bg-white shadow-lg text-xs sm:text-sm py-1.5 z-50">
+                {userId && (
+                  <NotificationsMenuItem
+                    userId={userId}
+                    onUnreadCountChange={setUnreadCount}
+                  />
+                )}
                 <button
                   type="button"
                   className="w-full flex items-center gap-2 px-3.5 py-2 hover:bg-gray-50 text-left"
