@@ -29,6 +29,10 @@ export function NotificationsMenuItem({ userId, onUnreadCountChange }: Props) {
   const [items, setItems] = useState<NotificationRow[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  useEffect(() => {
+    onUnreadCountChange?.(unreadCount);
+  }, [onUnreadCountChange, unreadCount]);
+
   const unreadLabel = useMemo(() => {
     if (unreadCount <= 0) return '';
     if (unreadCount > 99) return '99+';
@@ -54,7 +58,6 @@ export function NotificationsMenuItem({ userId, onUnreadCountChange }: Props) {
 
       const nextCount = countRes.count ?? 0;
       setUnreadCount(nextCount);
-      onUnreadCountChange?.(nextCount);
     } finally {
       setLoading(false);
     }
@@ -93,7 +96,6 @@ export function NotificationsMenuItem({ userId, onUnreadCountChange }: Props) {
     setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read_at: now } : n)));
     setUnreadCount((prev) => {
       const next = Math.max(0, prev - 1);
-      onUnreadCountChange?.(next);
       return next;
     });
     await supabase.from('notifications').update({ read_at: now }).eq('id', id);
@@ -103,14 +105,12 @@ export function NotificationsMenuItem({ userId, onUnreadCountChange }: Props) {
     const now = new Date().toISOString();
     setItems((prev) => prev.map((n) => (n.read_at ? n : { ...n, read_at: now })));
     setUnreadCount(0);
-    onUnreadCountChange?.(0);
     await supabase.from('notifications').update({ read_at: now }).eq('user_id', userId).is('read_at', null);
   };
 
   const clearAll = async () => {
     setItems([]);
     setUnreadCount(0);
-    onUnreadCountChange?.(0);
     await supabase.from('notifications').delete().eq('user_id', userId);
   };
 
