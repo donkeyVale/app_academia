@@ -90,12 +90,28 @@ export function NotificationsMenuItem({ userId, onUnreadCountChange }: Props) {
 
   const markOneRead = async (id: string) => {
     const now = new Date().toISOString();
+    setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read_at: now } : n)));
+    setUnreadCount((prev) => {
+      const next = Math.max(0, prev - 1);
+      onUnreadCountChange?.(next);
+      return next;
+    });
     await supabase.from('notifications').update({ read_at: now }).eq('id', id);
   };
 
   const markAllRead = async () => {
     const now = new Date().toISOString();
+    setItems((prev) => prev.map((n) => (n.read_at ? n : { ...n, read_at: now })));
+    setUnreadCount(0);
+    onUnreadCountChange?.(0);
     await supabase.from('notifications').update({ read_at: now }).eq('user_id', userId).is('read_at', null);
+  };
+
+  const clearAll = async () => {
+    setItems([]);
+    setUnreadCount(0);
+    onUnreadCountChange?.(0);
+    await supabase.from('notifications').delete().eq('user_id', userId);
   };
 
   return (
@@ -111,6 +127,7 @@ export function NotificationsMenuItem({ userId, onUnreadCountChange }: Props) {
       <PopoverTrigger asChild>
         <button
           type="button"
+          role="menuitem"
           className="w-full flex items-center justify-between gap-2 px-3.5 py-2 hover:bg-gray-50 text-left"
         >
           <span className="flex items-center gap-2">
@@ -127,14 +144,24 @@ export function NotificationsMenuItem({ userId, onUnreadCountChange }: Props) {
       <PopoverContent align="end" className="w-80 p-3">
         <div className="flex items-center justify-between gap-2">
           <div className="text-sm font-semibold text-slate-800">Notificaciones</div>
-          <button
-            type="button"
-            onClick={() => void markAllRead()}
-            disabled={unreadCount === 0}
-            className="text-[11px] font-semibold text-[#3cadaf] disabled:opacity-50"
-          >
-            Marcar todo leído
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => void clearAll()}
+              disabled={items.length === 0}
+              className="text-[11px] font-semibold text-slate-500 disabled:opacity-50"
+            >
+              Limpiar
+            </button>
+            <button
+              type="button"
+              onClick={() => void markAllRead()}
+              disabled={unreadCount === 0}
+              className="text-[11px] font-semibold text-[#3cadaf] disabled:opacity-50"
+            >
+              Marcar todo leído
+            </button>
+          </div>
         </div>
         <div className="mt-2">
           {loading ? (
@@ -152,7 +179,7 @@ export function NotificationsMenuItem({ userId, onUnreadCountChange }: Props) {
                     type="button"
                     className={'w-full text-left px-2 py-2 hover:bg-slate-50 ' + (isUnread ? 'bg-[#e6f5f6]/40' : '')}
                     onClick={async () => {
-                      if (isUnread) await markOneRead(n.id);
+                      if (isUnread) void markOneRead(n.id);
                       setOpen(false);
                       if (url) router.push(url);
                     }}

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CalendarDays, Users, CreditCard, UserCog, BarChart3, LogOut, UserCircle2, Smartphone } from 'lucide-react';
 import { createClientBrowser } from '@/lib/supabase';
@@ -102,6 +102,9 @@ type AppRole = 'super_admin' | 'admin' | 'coach' | 'student' | null;
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClientBrowser();
   const router = useRouter();
+  const avatarMenuRef = useRef<HTMLDivElement | null>(null);
+  const avatarButtonRef = useRef<HTMLButtonElement>(null);
+  const avatarMenuPanelRef = useRef<HTMLDivElement | null>(null);
 
   const [userName, setUserName] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -210,6 +213,81 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       supabase.removeChannel(channel);
     };
   }, [supabase, userId]);
+
+  useEffect(() => {
+    if (!avatarMenuOpen) return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+
+      // Si el usuario interactúa con el popover (Radix portal), no cerrar el menú
+      if (target.closest('[data-slot="popover-content"]') || target.closest('[data-slot="popover-trigger"]')) {
+        return;
+      }
+
+      const root = avatarMenuRef.current;
+      if (!root) return;
+      if (!root.contains(target)) {
+        setAvatarMenuOpen(false);
+      }
+    };
+
+    window.addEventListener('pointerdown', onPointerDown, { capture: true });
+    return () => window.removeEventListener('pointerdown', onPointerDown, true);
+  }, [avatarMenuOpen]);
+
+  useEffect(() => {
+    if (!avatarMenuOpen) return;
+
+    // Focus al primer item del menú para teclado
+    const t = window.setTimeout(() => {
+      const panel = avatarMenuPanelRef.current;
+      const first = panel?.querySelector<HTMLElement>('button, [href], [tabindex]:not([tabindex="-1"])');
+      first?.focus();
+    }, 0);
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setAvatarMenuOpen(false);
+        avatarButtonRef.current?.focus();
+        return;
+      }
+
+      if (e.key !== 'Tab') return;
+
+      const panel = avatarMenuPanelRef.current;
+      if (!panel) return;
+      const focusables = Array.from(
+        panel.querySelectorAll<HTMLElement>('button, [href], [tabindex]:not([tabindex="-1"])'),
+      ).filter((el) => !el.hasAttribute('disabled') && !el.getAttribute('aria-disabled'));
+
+      if (focusables.length === 0) return;
+
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const activeEl = document.activeElement as HTMLElement | null;
+
+      if (e.shiftKey) {
+        if (!activeEl || activeEl === first || !panel.contains(activeEl)) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (!activeEl || activeEl === last || !panel.contains(activeEl)) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.clearTimeout(t);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [avatarMenuOpen]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -357,18 +435,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         canSeeSettings={role === 'admin' || role === 'coach' || role === 'student' || role === 'super_admin'}
         studentsLabel={role === 'student' ? 'Mi cuenta' : 'Alumnos'}
         rightSlot={(
-          <>
+          <div ref={avatarMenuRef} className="relative flex items-center">
             <FooterAvatarButton
+              ref={avatarButtonRef}
               avatarUrl={avatarUrl}
               initials={initials}
               avatarOffsetX={avatarOffsetX}
               avatarOffsetY={avatarOffsetY}
               unreadBadgeText={unreadLabel}
               hasUnread={unreadCount > 0}
+              isMenuOpen={avatarMenuOpen}
               onClick={() => setAvatarMenuOpen((v) => !v)}
             />
             {avatarMenuOpen && (
-              <div className="absolute bottom-12 right-0 w-48 rounded-md border bg-white shadow-lg text-xs sm:text-sm py-1.5 z-50">
+              <div
+                ref={avatarMenuPanelRef}
+                role="menu"
+                className="absolute bottom-12 right-0 w-48 rounded-md border bg-white shadow-lg text-xs sm:text-sm py-1.5 z-50"
+              >
                 {userId && (
                   <NotificationsMenuItem
                     userId={userId}
@@ -377,6 +461,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 )}
                 <button
                   type="button"
+                  role="menuitem"
                   className="w-full flex items-center gap-2 px-3.5 py-2 hover:bg-gray-50 text-left"
                   onClick={() => {
                     setAvatarMenuOpen(false);
@@ -388,6 +473,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </button>
                 <button
                   type="button"
+                  role="menuitem"
                   className="w-full flex items-center gap-2 px-3.5 py-2 hover:bg-red-50 text-left text-red-600"
                   onClick={() => {
                     setAvatarMenuOpen(false);
@@ -399,7 +485,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </button>
               </div>
             )}
-          </>
+          </div>
         )}
       />
     </div>
