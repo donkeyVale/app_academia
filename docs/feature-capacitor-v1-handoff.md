@@ -125,6 +125,12 @@ Archivo:
 - Config principal:
   - `mobile/capacitor.config.ts`
 
+### Estado actual (wrapper)
+
+- El wrapper híbrido actualmente apunta a **PROD** (para que el login funcione con datos reales):
+  - `server.url`: `https://agendo.nativatech.com.py`
+  - `allowNavigation`: `agendo.nativatech.com.py`
+
 ### Notas importantes
 
 - Por issue de Node/npx en Windows, se usó preferentemente:
@@ -142,6 +148,18 @@ Archivo:
 
 - `mobile/ios/App/App/Info.plist`
   - `CFBundleURLTypes` para `agendo`
+
+### Deep link UX (estado)
+
+- `agendo://` abre la app en iPhone.
+- Si el usuario no está logueado, la navegación cae en `/login` (comportamiento normal del web app).
+- Pendiente (MVP): guardar `pendingDeepLink` y redirigir post-login a una ruta interna.
+- Rutas MVP acordadas para deep links (web routes):
+  - `/schedule`
+  - `/finance`
+  - `/students`
+  - `/reports`
+  - `/` (fallback)
 
 ---
 
@@ -233,6 +251,20 @@ En Xcode:
   - elegir Team (Apple ID personal si todavía no hay Apple Developer Organization)
 - Run en iPhone
 
+### Fixes que fueron necesarios en macOS (para futuro)
+
+- CocoaPods:
+  - `pod install` se corre en `mobile/ios/App`.
+- Node deps en `mobile/`:
+  - si falla `pod install` con `pods_helpers`, faltaba `npm install` en `mobile/`.
+- Permisos npm cache:
+  - si aparece `EACCES` en `~/.npm`, ejecutar el `chown` que recomienda npm.
+- `xcode-select`:
+  - para que `npx cap sync ios` pueda ejecutar `pod install`, el active developer dir debe apuntar a Xcode:
+    - `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`
+- Errores de build iOS por recursos faltantes (`App/public`, `capacitor.config.json`):
+  - se resuelven ejecutando `npx cap sync ios` desde `mobile/`.
+
 ## 6) Android (opcional en Mac)
 
 - Instalar Android Studio
@@ -270,3 +302,29 @@ En Xcode:
 - Definir distribución:
   - Android: Play Internal Testing (requiere AAB firmado)
   - iOS: TestFlight (requiere Apple Developer Program)
+
+---
+
+# Estado actual iOS / Apple Developer (enero 2026)
+
+## iOS: firmado y capabilities
+
+- La app iOS corre en iPhone con **Personal Team**.
+- Para poder compilar con Personal Team, se deshabilitó Associated Domains:
+  - `mobile/ios/App/App/App.entitlements` quedó con `<dict></dict>` (sin `com.apple.developer.associated-domains`).
+- Universal Links y APNs (push nativo iOS) quedan **pendientes** hasta tener Apple Developer Program (Organization).
+
+## Bloqueos actuales (D-U-N-S)
+
+- Se requiere D-U-N-S para:
+  - Apple Developer Program (Organization nueva a nombre de Nativatech)
+  - Google Play Console (Organization)
+
+## OneSignal (push nativo)
+
+- Decisión: OneSignal.
+- Web Push actual (VAPID + Service Worker) sigue existiendo para PWA.
+- Push nativo iOS requiere:
+  - Apple Developer Program activo
+  - APNs Auth Key `.p8` + `Key ID` + `Team ID` + Bundle ID (`com.nativatech.agendo`)
+- Pendiente: crear app en OneSignal (iOS/Android) y definir tabla `push_devices` en Supabase para guardar `onesignal_id`.
