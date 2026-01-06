@@ -41,7 +41,6 @@ export const FooterAvatarButton = React.forwardRef<HTMLButtonElement, FooterAvat
                 "h-full w-full rounded-full overflow-hidden ring-0 group-hover:ring-2 ring-[#3cadaf]" +
                 (hasUnread ? " ring-2" : "")
               }
-              style={{ transform }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
