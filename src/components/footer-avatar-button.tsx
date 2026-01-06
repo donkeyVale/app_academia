@@ -28,7 +28,7 @@ export const FooterAvatarButton = React.forwardRef<HTMLButtonElement, FooterAvat
           type="button"
           onClick={onClick}
           className={
-            "group h-12 w-12 sm:h-14 sm:w-14 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium text-gray-700 overflow-visible " +
+            "group relative h-12 w-12 sm:h-14 sm:w-14 rounded-full flex items-center justify-center text-xs sm:text-sm font-medium text-gray-700 overflow-hidden " +
             (avatarUrl ? "bg-transparent" : "bg-gray-200 hover:ring-2 hover:ring-[#3cadaf]")
           }
           aria-label="Abrir menú de usuario"
