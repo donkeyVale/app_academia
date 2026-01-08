@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:schema:pull": "npx supabase db pull --db-url \"$SUPABASE_DB_URL\"",
+    "db:schema:check": "npm run db:schema:pull && git diff --exit-code && git diff --cached --exit-code"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.15",

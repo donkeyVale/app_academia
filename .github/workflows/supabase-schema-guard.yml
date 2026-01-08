@@ -1,0 +1,52 @@
+name: Supabase Schema Guard
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  schema-guard:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install deps
+        run: npm ci
+
+      - name: Supabase db pull (no prompts)
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -e
+
+          if [ -z "${SUPABASE_DB_URL}" ]; then
+            echo "Missing secrets.SUPABASE_DB_URL" >&2
+            exit 1
+          fi
+
+          # Avoid interactive prompt that could mutate remote migration history
+          OUTPUT=$(printf "n\n" | npx supabase db pull --db-url "${SUPABASE_DB_URL}" 2>&1 || true)
+          echo "$OUTPUT"
+
+          # Some Supabase CLI versions return non-zero even when nothing changed
+          echo "$OUTPUT" | grep -qi "No schema changes found" && exit 0
+
+          # If command failed for other reasons, fail
+          echo "$OUTPUT" | grep -qi "error\|failed\|FATAL" && exit 1 || true
+
+      - name: Fail if migrations changed but not committed
+        run: |
+          set -e
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Schema drift detected. Please run db pull and commit generated files." >&2
+            git status --porcelain
+            exit 1
+          fi
