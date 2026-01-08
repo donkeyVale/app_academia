@@ -336,26 +336,36 @@ export default function PlansClient() {
 
       const allowedPlanIds = new Set(finalStudentPlans.map((sp) => sp.id));
 
-      const { data: payData, error: payErr } = await supabase
+      const allowedPlanIdsList = Array.from(allowedPlanIds);
+
+      const payQuery = supabase
         .from('payments')
         .select('id,student_id,student_plan_id,amount,currency,payment_date,method,status,notes')
         .order('payment_date', { ascending: false })
         .limit(10);
-      if (payErr) setError(payErr.message);
-      const allPayments = ((payData ?? []) as unknown as PaymentRow[]);
-      const filteredPayments = selectedAcademyId
-        ? allPayments.filter((p) => allowedPlanIds.has(p.student_plan_id))
-        : allPayments;
-      setPayments(filteredPayments);
 
-      const { data: payAggData, error: payAggErr } = await supabase
-        .from('payments')
-        .select('student_plan_id,amount,status');
+      const { data: payData, error: payErr } =
+        selectedAcademyId && allowedPlanIdsList.length > 0
+          ? await payQuery.in('student_plan_id', allowedPlanIdsList)
+          : selectedAcademyId
+            ? { data: [], error: null }
+            : await payQuery;
+      if (payErr) setError(payErr.message);
+      setPayments(((payData ?? []) as unknown as PaymentRow[]));
+
+      const payAggQuery = supabase.from('payments').select('student_plan_id,amount,status');
+
+      const { data: payAggData, error: payAggErr } =
+        selectedAcademyId && allowedPlanIdsList.length > 0
+          ? await payAggQuery.in('student_plan_id', allowedPlanIdsList)
+          : selectedAcademyId
+            ? { data: [], error: null }
+            : await payAggQuery;
+
       if (!payAggErr && payAggData) {
         const map: Record<string, number> = {};
         (payAggData as { student_plan_id: string; amount: number; status: string }[]).forEach((p) => {
           if (p.status !== 'pagado') return;
-          if (selectedAcademyId && !allowedPlanIds.has(p.student_plan_id)) return;
           map[p.student_plan_id] = (map[p.student_plan_id] ?? 0) + (p.amount ?? 0);
         });
         setPaymentsByPlan(map);
