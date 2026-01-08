@@ -200,6 +200,62 @@ export default function PlansClient() {
   const [paymentStudentOpen, setPaymentStudentOpen] = useState(false);
   const [planUsagesByPlanId, setPlanUsagesByPlanId] = useState<Record<string, number>>({});
 
+  const handleDeleteStudentPlan = async (studentPlanId: string) => {
+    if (!studentPlanId) return;
+
+    const ok = window.confirm(
+      '¿Eliminar esta asignación de plan?\n\nSolo se permitirá si NO hay clases usadas ni pagos registrados para este plan.',
+    );
+    if (!ok) return;
+
+    setSaving(true);
+    setError(null);
+    try {
+      const { data: usageRows, error: usageErr } = await supabase
+        .from('plan_usages')
+        .select('id')
+        .eq('student_plan_id', studentPlanId)
+        .limit(1);
+      if (usageErr) throw usageErr;
+      const hasUsages = (usageRows ?? []).length > 0;
+
+      const { data: paymentRows, error: paymentErr } = await supabase
+        .from('payments')
+        .select('id')
+        .eq('student_plan_id', studentPlanId)
+        .limit(1);
+      if (paymentErr) throw paymentErr;
+      const hasPayments = (paymentRows ?? []).length > 0;
+
+      if (hasUsages || hasPayments) {
+        toast.error('No se puede cambiar/eliminar el plan: ya tiene clases usadas y/o pagos asociados.');
+        return;
+      }
+
+      const { error: delErr } = await supabase.from('student_plans').delete().eq('id', studentPlanId);
+      if (delErr) throw delErr;
+
+      setStudentPlans((prev) => prev.filter((sp) => sp.id !== studentPlanId));
+      setPayments((prev) => prev.filter((p) => p.student_plan_id !== studentPlanId));
+      setPaymentsByPlan((prev) => {
+        const next = { ...prev };
+        delete next[studentPlanId];
+        return next;
+      });
+      setPlanUsagesByPlanId((prev) => {
+        const next = { ...prev };
+        delete next[studentPlanId];
+        return next;
+      });
+
+      toast.success('Asignación eliminada. Ahora podés asignar el plan correcto.');
+    } catch (e: any) {
+      setError(e?.message ?? 'No se pudo eliminar la asignación del plan.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   useEffect(() => {
     (async () => {
       if (!paymentStudentId) {
@@ -1371,8 +1427,19 @@ export default function PlansClient() {
                               </div>
                             )}
                           </div>
-                          <div className="text-xs text-gray-500">
-                            <span className="font-semibold">Asignado:</span> {new Date(sp.purchased_at).toLocaleString()}
+                          <div className="flex flex-col items-end gap-2">
+                            <div className="text-xs text-gray-500">
+                              <span className="font-semibold">Asignado:</span> {new Date(sp.purchased_at).toLocaleString()}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteStudentPlan(sp.id)}
+                              disabled={saving}
+                              className="text-xs px-3 py-1 rounded border border-red-200 text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-50"
+                              title="Eliminar asignación (solo si no tiene clases usadas ni pagos)"
+                            >
+                              Corregir asignación
+                            </button>
                           </div>
                         </li>
                       );
