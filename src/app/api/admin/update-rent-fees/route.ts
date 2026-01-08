@@ -16,6 +16,8 @@ type CourtFeeInput = {
 type LocationFeePerStudentInput = {
   locationId: string;
   feePerStudent: number;
+  feePerStudentOne?: number;
+  feePerStudentTwoPlus?: number;
   validFrom: string; // yyyy-mm-dd
   timeFrom: string; // HH:mm
   timeTo: string; // HH:mm
@@ -24,6 +26,8 @@ type LocationFeePerStudentInput = {
 type CourtFeePerStudentInput = {
   courtId: string;
   feePerStudent: number;
+  feePerStudentOne?: number;
+  feePerStudentTwoPlus?: number;
   validFrom: string; // yyyy-mm-dd
   timeFrom: string; // HH:mm
   timeTo: string; // HH:mm
@@ -264,8 +268,12 @@ export async function POST(req: NextRequest) {
 
     for (const row of locFeesPerStudent) {
       if (!row?.locationId || typeof row.locationId !== 'string') continue;
-      const fee = Number(row.feePerStudent);
-      if (Number.isNaN(fee) || fee < 0) continue;
+      const feeLegacy = Number(row.feePerStudent);
+      const feeOne = Number((row as any).feePerStudentOne ?? row.feePerStudent);
+      const feeTwo = Number((row as any).feePerStudentTwoPlus ?? row.feePerStudent);
+      if (Number.isNaN(feeLegacy) || feeLegacy < 0) continue;
+      if (Number.isNaN(feeOne) || feeOne < 0) continue;
+      if (Number.isNaN(feeTwo) || feeTwo < 0) continue;
       if (!row.validFrom || typeof row.validFrom !== 'string') continue;
       if (!row.timeFrom || typeof row.timeFrom !== 'string') continue;
       if (!row.timeTo || typeof row.timeTo !== 'string') continue;
@@ -288,7 +296,12 @@ export async function POST(req: NextRequest) {
       if (existingSameDate?.id) {
         const { error: updErr } = await supabaseAdmin
           .from('location_rent_fees_per_student')
-          .update({ fee_per_student: fee, updated_at: new Date().toISOString() })
+          .update({
+            fee_per_student: feeLegacy,
+            fee_per_student_one: feeOne,
+            fee_per_student_two_plus: feeTwo,
+            updated_at: new Date().toISOString(),
+          })
           .eq('id', existingSameDate.id);
 
         if (updErr) {
@@ -325,7 +338,9 @@ export async function POST(req: NextRequest) {
       const { error: insErr } = await supabaseAdmin.from('location_rent_fees_per_student').insert({
         academy_id: academyId,
         location_id: row.locationId,
-        fee_per_student: fee,
+        fee_per_student: feeLegacy,
+        fee_per_student_one: feeOne,
+        fee_per_student_two_plus: feeTwo,
         valid_from: row.validFrom,
         time_from: row.timeFrom,
         time_to: row.timeTo,
@@ -338,8 +353,12 @@ export async function POST(req: NextRequest) {
 
     for (const row of cFeesPerStudent) {
       if (!row?.courtId || typeof row.courtId !== 'string') continue;
-      const fee = Number(row.feePerStudent);
-      if (Number.isNaN(fee) || fee < 0) continue;
+      const feeLegacy = Number(row.feePerStudent);
+      const feeOne = Number((row as any).feePerStudentOne ?? row.feePerStudent);
+      const feeTwo = Number((row as any).feePerStudentTwoPlus ?? row.feePerStudent);
+      if (Number.isNaN(feeLegacy) || feeLegacy < 0) continue;
+      if (Number.isNaN(feeOne) || feeOne < 0) continue;
+      if (Number.isNaN(feeTwo) || feeTwo < 0) continue;
       if (!row.validFrom || typeof row.validFrom !== 'string') continue;
       if (!row.timeFrom || typeof row.timeFrom !== 'string') continue;
       if (!row.timeTo || typeof row.timeTo !== 'string') continue;
@@ -362,7 +381,12 @@ export async function POST(req: NextRequest) {
       if (existingSameDate?.id) {
         const { error: updErr } = await supabaseAdmin
           .from('court_rent_fees_per_student')
-          .update({ fee_per_student: fee, updated_at: new Date().toISOString() })
+          .update({
+            fee_per_student: feeLegacy,
+            fee_per_student_one: feeOne,
+            fee_per_student_two_plus: feeTwo,
+            updated_at: new Date().toISOString(),
+          })
           .eq('id', existingSameDate.id);
 
         if (updErr) {
@@ -399,7 +423,9 @@ export async function POST(req: NextRequest) {
       const { error: insErr } = await supabaseAdmin.from('court_rent_fees_per_student').insert({
         academy_id: academyId,
         court_id: row.courtId,
-        fee_per_student: fee,
+        fee_per_student: feeLegacy,
+        fee_per_student_one: feeOne,
+        fee_per_student_two_plus: feeTwo,
         valid_from: row.validFrom,
         time_from: row.timeFrom,
         time_to: row.timeTo,

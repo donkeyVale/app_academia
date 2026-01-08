@@ -77,7 +77,9 @@ export async function POST(req: NextRequest) {
 
     const { data: locationFeesPerStudent, error: locPsErr } = await supabaseAdmin
       .from('location_rent_fees_per_student')
-      .select('id, academy_id, location_id, fee_per_student, currency, valid_from, valid_to, time_from, time_to')
+      .select(
+        'id, academy_id, location_id, fee_per_student, fee_per_student_one, fee_per_student_two_plus, currency, valid_from, valid_to, time_from, time_to',
+      )
       .eq('academy_id', academyId)
       .is('valid_to', null);
 
@@ -87,7 +89,9 @@ export async function POST(req: NextRequest) {
 
     const { data: courtFeesPerStudent, error: courtPsErr } = await supabaseAdmin
       .from('court_rent_fees_per_student')
-      .select('id, academy_id, court_id, fee_per_student, currency, valid_from, valid_to, time_from, time_to')
+      .select(
+        'id, academy_id, court_id, fee_per_student, fee_per_student_one, fee_per_student_two_plus, currency, valid_from, valid_to, time_from, time_to',
+      )
       .eq('academy_id', academyId)
       .is('valid_to', null);
 

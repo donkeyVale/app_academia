@@ -2009,12 +2009,16 @@ export default function ReportsPage() {
           const [locBandsRes, courtBandsRes] = await Promise.all([
             supabase
               .from('location_rent_fees_per_student')
-              .select('location_id, fee_per_student, valid_from, valid_to, time_from, time_to')
+              .select(
+                'location_id, fee_per_student, fee_per_student_one, fee_per_student_two_plus, valid_from, valid_to, time_from, time_to',
+              )
               .eq('academy_id', selectedAcademyId)
               .is('valid_to', null),
             supabase
               .from('court_rent_fees_per_student')
-              .select('court_id, fee_per_student, valid_from, valid_to, time_from, time_to')
+              .select(
+                'court_id, fee_per_student, fee_per_student_one, fee_per_student_two_plus, valid_from, valid_to, time_from, time_to',
+              )
               .eq('academy_id', selectedAcademyId)
               .is('valid_to', null),
           ]);
@@ -2022,26 +2026,42 @@ export default function ReportsPage() {
           if (locBandsRes.error) throw locBandsRes.error;
           if (courtBandsRes.error) throw courtBandsRes.error;
 
-          const locationBands: Record<string, { time_from: string; time_to: string; fee: number; valid_from: string }[]> = {};
+          const locationBands: Record<
+            string,
+            { time_from: string; time_to: string; fee_one: number; fee_two: number; valid_from: string }[]
+          > = {};
           for (const r of (locBandsRes.data ?? []) as any[]) {
             const lid = r.location_id as string | undefined;
-            const fee = Number(r.fee_per_student);
+            const feeLegacy = Number(r.fee_per_student);
+            const feeOne = Number(r.fee_per_student_one ?? r.fee_per_student);
+            const feeTwo = Number(r.fee_per_student_two_plus ?? r.fee_per_student);
             const vf = r.valid_from as string | undefined;
             const tf = String(r.time_from ?? '').slice(0, 5);
             const tt = String(r.time_to ?? '').slice(0, 5);
-            if (!lid || !vf || !tf || !tt || Number.isNaN(fee) || fee < 0) continue;
-            (locationBands[lid] ||= []).push({ time_from: tf, time_to: tt, fee, valid_from: vf });
+            if (!lid || !vf || !tf || !tt) continue;
+            if (Number.isNaN(feeLegacy) || feeLegacy < 0) continue;
+            if (Number.isNaN(feeOne) || feeOne < 0) continue;
+            if (Number.isNaN(feeTwo) || feeTwo < 0) continue;
+            (locationBands[lid] ||= []).push({ time_from: tf, time_to: tt, fee_one: feeOne, fee_two: feeTwo, valid_from: vf });
           }
 
-          const courtBands: Record<string, { time_from: string; time_to: string; fee: number; valid_from: string }[]> = {};
+          const courtBands: Record<
+            string,
+            { time_from: string; time_to: string; fee_one: number; fee_two: number; valid_from: string }[]
+          > = {};
           for (const r of (courtBandsRes.data ?? []) as any[]) {
             const cid = r.court_id as string | undefined;
-            const fee = Number(r.fee_per_student);
+            const feeLegacy = Number(r.fee_per_student);
+            const feeOne = Number(r.fee_per_student_one ?? r.fee_per_student);
+            const feeTwo = Number(r.fee_per_student_two_plus ?? r.fee_per_student);
             const vf = r.valid_from as string | undefined;
             const tf = String(r.time_from ?? '').slice(0, 5);
             const tt = String(r.time_to ?? '').slice(0, 5);
-            if (!cid || !vf || !tf || !tt || Number.isNaN(fee) || fee < 0) continue;
-            (courtBands[cid] ||= []).push({ time_from: tf, time_to: tt, fee, valid_from: vf });
+            if (!cid || !vf || !tf || !tt) continue;
+            if (Number.isNaN(feeLegacy) || feeLegacy < 0) continue;
+            if (Number.isNaN(feeOne) || feeOne < 0) continue;
+            if (Number.isNaN(feeTwo) || feeTwo < 0) continue;
+            (courtBands[cid] ||= []).push({ time_from: tf, time_to: tt, fee_one: feeOne, fee_two: feeTwo, valid_from: vf });
           }
 
           // helpers
@@ -2049,15 +2069,18 @@ export default function ReportsPage() {
           for (const c of courts) courtToLocation[c.id] = c.location_id ?? null;
 
           const findBandFee = (
-            rows: { time_from: string; time_to: string; fee: number; valid_from: string }[],
+            rows: { time_from: string; time_to: string; fee_one: number; fee_two: number; valid_from: string }[],
             classDay: string,
             hm: string,
+            students: number,
           ) => {
             const candidates = (rows ?? [])
               .filter((r) => r.valid_from <= classDay)
               .filter((r) => r.time_from <= hm && hm < r.time_to)
               .sort((a, b) => b.valid_from.localeCompare(a.valid_from));
-            return candidates[0]?.fee ?? 0;
+            const picked = candidates[0];
+            if (!picked) return 0;
+            return students <= 1 ? picked.fee_one ?? 0 : picked.fee_two ?? 0;
           };
 
           // aggregate per location
@@ -2074,8 +2097,8 @@ export default function ReportsPage() {
             const classDay = getLocalYmdFromIso(cls.date, TZ);
             const hm = getLocalHmFromIso(cls.date, TZ);
 
-            const feeCourt = findBandFee(courtBands[courtId] ?? [], classDay, hm);
-            const feeLoc = feeCourt > 0 ? feeCourt : findBandFee(locationBands[locationId] ?? [], classDay, hm);
+            const feeCourt = findBandFee(courtBands[courtId] ?? [], classDay, hm, students);
+            const feeLoc = feeCourt > 0 ? feeCourt : findBandFee(locationBands[locationId] ?? [], classDay, hm, students);
             if (feeLoc <= 0) continue;
 
             const cost = students * feeLoc;

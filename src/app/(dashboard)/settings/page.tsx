@@ -18,7 +18,8 @@ type RentMode = "per_student" | "per_hour" | "both";
 type RentBand = {
   timeFrom: string;
   timeTo: string;
-  feePerStudent: string;
+  feePerStudentOne: string;
+  feePerStudentTwoPlus: string;
   validFrom: string;
 };
 
@@ -334,7 +335,18 @@ export default function SettingsPage() {
             .map((x) => ({
               timeFrom: String(x.time_from ?? '').slice(0, 5),
               timeTo: String(x.time_to ?? '').slice(0, 5),
-              feePerStudent: x.fee_per_student != null ? String(x.fee_per_student) : '',
+              feePerStudentOne:
+                x.fee_per_student_one != null
+                  ? String(x.fee_per_student_one)
+                  : x.fee_per_student != null
+                    ? String(x.fee_per_student)
+                    : '',
+              feePerStudentTwoPlus:
+                x.fee_per_student_two_plus != null
+                  ? String(x.fee_per_student_two_plus)
+                  : x.fee_per_student != null
+                    ? String(x.fee_per_student)
+                    : '',
               validFrom: x.valid_from ? String(x.valid_from) : new Date().toISOString().slice(0, 10),
             }))
             .filter((b) => !!b.timeFrom && !!b.timeTo);
@@ -348,7 +360,18 @@ export default function SettingsPage() {
             .map((x) => ({
               timeFrom: String(x.time_from ?? '').slice(0, 5),
               timeTo: String(x.time_to ?? '').slice(0, 5),
-              feePerStudent: x.fee_per_student != null ? String(x.fee_per_student) : '',
+              feePerStudentOne:
+                x.fee_per_student_one != null
+                  ? String(x.fee_per_student_one)
+                  : x.fee_per_student != null
+                    ? String(x.fee_per_student)
+                    : '',
+              feePerStudentTwoPlus:
+                x.fee_per_student_two_plus != null
+                  ? String(x.fee_per_student_two_plus)
+                  : x.fee_per_student != null
+                    ? String(x.fee_per_student)
+                    : '',
               validFrom: x.valid_from ? String(x.valid_from) : new Date().toISOString().slice(0, 10),
             }))
             .filter((b) => !!b.timeFrom && !!b.timeTo);
@@ -426,7 +449,9 @@ const onSaveRentFees = async () => {
       .flatMap(([locationId, bands]) =>
         (bands ?? []).map((b) => ({
           locationId,
-          feePerStudent: Number(b.feePerStudent),
+          feePerStudent: Number(b.feePerStudentOne),
+          feePerStudentOne: Number(b.feePerStudentOne),
+          feePerStudentTwoPlus: Number(b.feePerStudentTwoPlus),
           validFrom: b.validFrom,
           timeFrom: b.timeFrom,
           timeTo: b.timeTo,
@@ -438,14 +463,17 @@ const onSaveRentFees = async () => {
           !!row.validFrom &&
           !!row.timeFrom &&
           !!row.timeTo &&
-          !Number.isNaN(row.feePerStudent),
+          !Number.isNaN(row.feePerStudentOne) &&
+          !Number.isNaN(row.feePerStudentTwoPlus),
       );
 
     const courtFeesPerStudentPayload = Object.entries(rentCourtBands)
       .flatMap(([courtId, bands]) =>
         (bands ?? []).map((b) => ({
           courtId,
-          feePerStudent: Number(b.feePerStudent),
+          feePerStudent: Number(b.feePerStudentOne),
+          feePerStudentOne: Number(b.feePerStudentOne),
+          feePerStudentTwoPlus: Number(b.feePerStudentTwoPlus),
           validFrom: b.validFrom,
           timeFrom: b.timeFrom,
           timeTo: b.timeTo,
@@ -457,7 +485,8 @@ const onSaveRentFees = async () => {
           !!row.validFrom &&
           !!row.timeFrom &&
           !!row.timeTo &&
-          !Number.isNaN(row.feePerStudent),
+          !Number.isNaN(row.feePerStudentOne) &&
+          !Number.isNaN(row.feePerStudentTwoPlus),
       );
 
     const feesRes = await fetch('/api/admin/update-rent-fees', {
@@ -751,7 +780,8 @@ const onSaveRentFees = async () => {
                     const nextBand: RentBand = {
                       timeFrom: preset?.timeFrom ?? '06:00',
                       timeTo: preset?.timeTo ?? '18:00',
-                      feePerStudent: '',
+                      feePerStudentOne: '',
+                      feePerStudentTwoPlus: '',
                       validFrom: new Date().toISOString().slice(0, 10),
                     };
 
@@ -882,16 +912,34 @@ const onSaveRentFees = async () => {
                                       />
                                     </div>
                                     <div className="flex flex-col gap-1">
-                                      <label className="text-sm text-gray-600">Monto por alumno</label>
+                                      <label className="text-sm text-gray-600">Monto 1 alumno</label>
                                       <Input
                                         type="number"
                                         inputMode="decimal"
-                                        value={b.feePerStudent}
+                                        value={b.feePerStudentOne}
                                         onChange={(e) => {
                                           const v = e.target.value;
                                           setRentLocationBands((prev) => {
                                             const next = [...(prev[loc.id] ?? [])];
-                                            next[idx] = { ...next[idx], feePerStudent: v };
+                                            next[idx] = { ...next[idx], feePerStudentOne: v };
+                                            return { ...prev, [loc.id]: next };
+                                          });
+                                        }}
+                                        className="h-10 text-base"
+                                        placeholder="0"
+                                      />
+                                    </div>
+                                    <div className="flex flex-col gap-1">
+                                      <label className="text-sm text-gray-600">Monto 2+ alumnos</label>
+                                      <Input
+                                        type="number"
+                                        inputMode="decimal"
+                                        value={b.feePerStudentTwoPlus}
+                                        onChange={(e) => {
+                                          const v = e.target.value;
+                                          setRentLocationBands((prev) => {
+                                            const next = [...(prev[loc.id] ?? [])];
+                                            next[idx] = { ...next[idx], feePerStudentTwoPlus: v };
                                             return { ...prev, [loc.id]: next };
                                           });
                                         }}
@@ -934,7 +982,8 @@ const onSaveRentFees = async () => {
                                     const nextBand: RentBand = {
                                       timeFrom: preset?.timeFrom ?? '06:00',
                                       timeTo: preset?.timeTo ?? '18:00',
-                                      feePerStudent: '',
+                                      feePerStudentOne: '',
+                                      feePerStudentTwoPlus: '',
                                       validFrom: new Date().toISOString().slice(0, 10),
                                     };
 
@@ -1041,23 +1090,41 @@ const onSaveRentFees = async () => {
                                                   />
                                                 </div>
                                                 <div className="flex flex-col gap-1">
-                                                  <label className="text-sm text-gray-600">Monto por alumno</label>
+                                                  <label className="text-sm text-gray-600">Monto 1 alumno</label>
                                                   <Input
                                                     type="number"
                                                     inputMode="decimal"
-                                                    value={b.feePerStudent}
+                                                    value={b.feePerStudentOne}
                                                     onChange={(e) => {
                                                       const v = e.target.value;
                                                       setRentCourtBands((prev) => {
                                                         const next = [...(prev[c.id] ?? [])];
-                                                        next[idx] = { ...next[idx], feePerStudent: v };
+                                                        next[idx] = { ...next[idx], feePerStudentOne: v };
                                                         return { ...prev, [c.id]: next };
                                                       });
                                                     }}
                                                     className="h-10 text-base"
-                                                    placeholder="(usa sede)"
+                                                    placeholder="0"
                                                   />
                                                 </div>
+                                              </div>
+                                              <div className="flex flex-col gap-1">
+                                                <label className="text-sm text-gray-600">Monto 2+ alumnos</label>
+                                                <Input
+                                                  type="number"
+                                                  inputMode="decimal"
+                                                  value={b.feePerStudentTwoPlus}
+                                                  onChange={(e) => {
+                                                    const v = e.target.value;
+                                                    setRentCourtBands((prev) => {
+                                                      const next = [...(prev[c.id] ?? [])];
+                                                      next[idx] = { ...next[idx], feePerStudentTwoPlus: v };
+                                                      return { ...prev, [c.id]: next };
+                                                    });
+                                                  }}
+                                                  className="h-10 text-base"
+                                                  placeholder="0"
+                                                />
                                               </div>
 
                                               <div className="mt-2 flex justify-end">
