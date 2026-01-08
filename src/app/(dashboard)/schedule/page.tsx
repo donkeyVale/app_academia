@@ -631,7 +631,7 @@ export default function SchedulePage() {
           return;
         }
         if ((coachClash ?? []).length > 0) {
-          const coachName = coachesMap[coachId]?.full_name ?? 'el profesor seleccionado';
+          const coachName = getCoachLabel(coachId) ?? 'el profesor seleccionado';
           const msg = `${coachName} ya tiene una clase en ese horario.`;
           toast.warning(msg);
         }
@@ -801,7 +801,7 @@ export default function SchedulePage() {
             .limit(1);
           if (coachClashErr) throw coachClashErr;
           if ((coachClash ?? []).length > 0) {
-            const coachName = coachesMap[coachId]?.full_name ?? 'el profesor seleccionado';
+            const coachName = getCoachLabel(coachId) ?? 'el profesor seleccionado';
             toast.warning(`${coachName} ya tiene una clase en ese horario.`);
           }
         }
@@ -1008,6 +1008,17 @@ export default function SchedulePage() {
   const locationsMap = useMemo(() => Object.fromEntries(locations.map((x) => [x.id, x] as const)), [locations]);
   const courtsMap = useMemo(() => Object.fromEntries(courts.map((x) => [x.id, x] as const)), [courts]);
   const coachesMap = useMemo(() => Object.fromEntries(coaches.map((x) => [x.id, x] as const)), [coaches]);
+
+  const getCoachLabel = (coachId: string | null | undefined) => {
+    if (!coachId) return null;
+    const raw = (coachesMap[coachId]?.full_name ?? '').trim();
+    if (!raw) return null;
+    const normalized = raw.toLowerCase();
+    if (normalized === 'coach' || normalized === 'admin' || normalized === 'student' || normalized === 'super_admin') {
+      return null;
+    }
+    return raw;
+  };
   const studentsMap = useMemo(
     () => Object.fromEntries(allStudentsForLabels.map((x) => [x.id, x] as const)),
     [allStudentsForLabels]
@@ -1527,7 +1538,7 @@ export default function SchedulePage() {
           return;
         }
         if ((coachClash ?? []).length > 0) {
-          const coachName = coachesMap[editCoachId]?.full_name ?? 'el profesor seleccionado';
+          const coachName = getCoachLabel(editCoachId) ?? 'el profesor seleccionado';
           toast.warning(`${coachName} ya tiene una clase en ese horario.`);
         }
       }
@@ -2139,7 +2150,7 @@ export default function SchedulePage() {
                               </p>
                               <p className="truncate">
                                 <span className="font-semibold text-slate-700">Profesor:</span>{' '}
-                                {coachesMap[cls.coach_id || '']?.full_name ?? 'Coach'}
+                                {getCoachLabel(cls.coach_id) ?? 'Profesor sin nombre'}
                               </p>
                               <p className="truncate">
                                 <span className="font-semibold text-slate-700">Alumnos en clase:</span> {alumnos}
@@ -2596,7 +2607,8 @@ export default function SchedulePage() {
                           <span className="font-semibold text-slate-700">Cancha:</span> {court?.name ?? '-'}
                         </p>
                         <p className="truncate">
-                          <span className="font-semibold text-slate-700">Profesor:</span> {coach?.full_name ?? 'Coach'}
+                          <span className="font-semibold text-slate-700">Profesor:</span>{' '}
+                          {getCoachLabel(coach?.id) ?? 'Profesor sin nombre'}
                         </p>
                         <div className="flex flex-wrap items-center gap-2 pt-1">
                           <span
