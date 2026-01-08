@@ -435,7 +435,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   })();
 
   return (
-    <div className="min-h-dvh bg-gray-50 pb-16">
+    <div
+      className="min-h-dvh bg-gray-50"
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)' }}
+    >
       <main className="w-full flex justify-center px-4 py-3 overflow-x-hidden">
         <div className="w-full max-w-5xl">{children}</div>
       </main>

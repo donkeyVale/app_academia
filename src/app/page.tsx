@@ -933,7 +933,10 @@ export default function HomePage() {
   }
 
   return (
-    <section className="space-y-6 max-w-5xl mx-auto px-4 pt-6 pb-20">
+    <section
+      className="space-y-6 max-w-5xl mx-auto px-4 pt-6"
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)' }}
+    >
       <div className="flex items-center justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold text-[#31435d]">
