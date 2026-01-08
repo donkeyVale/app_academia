@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { createClientBrowser } from "@/lib/supabase";
+import { formatPyg } from "@/lib/formatters";
 import { Bell, BellOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -928,6 +929,9 @@ const onSaveRentFees = async () => {
                                         className="h-10 text-base"
                                         placeholder="0"
                                       />
+                                      {b.feePerStudentOne !== '' && Number.isFinite(Number(b.feePerStudentOne)) && (
+                                        <p className="text-[11px] text-gray-500">{formatPyg(Number(b.feePerStudentOne))} PYG</p>
+                                      )}
                                     </div>
                                     <div className="flex flex-col gap-1">
                                       <label className="text-sm text-gray-600">Monto 2+ alumnos</label>
@@ -946,6 +950,9 @@ const onSaveRentFees = async () => {
                                         className="h-10 text-base"
                                         placeholder="0"
                                       />
+                                      {b.feePerStudentTwoPlus !== '' && Number.isFinite(Number(b.feePerStudentTwoPlus)) && (
+                                        <p className="text-[11px] text-gray-500">{formatPyg(Number(b.feePerStudentTwoPlus))} PYG</p>
+                                      )}
                                     </div>
                                   </div>
 
@@ -1106,6 +1113,9 @@ const onSaveRentFees = async () => {
                                                     className="h-10 text-base"
                                                     placeholder="0"
                                                   />
+                                                  {b.feePerStudentOne !== '' && Number.isFinite(Number(b.feePerStudentOne)) && (
+                                                    <p className="text-[11px] text-gray-500">{formatPyg(Number(b.feePerStudentOne))} PYG</p>
+                                                  )}
                                                 </div>
                                               </div>
                                               <div className="flex flex-col gap-1">
@@ -1125,6 +1135,9 @@ const onSaveRentFees = async () => {
                                                   className="h-10 text-base"
                                                   placeholder="0"
                                                 />
+                                                {b.feePerStudentTwoPlus !== '' && Number.isFinite(Number(b.feePerStudentTwoPlus)) && (
+                                                  <p className="text-[11px] text-gray-500">{formatPyg(Number(b.feePerStudentTwoPlus))} PYG</p>
+                                                )}
                                               </div>
 
                                               <div className="mt-2 flex justify-end">
@@ -1224,12 +1237,15 @@ const onSaveRentFees = async () => {
                                 onChange={(e) =>
                                   setRentLocationValues((prev) => ({
                                     ...prev,
-                                    [loc.id]: { ...locValue, feePerClass: e.target.value },
+                                    [loc.id]: { ...prev[loc.id], feePerClass: e.target.value },
                                   }))
                                 }
                                 className="h-10 text-base"
                                 placeholder="0"
                               />
+                              {locValue.feePerClass !== '' && Number.isFinite(Number(locValue.feePerClass)) && (
+                                <p className="text-[11px] text-gray-500">{formatPyg(Number(locValue.feePerClass))} PYG</p>
+                              )}
                             </div>
                           </div>
 
@@ -1267,12 +1283,15 @@ const onSaveRentFees = async () => {
                                             onChange={(e) =>
                                               setRentCourtValues((prev) => ({
                                                 ...prev,
-                                                [c.id]: { ...cValue, feePerClass: e.target.value },
+                                                [c.id]: { ...prev[c.id], feePerClass: e.target.value },
                                               }))
                                             }
                                             className="h-10 text-base"
-                                            placeholder="(usa tarifa base)"
+                                            placeholder="0"
                                           />
+                                          {cValue.feePerClass !== '' && Number.isFinite(Number(cValue.feePerClass)) && (
+                                            <p className="text-[11px] text-gray-500">{formatPyg(Number(cValue.feePerClass))} PYG</p>
+                                          )}
                                         </div>
                                       </div>
                                     </div>
