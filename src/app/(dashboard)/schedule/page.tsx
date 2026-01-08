@@ -124,6 +124,7 @@ export default function SchedulePage() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [courts, setCourts] = useState<Court[]>([]);
   const [coaches, setCoaches] = useState<Coach[]>([]);
+  const [coachNameByCoachId, setCoachNameByCoachId] = useState<Record<string, string | null>>({});
   const [students, setStudents] = useState<Student[]>([]);
   const [allStudentsForLabels, setAllStudentsForLabels] = useState<Student[]>([]);
   const [classes, setClasses] = useState<ClassSession[]>([]);
@@ -412,6 +413,55 @@ export default function SchedulePage() {
       }
 
       setClasses(finalClasses);
+
+      // Always resolve coach names for the coaches used in the loaded classes.
+      // This avoids showing role strings or placeholders when the coach list is filtered by academy.
+      try {
+        const usedCoachIds = Array.from(
+          new Set(
+            finalClasses
+              .map((c) => c.coach_id)
+              .filter((id): id is string => !!id)
+          )
+        );
+
+        if (usedCoachIds.length > 0) {
+          const { data: usedCoaches, error: usedCoachesErr } = await supabase
+            .from('coaches')
+            .select('id,user_id')
+            .in('id', usedCoachIds);
+          if (usedCoachesErr) throw usedCoachesErr;
+
+          const coachRows = (usedCoaches ?? []) as { id: string; user_id: string | null }[];
+          const userIds = Array.from(new Set(coachRows.map((c) => c.user_id).filter((x): x is string => !!x)));
+
+          let nameByUserId: Record<string, string | null> = {};
+          if (userIds.length > 0) {
+            const { data: profilesData, error: profilesErr } = await supabase
+              .from('profiles')
+              .select('id, full_name')
+              .in('id', userIds);
+            if (profilesErr) throw profilesErr;
+            nameByUserId = (profilesData ?? []).reduce<Record<string, string | null>>((acc, p: any) => {
+              acc[p.id] = (p.full_name as string | null) ?? null;
+              return acc;
+            }, {});
+          }
+
+          const nameByCoachId = coachRows.reduce<Record<string, string | null>>((acc, c) => {
+            acc[c.id] = c.user_id ? nameByUserId[c.user_id] ?? null : null;
+            return acc;
+          }, {});
+
+          setCoachNameByCoachId(nameByCoachId);
+        } else {
+          setCoachNameByCoachId({});
+        }
+      } catch (e) {
+        console.error('Error resolviendo nombres de profesores', e);
+        setCoachNameByCoachId({});
+      }
+
       // Fetch bookings for these classes to compute alumnos count y mapear alumnos por clase
       if ((clsData ?? []).length) {
         const classIds = (clsData ?? []).map((c) => c.id);
@@ -1011,7 +1061,7 @@ export default function SchedulePage() {
 
   const getCoachLabel = (coachId: string | null | undefined) => {
     if (!coachId) return null;
-    const raw = (coachesMap[coachId]?.full_name ?? '').trim();
+    const raw = ((coachNameByCoachId[coachId] ?? coachesMap[coachId]?.full_name) ?? '').trim();
     if (!raw) return null;
     const normalized = raw.toLowerCase();
     if (normalized === 'coach' || normalized === 'admin' || normalized === 'student' || normalized === 'super_admin') {
@@ -2150,7 +2200,7 @@ export default function SchedulePage() {
                               </p>
                               <p className="truncate">
                                 <span className="font-semibold text-slate-700">Profesor:</span>{' '}
-                                {getCoachLabel(cls.coach_id) ?? 'Profesor sin nombre'}
+                                {getCoachLabel(cls.coach_id) ?? 'Profesor'}
                               </p>
                               <p className="truncate">
                                 <span className="font-semibold text-slate-700">Alumnos en clase:</span> {alumnos}
@@ -2608,7 +2658,7 @@ export default function SchedulePage() {
                         </p>
                         <p className="truncate">
                           <span className="font-semibold text-slate-700">Profesor:</span>{' '}
-                          {getCoachLabel(coach?.id) ?? 'Profesor sin nombre'}
+                          {getCoachLabel(coach?.id) ?? 'Profesor'}
                         </p>
                         <div className="flex flex-wrap items-center gap-2 pt-1">
                           <span
