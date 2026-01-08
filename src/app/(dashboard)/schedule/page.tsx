@@ -2658,7 +2658,7 @@ export default function SchedulePage() {
                         </p>
                         <p className="truncate">
                           <span className="font-semibold text-slate-700">Profesor:</span>{' '}
-                          {getCoachLabel(coach?.id) ?? 'Profesor'}
+                          {getCoachLabel(cls.coach_id) ?? 'Profesor'}
                         </p>
                         <div className="flex flex-wrap items-center gap-2 pt-1">
                           <span
