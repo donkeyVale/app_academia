@@ -765,6 +765,7 @@ export default function UsersPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          currentUserId,
           userId: detailUserId,
           firstName: detailFirstName,
           lastName: detailLastName,
