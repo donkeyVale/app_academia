@@ -490,8 +490,8 @@ export default function SchedulePage() {
       }
 
       // Fetch bookings for these classes to compute alumnos count y mapear alumnos por clase
-      if ((clsData ?? []).length) {
-        const classIds = (clsData ?? []).map((c) => c.id);
+      if (finalClasses.length) {
+        const classIds = finalClasses.map((c) => c.id);
         const { data: bData, error: bErr } = await supabase
           .from('bookings')
           .select('id,class_id,student_id')
@@ -3027,7 +3027,7 @@ export default function SchedulePage() {
                       const min = String(d.getMinutes()).padStart(2, '0');
                       const court = cls.court_id ? courtsMap[cls.court_id] : undefined;
                       const studentIds = studentsByClass[cls.id] ?? [];
-                      const studentsCountLabel = studentIds.length === 0 ? '-' : `${studentIds.length}`;
+                      const alumnos = bookingsCount[cls.id] ?? studentIds.length;
                       return (
                         <li
                           key={cls.id}
@@ -3042,9 +3042,13 @@ export default function SchedulePage() {
                                 <span className="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200">
                                   Cancha: {court?.name ?? '-'}
                                 </span>
-                                <span className="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200">
-                                  Alumnos: {studentsCountLabel}
-                                </span>
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center rounded-full bg-slate-50 text-slate-700 border border-slate-200 px-2 py-0.5 text-[11px] font-medium hover:bg-slate-100"
+                                  onClick={() => setStudentsModalClass(cls)}
+                                >
+                                  {alumnos}/{cls.capacity} alumnos
+                                </button>
                               </div>
                             </div>
                             <div className="flex w-full items-center justify-start gap-2 sm:w-auto sm:justify-end">
