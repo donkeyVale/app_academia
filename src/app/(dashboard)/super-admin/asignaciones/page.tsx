@@ -32,6 +32,8 @@ export default function AssignmentsPage() {
   const [loadingData, setLoadingData] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
   const [users, setUsers] = useState<ProfileUser[]>([]);
   const [academies, setAcademies] = useState<Academy[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -56,6 +58,8 @@ export default function AssignmentsPage() {
         setLoadingUser(false);
         return;
       }
+
+      setCurrentUserId(user.id);
 
       try {
         const { data: profile, error: profErr } = await supabase
@@ -183,18 +187,27 @@ export default function AssignmentsPage() {
         return;
       }
 
-      const { data, error: insErr } = await supabase
-        .from("user_academies")
-        .insert({
-          user_id: selectedUserId,
-          academy_id: newAcademyId,
-          role: newRole,
-        })
-        .select("id, academy_id, role")
-        .single();
+      if (!currentUserId) {
+        throw new Error('No se pudo identificar al usuario actual.');
+      }
 
-      if (insErr) throw insErr;
-      setAssignments((prev) => [...prev, data as UserAcademy]);
+      const res = await fetch('/api/admin/user-academy-assignment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentUserId,
+          userId: selectedUserId,
+          academyId: newAcademyId,
+          role: newRole,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json?.error ?? 'No se pudo agregar la asignación.');
+      }
+
+      setAssignments((prev) => [...prev, json.assignment as UserAcademy]);
       setNewAcademyId("");
     } catch (err: any) {
       setError(err?.message ?? "No se pudo agregar la asignación.");
@@ -207,12 +220,21 @@ export default function AssignmentsPage() {
     setRemovingId(id);
     setError(null);
     try {
-      const { error: delErr } = await supabase
-        .from("user_academies")
-        .delete()
-        .eq("id", id);
+      if (!currentUserId) {
+        throw new Error('No se pudo identificar al usuario actual.');
+      }
 
-      if (delErr) throw delErr;
+      const res = await fetch('/api/admin/user-academy-assignment', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentUserId, id }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json?.error ?? 'No se pudo eliminar la asignación.');
+      }
+
       setAssignments((prev) => prev.filter((a) => a.id !== id));
     } catch (err: any) {
       setError(err?.message ?? "No se pudo eliminar la asignación.");
