@@ -958,11 +958,31 @@ export default function PlansClient() {
         }));
       }
 
-      const { data: payData, error: payErr } = await supabase
+      let academyIdForRefresh: string | null = (sp?.academy_id as string | null | undefined) ?? null;
+      if (!academyIdForRefresh && typeof window !== 'undefined') {
+        const stored = window.localStorage.getItem('selectedAcademyId');
+        academyIdForRefresh = stored && stored.trim() ? stored : null;
+      }
+
+      const allowedPlanIdsList = academyIdForRefresh
+        ? studentPlans
+            .filter((row) => row.academy_id === academyIdForRefresh)
+            .map((row) => row.id)
+        : [];
+
+      const payQuery = supabase
         .from('payments')
         .select('id,student_id,student_plan_id,amount,currency,payment_date,method,status,notes')
         .order('payment_date', { ascending: false })
         .limit(10);
+
+      const { data: payData, error: payErr } =
+        academyIdForRefresh && allowedPlanIdsList.length > 0
+          ? await payQuery.in('student_plan_id', allowedPlanIdsList)
+          : academyIdForRefresh
+            ? { data: [], error: null }
+            : await payQuery;
+
       if (payErr) throw payErr;
       setPayments(((payData ?? []) as unknown as PaymentRow[]));
 
