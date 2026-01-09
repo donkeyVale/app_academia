@@ -542,7 +542,7 @@ export default function AdminHomeIncomeExpensesCard() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs md:text-sm">
+          <div className="grid grid-cols-1 gap-3 text-xs md:text-sm">
             <div className="rounded-xl bg-white/70 border border-emerald-100 px-3 py-2">
               <p className="text-[11px] uppercase tracking-wide text-gray-500">Ingresos</p>
               <div className="flex flex-col items-end">
