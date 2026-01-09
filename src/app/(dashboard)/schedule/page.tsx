@@ -12,6 +12,14 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   Select,
   SelectTrigger,
   SelectValue,
@@ -108,8 +116,9 @@ type ClassSession = {
   coach_id: string | null;
   court_id: string | null;
   notes?: string | null;
-  price_cents: number;
-  currency: string;
+  price_cents?: number | null;
+  currency?: string | null;
+  attendance_pending?: boolean | null;
 };
 type Student = {
   id: string;
@@ -156,6 +165,9 @@ export default function SchedulePage() {
   const [recurringEnabled, setRecurringEnabled] = useState(false);
   const [recurringWeekdays, setRecurringWeekdays] = useState<number[]>([]);
   const [recurringTimesByWeekday, setRecurringTimesByWeekday] = useState<Record<number, string>>({});
+
+  const [pastWarningOpen, setPastWarningOpen] = useState(false);
+  const [pastWarningLabel, setPastWarningLabel] = useState<string>('');
 
   // Filters for list
   const [filterLocationId, setFilterLocationId] = useState<string>('');
@@ -399,11 +411,26 @@ export default function SchedulePage() {
         .select('*')
         .gte('date', from.toISOString())
         .lte('date', to.toISOString())
-        .order('date', { ascending: true })
-        .limit(500);
-      if (e3) setError(e3.message);
+        .order('date', { ascending: true });
+      if (e3) throw e3;
 
-      let finalClasses: ClassSession[] = (clsData as ClassSession[]) ?? [];
+      const { data: pendingData, error: pendingErr } = await supabase
+        .from('class_sessions')
+        .select('*')
+        .eq('attendance_pending', true)
+        .order('date', { ascending: true });
+      if (pendingErr) throw pendingErr;
+
+      const mergedById = new Map<string, any>();
+      (clsData as any[] | null | undefined)?.forEach((c) => {
+        if (c?.id) mergedById.set(c.id, c);
+      });
+      (pendingData as any[] | null | undefined)?.forEach((c) => {
+        if (c?.id) mergedById.set(c.id, c);
+      });
+      const merged = Array.from(mergedById.values()).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+      let finalClasses: ClassSession[] = (merged as ClassSession[]) ?? [];
       if (selectedAcademyId && academyLocationIds.size > 0 && finalClasses.length > 0) {
         finalClasses = finalClasses.filter((cls) => {
           if (!cls.court_id) return false;
@@ -555,8 +582,17 @@ export default function SchedulePage() {
     return candidates;
   }, []);
 
-  const onCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const formatPastLabel = (ymd: string, hhmm: string) => {
+    const parts = (ymd || '').split('-');
+    const y = parts[0] || '';
+    const m = parts[1] || '';
+    const d = parts[2] || '';
+    const yy = y.length >= 2 ? y.slice(-2) : y;
+    if (!d || !m || !yy) return `${ymd} ${hhmm}`;
+    return `${d}/${m}/${yy} ${hhmm}`;
+  };
+
+  const createClassSessions = async (allowPast: boolean) => {
     setSaving(true);
     setError(null);
     try {
@@ -645,9 +681,9 @@ export default function SchedulePage() {
       {
         const now = new Date();
         const classStart = new Date(iso);
-        if (classStart.getTime() <= now.getTime()) {
-          const msg = 'No podés crear una clase en una fecha y hora que ya pasaron.';
-          toast.error(msg);
+        if (!allowPast && classStart.getTime() <= now.getTime()) {
+          setPastWarningLabel(formatPastLabel(day, baseTime));
+          setPastWarningOpen(true);
           setSaving(false);
           return;
         }
@@ -713,6 +749,8 @@ export default function SchedulePage() {
 
         let chosenPlan: any = null;
         let chosenPlanRemaining: number | null = null;
+        // Para carga histórica (allowPast=true), no bloqueamos por saldo.
+        // Aun así, intentamos elegir un plan con saldo; si no hay, tomamos el primero.
         for (const p of plans as any[]) {
           const { count: usedCount, error: usageCountErr } = await supabase
             .from('plan_usages')
@@ -735,6 +773,12 @@ export default function SchedulePage() {
           }
         }
 
+        if (!chosenPlan && allowPast) {
+          chosenPlan = (plans as any[])[0] ?? null;
+          const totalFromPlan = (chosenPlan?.remaining_classes as number) ?? 0;
+          chosenPlanRemaining = Math.max(1, totalFromPlan);
+        }
+
         if (!chosenPlan) {
           const msg = 'El alumno seleccionado ya no tiene clases disponibles en su plan.';
           toast.error(msg);
@@ -750,34 +794,37 @@ export default function SchedulePage() {
         }
 
         // V3: limitar cantidad de clases futuras reservadas al total de clases del plan
-        const totalFromPlan = (chosenPlan.remaining_classes as number) ?? 0;
-        if (totalFromPlan > 0) {
-          const nowIso = new Date().toISOString();
-          const { data: futureBookings, error: futureErr } = await supabase
-            .from('bookings')
-            .select('id, class_sessions!inner(id,date)')
-            .eq('student_id', sid)
-            .gt('class_sessions.date', nowIso);
+        // Para carga histórica (allowPast=true), no aplica.
+        if (!allowPast) {
+          const totalFromPlan = (chosenPlan.remaining_classes as number) ?? 0;
+          if (totalFromPlan > 0) {
+            const nowIso = new Date().toISOString();
+            const { data: futureBookings, error: futureErr } = await supabase
+              .from('bookings')
+              .select('id, class_sessions!inner(id,date)')
+              .eq('student_id', sid)
+              .gt('class_sessions.date', nowIso);
 
-          if (futureErr) {
-            const msg = 'No se pudo verificar las clases futuras del alumno. Intenta nuevamente.';
-            toast.error(msg);
-            setSaving(false);
-            return;
-          }
+            if (futureErr) {
+              const msg = 'No se pudo verificar las clases futuras del alumno. Intenta nuevamente.';
+              toast.error(msg);
+              setSaving(false);
+              return;
+            }
 
-          const futureCount = (futureBookings ?? []).length;
-          if (futureCount >= totalFromPlan) {
-            const label = getStudentLabel(sid);
-            const msg = `El alumno ${label} ya tiene ${futureCount} clases futuras reservadas, que es el máximo permitido por su plan.`;
-            toast.error(msg);
-            setSaving(false);
-            return;
+            const futureCount = (futureBookings ?? []).length;
+            if (futureCount >= totalFromPlan) {
+              const label = getStudentLabel(sid);
+              const msg = `El alumno ${label} ya tiene ${futureCount} clases futuras reservadas, que es el máximo permitido por su plan.`;
+              toast.error(msg);
+              setSaving(false);
+              return;
+            }
           }
         }
 
         planForStudent[sid] = chosenPlan.id as string;
-        remainingForStudent[sid] = chosenPlanRemaining;
+        remainingForStudent[sid] = allowPast ? Math.max(1, chosenPlanRemaining) : chosenPlanRemaining;
       }
 
       // V4: Validar que ningún alumno tenga otra clase en el mismo horario (en cualquier sede/cancha)
@@ -825,6 +872,12 @@ export default function SchedulePage() {
       const createOneSession = async (sessionIso: string, sessionIndex: number) => {
         const studentsToBook = selectedStudents.filter((sid) => (remainingForStudent[sid] ?? 0) >= sessionIndex + 1);
         if (studentsToBook.length === 0) return;
+
+        const now = new Date();
+        const startTs = new Date(sessionIso).getTime();
+        const endTs = startTs + 60 * 60 * 1000;
+        const olderThan24h = endTs < (now.getTime() - 24 * 60 * 60 * 1000);
+        const needsAttendancePending = allowPast && olderThan24h;
 
         // Anti-race: misma cancha y misma hora
         {
@@ -882,6 +935,7 @@ export default function SchedulePage() {
             coach_id: coachId,
             capacity: capacityForSession,
             type: typeForSession,
+            attendance_pending: needsAttendancePending,
             // price_cents y currency pueden tener defaults en la DB; si no, se agregan luego.
           })
           .select('*')
@@ -1055,6 +1109,11 @@ export default function SchedulePage() {
     }
   };
 
+  const onCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await createClassSessions(false);
+  };
+
   const locationsMap = useMemo(() => Object.fromEntries(locations.map((x) => [x.id, x] as const)), [locations]);
   const courtsMap = useMemo(() => Object.fromEntries(courts.map((x) => [x.id, x] as const)), [courts]);
   const coachesMap = useMemo(() => Object.fromEntries(coaches.map((x) => [x.id, x] as const)), [coaches]);
@@ -1143,8 +1202,8 @@ export default function SchedulePage() {
       const endTs = startTs + 60 * 60 * 1000;
       // ya terminadas
       if (endTs >= now.getTime()) return false;
-      // solo últimas 24h
-      if (startTs < cutoff.getTime()) return false;
+      // solo últimas 24h (o históricas recién creadas para asistencia)
+      if (startTs < cutoff.getTime() && !cls.attendance_pending) return false;
       if (attendanceMarkedByClass[cls.id]) return false;
       return true;
     });
@@ -1366,6 +1425,16 @@ export default function SchedulePage() {
         }));
         const { error: insErr } = await supabase.from('attendance').insert(rows);
         if (insErr) throw insErr;
+
+        const { error: updPendingErr } = await supabase
+          .from('class_sessions')
+          .update({ attendance_pending: false })
+          .eq('id', attendanceClass.id);
+        if (updPendingErr) {
+          console.error('Error limpiando attendance_pending', updPendingErr.message);
+        } else {
+          setClasses((prev) => prev.map((c) => (c.id === attendanceClass.id ? ({ ...c, attendance_pending: false } as any) : c)));
+        }
 
         await logAudit('attendance_update', 'class_session', attendanceClass.id, {
           attendance: rows,
@@ -1763,6 +1832,41 @@ export default function SchedulePage() {
 
   return (
     <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4 overflow-x-hidden">
+      <Dialog open={pastWarningOpen} onOpenChange={setPastWarningOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Crear clase en fecha/hora pasada</DialogTitle>
+            <DialogDescription>
+              Estás por cargar una clase histórica ({pastWarningLabel}). Esto sirve para migrar clases anteriores al
+              uso de Agendo y reflejar el consumo real de planes.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="text-sm text-gray-700 space-y-2">
+            <p>Confirmá solo si los datos son correctos y querés que esta clase cuente para el seguimiento.</p>
+            <div className="space-y-1">
+              <p>- Se crearán reservas para los alumnos seleccionados.</p>
+              <p>- Puede impactar el saldo/consumo de planes y reportes.</p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={() => setPastWarningOpen(false)} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              className="bg-[#3cadaf] hover:bg-[#31435d]"
+              onClick={async () => {
+                setPastWarningOpen(false);
+                await createClassSessions(true);
+              }}
+              disabled={saving}
+            >
+              Confirmar y crear
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <CalendarIcon className="h-5 w-5 text-[#3cadaf]" />
