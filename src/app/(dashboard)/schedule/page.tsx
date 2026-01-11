@@ -200,6 +200,13 @@ export default function SchedulePage() {
   const [coachFilterSearch, setCoachFilterSearch] = useState('');
   const [studentFilterSearch, setStudentFilterSearch] = useState('');
 
+  const [nowTick, setNowTick] = useState<number>(() => Date.now());
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNowTick(Date.now()), 60 * 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
   // Cargar rol del usuario actual y, si es alumno, su studentId
   useEffect(() => {
     (async () => {
@@ -1914,6 +1921,15 @@ export default function SchedulePage() {
     );
   }
 
+  const upcoming7DaysCount = useMemo(() => {
+    const start = nowTick;
+    const end = start + 7 * 24 * 60 * 60 * 1000;
+    return filteredClasses.filter((cls) => {
+      const startTs = new Date(cls.date).getTime();
+      return startTs >= start && startTs < end;
+    }).length;
+  }, [filteredClasses, nowTick]);
+
   return (
     <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4 overflow-x-hidden">
       <Dialog open={pastWarningOpen} onOpenChange={setPastWarningOpen}>
@@ -1955,6 +1971,9 @@ export default function SchedulePage() {
         <div className="flex items-center gap-2">
           <CalendarIcon className="h-5 w-5 text-[#3cadaf]" />
           <h1 className="text-2xl font-semibold text-[#31435d]">Agenda</h1>
+          <span className="ml-1 inline-flex items-center rounded-full bg-[#e6f5f6] text-[#0f172a] border border-[#3cadaf]/30 px-2 py-0.5 text-[11px] font-semibold">
+            {upcoming7DaysCount} próximas (7d)
+          </span>
         </div>
         <div className="flex items-center justify-end flex-1">
           <Link href="/" className="flex items-center">
