@@ -294,7 +294,7 @@ export default function SettingsPage() {
           const next: Record<string, boolean> = { ...prev };
           for (const l of locs) {
             if (typeof next[l.id] !== 'boolean') {
-              next[l.id] = locs.length === 1;
+              next[l.id] = false;
             }
           }
           return next;
