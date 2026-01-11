@@ -59,6 +59,19 @@ function formatYmd(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+function formatPastLabel(ymd: string, hhmm: string): string {
+  const [y, m, d] = ymd.split('-');
+  const yy = (y || '').slice(-2);
+  const dd = (d || '').padStart(2, '0');
+  const mm = (m || '').padStart(2, '0');
+  return `${dd}/${mm}/${yy} ${hhmm}`;
+}
+
+function weekdayAbbrevEs(date: Date): string {
+  const labels = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+  return labels[date.getDay()] ?? '';
+}
+
 function formatDisplay(date: Date | null): string {
   if (!date) return 'Selecciona una fecha';
   return date.toLocaleDateString('es-ES', {
@@ -582,16 +595,6 @@ export default function SchedulePage() {
     return candidates;
   }, []);
 
-  const formatPastLabel = (ymd: string, hhmm: string) => {
-    const parts = (ymd || '').split('-');
-    const y = parts[0] || '';
-    const m = parts[1] || '';
-    const d = parts[2] || '';
-    const yy = y.length >= 2 ? y.slice(-2) : y;
-    if (!d || !m || !yy) return `${ymd} ${hhmm}`;
-    return `${d}/${m}/${yy} ${hhmm}`;
-  };
-
   const createClassSessions = async (allowPast: boolean) => {
     setSaving(true);
     setError(null);
@@ -997,7 +1000,7 @@ export default function SchedulePage() {
         }));
 
         // Push solo para la primera clase creada (solo cuando NO es recurrente)
-        if (!recurringEnabled && sessionIndex === 0 && selectedAcademyId) {
+        if (!recurringEnabled && selectedAcademyId) {
           try {
             await fetch('/api/push/class-created', {
               method: 'POST',
@@ -2184,7 +2187,7 @@ export default function SchedulePage() {
                   <div className="space-y-2 border rounded-md p-2 bg-slate-50">
                     <div className="flex flex-wrap gap-2 items-center">
                       <span className="text-xs text-gray-600 mr-1">Días de la semana:</span>
-                      {['D', 'L', 'M', 'X', 'J', 'V', 'S'].map((label, idx) => {
+                      {['D', 'L', 'M', 'Mi', 'J', 'V', 'S'].map((label, idx) => {
                         const wd = idx; // 0=Domingo
                         const active = recurringWeekdays.includes(wd);
                         return (
@@ -2223,8 +2226,8 @@ export default function SchedulePage() {
                         .sort((a, b) => a - b)
                         .map((wd) => (
                           <div key={`wd-time-${wd}`} className="flex items-center gap-2">
-                            <span className="text-xs text-gray-700 w-6">
-                              {['D', 'L', 'M', 'X', 'J', 'V', 'S'][wd]}
+                            <span className="text-xs font-medium text-slate-700 w-10">
+                              {['D', 'L', 'M', 'Mi', 'J', 'V', 'S'][wd]}
                             </span>
                             <Select
                               value={recurringTimesByWeekday[wd] || ''}
@@ -2295,6 +2298,7 @@ export default function SchedulePage() {
                 <ul className="space-y-3">
                   {(showAllStudentHistory ? studentPastClasses : studentPastClasses.slice(0, 5)).map((cls) => {
                     const d = new Date(cls.date);
+                    const wd = weekdayAbbrevEs(d);
                     const yyyy = d.getFullYear();
                     const mm = String(d.getMonth() + 1).padStart(2, '0');
                     const dd = String(d.getDate()).padStart(2, '0');
@@ -2310,12 +2314,12 @@ export default function SchedulePage() {
                         className="max-w-full overflow-hidden rounded-lg border bg-white p-3 text-xs shadow-sm transition hover:border-[#dbeafe] hover:shadow-md sm:text-sm"
                       >
                         <div className="flex max-w-full flex-col items-start justify-between gap-2 sm:flex-row">
-                          <div className="min-w-0 space-y-1">
+                          <div className="min-w-0 space-y-1.5">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="inline-flex items-center rounded-full bg-[#e0f2fe] px-2 py-0.5 text-[11px] font-medium text-[#075985]">
-                                {dd}/{mm}/{yyyy} • {hh}:{min}
+                                {wd} {dd}/{mm}/{yyyy} • {hh}:{min}
                               </span>
-                              <span className="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200">
+                              <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
                                 {location?.name ?? 'Sede sin asignar'}
                               </span>
                             </div>
@@ -2749,6 +2753,7 @@ export default function SchedulePage() {
               const alumnos = bookingsCount[cls.id] ?? 0;
 
               const d = new Date(cls.date);
+              const wd = weekdayAbbrevEs(d);
               const yyyy = d.getFullYear();
               const mm = String(d.getMonth() + 1).padStart(2, '0');
               const dd = String(d.getDate()).padStart(2, '0');
@@ -2771,7 +2776,7 @@ export default function SchedulePage() {
                     <div className="space-y-1.5 min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="inline-flex items-center rounded-full bg-[#e0f2fe] px-2 py-0.5 text-[11px] font-medium text-[#075985]">
-                          {dd}/{mm}/{yyyy} • {hh}:{min}
+                          {wd} {dd}/{mm}/{yyyy} • {hh}:{min}
                         </span>
                         <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
                           {location?.name ?? 'Sede sin asignar'}
@@ -3041,6 +3046,7 @@ export default function SchedulePage() {
                   <ul className="space-y-3">
                     {(showAllRecent ? recentClasses : recentClasses.slice(0, 5)).map((cls) => {
                       const d = new Date(cls.date);
+                      const wd = weekdayAbbrevEs(d);
                       const yyyy = d.getFullYear();
                       const mm = String(d.getMonth() + 1).padStart(2, '0');
                       const dd = String(d.getDate()).padStart(2, '0');
@@ -3058,7 +3064,7 @@ export default function SchedulePage() {
                             <div className="min-w-0 space-y-1">
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="inline-flex items-center rounded-full bg-[#e0f2fe] px-2 py-0.5 text-[11px] font-medium text-[#075985]">
-                                  {dd}/{mm}/{yyyy} • {hh}:{min}
+                                  {wd} {dd}/{mm}/{yyyy} • {hh}:{min}
                                 </span>
                                 <span className="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200">
                                   Cancha: {court?.name ?? '-'}
