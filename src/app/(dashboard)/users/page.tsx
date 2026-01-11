@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
 import { formatPyg } from '@/lib/formatters';
-import { Users, UserPlus, ListChecks, Calendar as CalendarIcon, Trash2 } from 'lucide-react';
+import { Users, UserPlus, ListChecks, Calendar as CalendarIcon, Trash2, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -119,6 +119,14 @@ export default function UsersPage() {
   const [usersAcademyFilter, setUsersAcademyFilter] = useState<string>('all');
   const [usersStatusFilter, setUsersStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [userAcademiesMap, setUserAcademiesMap] = useState<Record<string, string[]>>({});
+
+  const [usersAcademyFilterOpen, setUsersAcademyFilterOpen] = useState(false);
+  const [usersAcademyFilterQuery, setUsersAcademyFilterQuery] = useState('');
+  const usersAcademyFilterSearchRef = useRef<HTMLInputElement | null>(null);
+
+  const [usersStatusFilterOpen, setUsersStatusFilterOpen] = useState(false);
+  const [usersStatusFilterQuery, setUsersStatusFilterQuery] = useState('');
+  const usersStatusFilterSearchRef = useRef<HTMLInputElement | null>(null);
   const [userAcademyStatusMap, setUserAcademyStatusMap] = useState<Record<string, Record<string, boolean>>>({});
 
   const [submitting, setSubmitting] = useState(false);
@@ -158,6 +166,38 @@ export default function UsersPage() {
   const [detailCoachFeeAcademyId, setDetailCoachFeeAcademyId] = useState<string | null>(null);
   const [detailAcademyStatuses, setDetailAcademyStatuses] = useState<UserAcademyStatus[]>([]);
   const [detailStatusAcademyId, setDetailStatusAcademyId] = useState<string>('');
+
+  const [detailStatusAcademyOpen, setDetailStatusAcademyOpen] = useState(false);
+  const [detailStatusAcademyQuery, setDetailStatusAcademyQuery] = useState('');
+  const detailStatusAcademySearchRef = useRef<HTMLInputElement | null>(null);
+
+  const [detailCoachFeeAcademyOpen, setDetailCoachFeeAcademyOpen] = useState(false);
+  const [detailCoachFeeAcademyQuery, setDetailCoachFeeAcademyQuery] = useState('');
+  const detailCoachFeeAcademySearchRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!usersAcademyFilterOpen) return;
+    const t = window.setTimeout(() => usersAcademyFilterSearchRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [usersAcademyFilterOpen]);
+
+  useEffect(() => {
+    if (!usersStatusFilterOpen) return;
+    const t = window.setTimeout(() => usersStatusFilterSearchRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [usersStatusFilterOpen]);
+
+  useEffect(() => {
+    if (!detailStatusAcademyOpen) return;
+    const t = window.setTimeout(() => detailStatusAcademySearchRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [detailStatusAcademyOpen]);
+
+  useEffect(() => {
+    if (!detailCoachFeeAcademyOpen) return;
+    const t = window.setTimeout(() => detailCoachFeeAcademySearchRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [detailCoachFeeAcademyOpen]);
   const [detailIsActive, setDetailIsActive] = useState(true);
 
   // Importación masiva desde CSV
@@ -1195,30 +1235,141 @@ export default function UsersPage() {
                   <div className="grid gap-3 md:grid-cols-3">
                     <div>
                       <label className="block text-xs mb-1 text-gray-600">Filtrar por academia</label>
-                      <select
-                        className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/50"
-                        value={usersAcademyFilter}
-                        onChange={(e) => setUsersAcademyFilter(e.target.value)}
-                      >
-                        <option value="all">Todas</option>
-                        {academyOptions.map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.name}
-                          </option>
-                        ))}
-                      </select>
+                      <Popover open={usersAcademyFilterOpen} onOpenChange={setUsersAcademyFilterOpen}>
+                        <PopoverTrigger asChild>
+                          <Button type="button" variant="outline" className="w-full justify-between text-sm font-normal">
+                            <span className="truncate mr-2">
+                              {(() => {
+                                if (usersAcademyFilter === 'all') return 'Todas';
+                                const a = academyOptions.find((x) => x.id === usersAcademyFilter);
+                                return a?.name ?? 'Todas';
+                              })()}
+                            </span>
+                            <ChevronDown className="h-4 w-4 text-gray-500" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80 p-3" align="start">
+                          <div className="space-y-2">
+                            <Input
+                              type="text"
+                              placeholder="Buscar academias..."
+                              value={usersAcademyFilterQuery}
+                              onChange={(e) => setUsersAcademyFilterQuery(e.target.value)}
+                              className="h-11 text-base"
+                              ref={usersAcademyFilterSearchRef}
+                            />
+                            <div className="max-h-52 overflow-auto border rounded-md divide-y">
+                              {(() => {
+                                const opts = [{ id: 'all', name: 'Todas' }, ...academyOptions];
+                                const filtered = opts.filter((a) => {
+                                  const t = (usersAcademyFilterQuery || '').toLowerCase();
+                                  if (!t) return true;
+                                  return `${a.name || ''} ${a.id || ''}`.toLowerCase().includes(t);
+                                });
+                                const limited = filtered.slice(0, 50);
+                                if (opts.length === 0) {
+                                  return (
+                                    <div className="px-2 py-1.5 text-xs text-gray-500">No hay academias.</div>
+                                  );
+                                }
+                                if (filtered.length === 0) {
+                                  return (
+                                    <div className="px-2 py-1.5 text-xs text-gray-500">
+                                      No se encontraron academias con ese criterio de búsqueda.
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <>
+                                    {limited.map((a) => (
+                                      <button
+                                        key={a.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setUsersAcademyFilter(a.id);
+                                          setUsersAcademyFilterQuery('');
+                                          setUsersAcademyFilterOpen(false);
+                                        }}
+                                        className="w-full flex items-center justify-between px-2 py-1.5 text-sm hover:bg-slate-50"
+                                      >
+                                        <span className="mr-2 truncate">{a.name}</span>
+                                      </button>
+                                    ))}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                     <div>
                       <label className="block text-xs mb-1 text-gray-600">Filtrar por estado</label>
-                      <select
-                        className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/50"
-                        value={usersStatusFilter}
-                        onChange={(e) => setUsersStatusFilter(e.target.value as any)}
-                      >
-                        <option value="all">Todos</option>
-                        <option value="active">Activos</option>
-                        <option value="inactive">Inactivos</option>
-                      </select>
+                      <Popover open={usersStatusFilterOpen} onOpenChange={setUsersStatusFilterOpen}>
+                        <PopoverTrigger asChild>
+                          <Button type="button" variant="outline" className="w-full justify-between text-sm font-normal">
+                            <span className="truncate mr-2">
+                              {usersStatusFilter === 'all'
+                                ? 'Todos'
+                                : usersStatusFilter === 'active'
+                                ? 'Activos'
+                                : 'Inactivos'}
+                            </span>
+                            <ChevronDown className="h-4 w-4 text-gray-500" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-72 p-3" align="start">
+                          <div className="space-y-2">
+                            <Input
+                              type="text"
+                              placeholder="Buscar..."
+                              value={usersStatusFilterQuery}
+                              onChange={(e) => setUsersStatusFilterQuery(e.target.value)}
+                              className="h-11 text-base"
+                              ref={usersStatusFilterSearchRef}
+                            />
+                            <div className="max-h-52 overflow-auto border rounded-md divide-y">
+                              {(() => {
+                                const opts: { id: 'all' | 'active' | 'inactive'; name: string }[] = [
+                                  { id: 'all', name: 'Todos' },
+                                  { id: 'active', name: 'Activos' },
+                                  { id: 'inactive', name: 'Inactivos' },
+                                ];
+                                const filtered = opts.filter((o) => {
+                                  const t = (usersStatusFilterQuery || '').toLowerCase();
+                                  if (!t) return true;
+                                  return o.name.toLowerCase().includes(t) || o.id.toLowerCase().includes(t);
+                                });
+                                if (filtered.length === 0) {
+                                  return (
+                                    <div className="px-2 py-1.5 text-xs text-gray-500">
+                                      No se encontraron opciones con ese criterio de búsqueda.
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <>
+                                    {filtered.map((o) => (
+                                      <button
+                                        key={o.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setUsersStatusFilter(o.id);
+                                          setUsersStatusFilterQuery('');
+                                          setUsersStatusFilterOpen(false);
+                                        }}
+                                        className="w-full flex items-center justify-between px-2 py-1.5 text-sm hover:bg-slate-50"
+                                      >
+                                        <span className="mr-2 truncate">{o.name}</span>
+                                      </button>
+                                    ))}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   </div>
                 )}
@@ -1315,32 +1466,84 @@ export default function UsersPage() {
 
                       <div>
                         <label className="block text-xs mb-1 text-gray-600">Academia</label>
-                        <select
-                          className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/50"
-                          value={detailStatusAcademyId}
-                          onChange={(e) => {
-                            const nextAcademyId = e.target.value;
-                            setDetailStatusAcademyId(nextAcademyId);
-                            const nextActive =
-                              detailAcademyStatuses.find((s) => s.academy_id === nextAcademyId)?.is_active ??
-                              true;
-                            setDetailIsActive(nextActive);
-                          }}
-                          disabled={detailAcademyStatuses.length === 0}
-                        >
-                          {detailAcademyStatuses.length === 0 ? (
-                            <option value="">Sin academias asignadas</option>
-                          ) : (
-                            detailAcademyStatuses.map((s) => {
-                              const name = academyOptions.find((a) => a.id === s.academy_id)?.name ?? s.academy_id;
-                              return (
-                                <option key={s.academy_id} value={s.academy_id}>
-                                  {name}
-                                </option>
-                              );
-                            })
-                          )}
-                        </select>
+                        <Popover open={detailStatusAcademyOpen} onOpenChange={setDetailStatusAcademyOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              disabled={detailAcademyStatuses.length === 0}
+                              className="w-full justify-between text-sm font-normal"
+                            >
+                              <span className="truncate mr-2">
+                                {(() => {
+                                  if (detailAcademyStatuses.length === 0) return 'Sin academias asignadas';
+                                  const id = detailStatusAcademyId;
+                                  const name = academyOptions.find((a) => a.id === id)?.name ?? id;
+                                  return name || 'Seleccionar academia';
+                                })()}
+                              </span>
+                              <ChevronDown className="h-4 w-4 text-gray-500" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-80 p-3" align="start">
+                            <div className="space-y-2">
+                              <Input
+                                type="text"
+                                placeholder="Buscar academias..."
+                                value={detailStatusAcademyQuery}
+                                onChange={(e) => setDetailStatusAcademyQuery(e.target.value)}
+                                className="h-11 text-base"
+                                ref={detailStatusAcademySearchRef}
+                              />
+                              <div className="max-h-52 overflow-auto border rounded-md divide-y">
+                                {(() => {
+                                  const opts = detailAcademyStatuses.map((s) => {
+                                    const name = academyOptions.find((a) => a.id === s.academy_id)?.name ?? s.academy_id;
+                                    return { id: s.academy_id, name: name ?? s.academy_id, is_active: s.is_active };
+                                  });
+                                  const filtered = opts.filter((o) => {
+                                    const t = (detailStatusAcademyQuery || '').toLowerCase();
+                                    if (!t) return true;
+                                    return `${o.name || ''} ${o.id || ''}`.toLowerCase().includes(t);
+                                  });
+                                  const limited = filtered.slice(0, 50);
+                                  if (opts.length === 0) {
+                                    return (
+                                      <div className="px-2 py-1.5 text-xs text-gray-500">Sin academias asignadas</div>
+                                    );
+                                  }
+                                  if (filtered.length === 0) {
+                                    return (
+                                      <div className="px-2 py-1.5 text-xs text-gray-500">
+                                        No se encontraron academias con ese criterio de búsqueda.
+                                      </div>
+                                    );
+                                  }
+                                  return (
+                                    <>
+                                      {limited.map((o) => (
+                                        <button
+                                          key={o.id}
+                                          type="button"
+                                          onClick={() => {
+                                            setDetailStatusAcademyId(o.id);
+                                            setDetailIsActive(o.is_active ?? true);
+                                            setDetailStatusAcademyQuery('');
+                                            setDetailStatusAcademyOpen(false);
+                                          }}
+                                          className="w-full flex items-center justify-between px-2 py-1.5 text-sm hover:bg-slate-50"
+                                        >
+                                          <span className="mr-2 truncate">{o.name}</span>
+                                          <span className="text-[11px] text-gray-500">{o.is_active ? 'Activo' : 'Inactivo'}</span>
+                                        </button>
+                                      ))}
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     </div>
                   )}
@@ -1432,26 +1635,79 @@ export default function UsersPage() {
                       {role === 'super_admin' && detailCoachAcademies.length > 1 && detailUserId && (
                         <div className="mb-2">
                           <label className="block text-sm mb-1">Academia para la tarifa</label>
-                          <select
-                            value={detailCoachFeeAcademyId ?? ''}
-                            onChange={async (e) => {
-                              const next = e.target.value || null;
-                              setDetailCoachFeeAcademyId(next);
-                              setDetailCoachAcademyId(next);
-                              if (next) {
-                                await loadCoachFee({ targetUserId: detailUserId, academyId: next });
-                              } else {
-                                setDetailCoachFee('');
-                              }
-                            }}
-                            className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#3cadaf] focus:border-[#3cadaf] bg-white"
-                          >
-                            {detailCoachAcademies.map((a) => (
-                              <option key={a.id} value={a.id}>
-                                {a.name}
-                              </option>
-                            ))}
-                          </select>
+                          <Popover open={detailCoachFeeAcademyOpen} onOpenChange={setDetailCoachFeeAcademyOpen}>
+                            <PopoverTrigger asChild>
+                              <Button type="button" variant="outline" className="w-full justify-between text-sm font-normal">
+                                <span className="truncate mr-2">
+                                  {(() => {
+                                    const id = detailCoachFeeAcademyId ?? '';
+                                    const a = detailCoachAcademies.find((x) => x.id === id);
+                                    return a?.name ?? 'Seleccionar academia';
+                                  })()}
+                                </span>
+                                <ChevronDown className="h-4 w-4 text-gray-500" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80 p-3" align="start">
+                              <div className="space-y-2">
+                                <Input
+                                  type="text"
+                                  placeholder="Buscar academias..."
+                                  value={detailCoachFeeAcademyQuery}
+                                  onChange={(e) => setDetailCoachFeeAcademyQuery(e.target.value)}
+                                  className="h-11 text-base"
+                                  ref={detailCoachFeeAcademySearchRef}
+                                />
+                                <div className="max-h-52 overflow-auto border rounded-md divide-y">
+                                  {(() => {
+                                    const filtered = detailCoachAcademies.filter((a) => {
+                                      const t = (detailCoachFeeAcademyQuery || '').toLowerCase();
+                                      if (!t) return true;
+                                      return `${a.name || ''} ${a.id || ''}`.toLowerCase().includes(t);
+                                    });
+                                    const limited = filtered.slice(0, 50);
+                                    if (detailCoachAcademies.length === 0) {
+                                      return (
+                                        <div className="px-2 py-1.5 text-xs text-gray-500">No hay academias.</div>
+                                      );
+                                    }
+                                    if (filtered.length === 0) {
+                                      return (
+                                        <div className="px-2 py-1.5 text-xs text-gray-500">
+                                          No se encontraron academias con ese criterio de búsqueda.
+                                        </div>
+                                      );
+                                    }
+                                    return (
+                                      <>
+                                        {limited.map((a) => (
+                                          <button
+                                            key={a.id}
+                                            type="button"
+                                            onClick={async () => {
+                                              const next = a.id || null;
+                                              setDetailCoachFeeAcademyId(next);
+                                              setDetailCoachAcademyId(next);
+                                              setDetailCoachFeeAcademyQuery('');
+                                              setDetailCoachFeeAcademyOpen(false);
+                                              if (next) {
+                                                await loadCoachFee({ targetUserId: detailUserId, academyId: next });
+                                              } else {
+                                                setDetailCoachFee('');
+                                              }
+                                            }}
+                                            className="w-full flex items-center justify-between px-2 py-1.5 text-sm hover:bg-slate-50"
+                                          >
+                                            <span className="mr-2 truncate">{a.name}</span>
+                                          </button>
+                                        ))}
+                                      </>
+                                    );
+                                  })()}
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         </div>
                       )}
                       <label className="block text-sm mb-1">

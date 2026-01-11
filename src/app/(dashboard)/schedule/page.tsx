@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
 import { logAudit } from '@/lib/audit';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -175,6 +175,7 @@ export default function SchedulePage() {
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [studentQuery, setStudentQuery] = useState<string>('');
   const [studentsPopoverOpen, setStudentsPopoverOpen] = useState(false);
+  const studentsSearchRef = useRef<HTMLInputElement | null>(null);
   const [remainingByStudent, setRemainingByStudent] = useState<Record<string, number>>({});
   const [remainingLoading, setRemainingLoading] = useState(false);
   const [notes, setNotes] = useState<string>('');
@@ -574,6 +575,12 @@ export default function SchedulePage() {
       }
     })();
   }, [studentsPopoverOpen, selectedAcademyId, supabase, remainingLoading]);
+
+  useEffect(() => {
+    if (!studentsPopoverOpen) return;
+    const t = window.setTimeout(() => studentsSearchRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [studentsPopoverOpen]);
 
   // Compute available time slots for selected court and day (60 min slots)
   useEffect(() => {
@@ -2125,6 +2132,7 @@ export default function SchedulePage() {
                         value={studentQuery}
                         onChange={(e) => setStudentQuery(e.target.value)}
                         className="h-11 text-base"
+                        ref={studentsSearchRef}
                       />
                       <div className="max-h-52 overflow-auto border rounded-md divide-y">
                         {(() => {
@@ -2170,6 +2178,7 @@ export default function SchedulePage() {
                                   setSelectedStudents((prev) =>
                                     checked ? prev.filter((x) => x !== id) : [...prev, id]
                                   );
+                                  setStudentQuery('');
                                 };
                                 return (
                                   <button
@@ -3332,6 +3341,7 @@ export default function SchedulePage() {
                                 ? prev.filter((x) => x !== id)
                                 : [...prev, id];
                             });
+                            setEditStudentQuery('');
                           };
                           return (
                             <button

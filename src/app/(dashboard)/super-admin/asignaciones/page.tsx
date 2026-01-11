@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { createClientBrowser } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ChevronDown } from "lucide-react";
 
 type AppRole = "super_admin" | "admin" | "coach" | "student" | null;
 
@@ -43,8 +46,17 @@ export default function AssignmentsPage() {
 
   const [newAcademyId, setNewAcademyId] = useState<string>("");
   const [newRole, setNewRole] = useState<"admin" | "coach" | "student">("admin");
+  const [academySelectOpen, setAcademySelectOpen] = useState(false);
+  const [academySelectQuery, setAcademySelectQuery] = useState("");
+  const academySelectSearchRef = useRef<HTMLInputElement | null>(null);
   const [saving, setSaving] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!academySelectOpen) return;
+    const t = window.setTimeout(() => academySelectSearchRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [academySelectOpen]);
 
   useEffect(() => {
     let active = true;
@@ -366,19 +378,81 @@ export default function AssignmentsPage() {
                     <form onSubmit={onAddAssignment} className="space-y-2 border-b pb-3 mb-2">
                       <div className="flex flex-col gap-1">
                         <label className="text-xs font-medium text-gray-700">Academia</label>
-                        <select
-                          value={newAcademyId}
-                          onChange={(e) => setNewAcademyId(e.target.value)}
-                          disabled={saving || availableAcademies.length === 0}
-                          className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#3cadaf] focus:border-[#3cadaf] bg-white"
-                        >
-                          <option value="">Seleccionar academia...</option>
-                          {availableAcademies.map((a) => (
-                            <option key={a.id} value={a.id}>
-                              {a.name}
-                            </option>
-                          ))}
-                        </select>
+                        <Popover open={academySelectOpen} onOpenChange={setAcademySelectOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              disabled={saving || availableAcademies.length === 0}
+                              className="w-full justify-between text-xs font-normal"
+                            >
+                              <span className="truncate mr-2">
+                                {(() => {
+                                  if (!newAcademyId) return 'Seleccionar academia...';
+                                  const a = availableAcademies.find((x) => x.id === newAcademyId);
+                                  return a?.name ?? 'Seleccionar academia...';
+                                })()}
+                              </span>
+                              <ChevronDown className="h-3.5 w-3.5 text-gray-500" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-80 p-3" align="start">
+                            <div className="space-y-2">
+                              <Input
+                                type="text"
+                                placeholder="Buscar academias..."
+                                value={academySelectQuery}
+                                onChange={(e) => setAcademySelectQuery(e.target.value)}
+                                className="h-11 text-base"
+                                ref={academySelectSearchRef}
+                              />
+                              <div className="max-h-52 overflow-auto border rounded-md divide-y">
+                                {(() => {
+                                  const filtered = availableAcademies.filter((a) => {
+                                    const t = (academySelectQuery || '').toLowerCase();
+                                    if (!t) return true;
+                                    return `${a.name || ''} ${a.id || ''}`.toLowerCase().includes(t);
+                                  });
+                                  const limited = filtered.slice(0, 50);
+
+                                  if (availableAcademies.length === 0) {
+                                    return (
+                                      <div className="px-2 py-1.5 text-xs text-gray-500">
+                                        Este usuario ya tiene todas las academias asignadas.
+                                      </div>
+                                    );
+                                  }
+                                  if (filtered.length === 0) {
+                                    return (
+                                      <div className="px-2 py-1.5 text-xs text-gray-500">
+                                        No se encontraron academias con ese criterio de búsqueda.
+                                      </div>
+                                    );
+                                  }
+
+                                  return (
+                                    <>
+                                      {limited.map((a) => (
+                                        <button
+                                          key={a.id}
+                                          type="button"
+                                          onClick={() => {
+                                            setNewAcademyId(a.id);
+                                            setAcademySelectQuery('');
+                                            setAcademySelectOpen(false);
+                                          }}
+                                          className="w-full flex items-center justify-between px-2 py-1.5 text-sm hover:bg-slate-50"
+                                        >
+                                          <span className="mr-2 truncate">{a.name}</span>
+                                        </button>
+                                      ))}
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       </div>
                       <div className="flex flex-col gap-1">
                         <label className="text-xs font-medium text-gray-700">Rol en la academia</label>

@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { createClientBrowser } from "@/lib/supabase";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ChevronDown } from "lucide-react";
 
 type AppRole = "super_admin" | "admin" | "coach" | "student" | null;
 
@@ -49,6 +53,15 @@ export default function LocationsAdminPage() {
   const [savingAcademyLink, setSavingAcademyLink] = useState(false);
   const [removingAcademyLinkId, setRemovingAcademyLinkId] = useState<string | null>(null);
   const [selectedAcademyIdForLocation, setSelectedAcademyIdForLocation] = useState<string>("");
+  const [academySelectOpen, setAcademySelectOpen] = useState(false);
+  const [academySelectQuery, setAcademySelectQuery] = useState("");
+  const academySelectSearchRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!academySelectOpen) return;
+    const t = window.setTimeout(() => academySelectSearchRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [academySelectOpen]);
 
   useEffect(() => {
     let active = true;
@@ -406,19 +419,81 @@ export default function LocationsAdminPage() {
                       <form onSubmit={onAssignAcademyToLocation} className="space-y-2">
                         <div className="flex flex-col gap-1">
                           <label className="text-xs font-medium text-gray-700">Agregar academia</label>
-                          <select
-                            value={selectedAcademyIdForLocation}
-                            onChange={(e) => setSelectedAcademyIdForLocation(e.target.value)}
-                            disabled={savingAcademyLink || availableAcademiesForSelectedLocation.length === 0}
-                            className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#3cadaf] focus:border-[#3cadaf] bg-white"
-                          >
-                            <option value="">Seleccionar academia...</option>
-                            {availableAcademiesForSelectedLocation.map((a) => (
-                              <option key={a.id} value={a.id}>
-                                {a.name}
-                              </option>
-                            ))}
-                          </select>
+                          <Popover open={academySelectOpen} onOpenChange={setAcademySelectOpen}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                disabled={savingAcademyLink || availableAcademiesForSelectedLocation.length === 0}
+                                className="w-full justify-between text-xs font-normal"
+                              >
+                                <span className="truncate mr-2">
+                                  {(() => {
+                                    if (!selectedAcademyIdForLocation) return 'Seleccionar academia...';
+                                    const a = availableAcademiesForSelectedLocation.find((x) => x.id === selectedAcademyIdForLocation);
+                                    return a?.name ?? 'Seleccionar academia...';
+                                  })()}
+                                </span>
+                                <ChevronDown className="h-3.5 w-3.5 text-gray-500" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80 p-3" align="start">
+                              <div className="space-y-2">
+                                <Input
+                                  type="text"
+                                  placeholder="Buscar academias..."
+                                  value={academySelectQuery}
+                                  onChange={(e) => setAcademySelectQuery(e.target.value)}
+                                  className="h-11 text-base"
+                                  ref={academySelectSearchRef}
+                                />
+                                <div className="max-h-52 overflow-auto border rounded-md divide-y">
+                                  {(() => {
+                                    const filtered = availableAcademiesForSelectedLocation.filter((a) => {
+                                      const t = (academySelectQuery || '').toLowerCase();
+                                      if (!t) return true;
+                                      return `${a.name || ''} ${a.id || ''}`.toLowerCase().includes(t);
+                                    });
+                                    const limited = filtered.slice(0, 50);
+
+                                    if (availableAcademiesForSelectedLocation.length === 0) {
+                                      return (
+                                        <div className="px-2 py-1.5 text-xs text-gray-500">
+                                          Esta sede ya está vinculada a todas las academias existentes.
+                                        </div>
+                                      );
+                                    }
+                                    if (filtered.length === 0) {
+                                      return (
+                                        <div className="px-2 py-1.5 text-xs text-gray-500">
+                                          No se encontraron academias con ese criterio de búsqueda.
+                                        </div>
+                                      );
+                                    }
+
+                                    return (
+                                      <>
+                                        {limited.map((a) => (
+                                          <button
+                                            key={a.id}
+                                            type="button"
+                                            onClick={() => {
+                                              setSelectedAcademyIdForLocation(a.id);
+                                              setAcademySelectQuery('');
+                                              setAcademySelectOpen(false);
+                                            }}
+                                            className="w-full flex items-center justify-between px-2 py-1.5 text-sm hover:bg-slate-50"
+                                          >
+                                            <span className="mr-2 truncate">{a.name}</span>
+                                          </button>
+                                        ))}
+                                      </>
+                                    );
+                                  })()}
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         </div>
                         <div className="flex justify-end">
                           <button

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { createClientBrowser } from "@/lib/supabase";
@@ -92,9 +92,18 @@ export default function SettingsPage() {
   const [role, setRole] = useState<AppRole>(null);
   const [academyOptions, setAcademyOptions] = useState<{ id: string; name: string }[]>([]);
   const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
+  const [academySelectOpen, setAcademySelectOpen] = useState(false);
+  const [academySelectQuery, setAcademySelectQuery] = useState("");
+  const academySelectSearchRef = useRef<HTMLInputElement | null>(null);
   const [rentMode, setRentMode] = useState<RentMode>("per_student");
   const [rentModeSaving, setRentModeSaving] = useState(false);
   const [rentModeError, setRentModeError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!academySelectOpen) return;
+    const t = window.setTimeout(() => academySelectSearchRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [academySelectOpen]);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [rentLoading, setRentLoading] = useState(false);
@@ -650,38 +659,98 @@ const onSaveRentFees = async () => {
             </p>
             <div className="flex flex-col gap-1 max-w-xs">
               <label className="text-xs font-medium text-gray-700">Academia</label>
-              <select
-                value={selectedAcademyId ?? ""}
-                onChange={async (e) => {
-                  const next = e.target.value || null;
-                  setSelectedAcademyId(next);
-                  if (typeof window !== "undefined" && next) {
-                    window.localStorage.setItem("selectedAcademyId", next);
-                    window.dispatchEvent(new CustomEvent('selectedAcademyIdChanged', { detail: { academyId: next } }));
-                  }
+              <Popover open={academySelectOpen} onOpenChange={setAcademySelectOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-between text-xs font-normal"
+                  >
+                    <span className="truncate mr-2">
+                      {(() => {
+                        const current = academyOptions.find((a) => a.id === selectedAcademyId);
+                        return current?.name ?? 'Seleccionar academia';
+                      })()}
+                    </span>
+                    <ChevronDown className="h-3.5 w-3.5 text-gray-500" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-3" align="start">
+                  <div className="space-y-2">
+                    <Input
+                      type="text"
+                      placeholder="Buscar academias..."
+                      value={academySelectQuery}
+                      onChange={(e) => setAcademySelectQuery(e.target.value)}
+                      className="h-11 text-base"
+                      ref={academySelectSearchRef}
+                    />
+                    <div className="max-h-52 overflow-auto border rounded-md divide-y">
+                      {(() => {
+                        const filtered = academyOptions.filter((a) => {
+                          const t = (academySelectQuery || '').toLowerCase();
+                          if (!t) return true;
+                          return `${a.name || ''} ${a.id || ''}`.toLowerCase().includes(t);
+                        });
+                        const limited = filtered.slice(0, 50);
 
-                  // Guardar academia por defecto a nivel de usuario
-                  try {
-                    const { data } = await supabase.auth.getUser();
-                    const user = data.user;
-                    if (!user || !next) return;
+                        if (academyOptions.length === 0) {
+                          return (
+                            <div className="px-2 py-1.5 text-xs text-gray-500">No hay academias.</div>
+                          );
+                        }
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="px-2 py-1.5 text-xs text-gray-500">
+                              No se encontraron academias con ese criterio de búsqueda.
+                            </div>
+                          );
+                        }
 
-                    await supabase
-                      .from("profiles")
-                      .update({ default_academy_id: next })
-                      .eq("id", user.id);
-                  } catch (err) {
-                    console.error("No se pudo actualizar default_academy_id", err);
-                  }
-                }}
-                className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#3cadaf] focus:border-[#3cadaf] bg-white"
-              >
-                {academyOptions.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
-                ))}
-              </select>
+                        return (
+                          <>
+                            {limited.map((a) => (
+                              <button
+                                key={a.id}
+                                type="button"
+                                onClick={async () => {
+                                  const next = a.id || null;
+                                  setSelectedAcademyId(next);
+                                  setAcademySelectQuery('');
+                                  setAcademySelectOpen(false);
+                                  if (typeof window !== 'undefined' && next) {
+                                    window.localStorage.setItem('selectedAcademyId', next);
+                                    window.dispatchEvent(
+                                      new CustomEvent('selectedAcademyIdChanged', { detail: { academyId: next } })
+                                    );
+                                  }
+
+                                  // Guardar academia por defecto a nivel de usuario
+                                  try {
+                                    const { data } = await supabase.auth.getUser();
+                                    const user = data.user;
+                                    if (!user || !next) return;
+
+                                    await supabase
+                                      .from('profiles')
+                                      .update({ default_academy_id: next })
+                                      .eq('id', user.id);
+                                  } catch (err) {
+                                    console.error('No se pudo actualizar default_academy_id', err);
+                                  }
+                                }}
+                                className="w-full flex items-center justify-between px-2 py-1.5 text-sm hover:bg-slate-50"
+                              >
+                                <span className="mr-2 truncate">{a.name}</span>
+                              </button>
+                            ))}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
         </div>
