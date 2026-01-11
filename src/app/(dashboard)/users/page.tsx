@@ -11,6 +11,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { roleLabel } from '@/lib/role-label';
 import { toast } from 'sonner';
 
 const ROLES = ['admin', 'coach', 'student'] as const;
@@ -135,11 +136,37 @@ export default function UsersPage() {
 
   const [users, setUsers] = useState<UserRow[]>([]);
   const [userRoles, setUserRoles] = useState<UserRolesRow[]>([]);
+  const [userNationalIdMap, setUserNationalIdMap] = useState<Record<string, string | null>>({});
   const [loadingList, setLoadingList] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [role, setRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
+
+  const loadUserDocuments = async (params: { currentUserId: string; userIds: string[] }) => {
+    try {
+      const res = await fetch('/api/admin/list-user-documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentUserId: params.currentUserId, userIds: params.userIds }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        return;
+      }
+
+      const rows = (json?.rows ?? []) as { userId: string; nationalId: string | null }[];
+      const map: Record<string, string | null> = {};
+      rows.forEach((r) => {
+        if (!r?.userId) return;
+        map[r.userId] = r.nationalId ?? null;
+      });
+      setUserNationalIdMap(map);
+    } catch {
+      // no-op
+    }
+  };
 
   // UI: secciones plegables
   const [showCreateUser, setShowCreateUser] = useState(false);
@@ -328,6 +355,13 @@ export default function UsersPage() {
 
       setUsers(finalUsers);
       setUserRoles(finalUserRoles);
+      setUserNationalIdMap({});
+      if (userId && finalUsers.length > 0) {
+        await loadUserDocuments({
+          currentUserId: userId,
+          userIds: finalUsers.map((u) => u.id),
+        });
+      }
       setLoadingList(false);
     })();
 
@@ -444,8 +478,16 @@ export default function UsersPage() {
         return;
       }
 
-      setUsers((profilesRes.data ?? []) as UserRow[]);
+      const nextUsers = (profilesRes.data ?? []) as UserRow[];
+      setUsers(nextUsers);
       setUserRoles((rolesRes.data ?? []) as UserRolesRow[]);
+      setUserNationalIdMap({});
+      if (currentUserId && nextUsers.length > 0) {
+        await loadUserDocuments({
+          currentUserId,
+          userIds: nextUsers.map((u) => u.id),
+        });
+      }
     } catch (err: any) {
       const message = err?.message ?? 'Error inesperado.';
       setError(message);
@@ -652,6 +694,13 @@ export default function UsersPage() {
 
     setUsers(finalUsers);
     setUserRoles(finalUserRoles);
+    setUserNationalIdMap({});
+    if (currentUserId && finalUsers.length > 0) {
+      await loadUserDocuments({
+        currentUserId,
+        userIds: finalUsers.map((u) => u.id),
+      });
+    }
   };
 
   const filteredUsers = useMemo(() => {
@@ -661,8 +710,21 @@ export default function UsersPage() {
         if (!term) return true;
         const name = (u.full_name ?? '').toLowerCase();
         const mainRole = String(u.role ?? '').toLowerCase();
+        const mainRoleLabel = roleLabel(u.role).toLowerCase();
         const roles = rolesForUser(u.id).join(', ').toLowerCase();
-        return name.includes(term) || mainRole.includes(term) || roles.includes(term);
+        const rolesLabel = rolesForUser(u.id)
+          .map((r) => roleLabel(r))
+          .join(', ')
+          .toLowerCase();
+        const doc = String(userNationalIdMap[u.id] ?? '').toLowerCase();
+        return (
+          name.includes(term) ||
+          mainRole.includes(term) ||
+          mainRoleLabel.includes(term) ||
+          roles.includes(term) ||
+          rolesLabel.includes(term) ||
+          doc.includes(term)
+        );
       })
       .filter((u) => {
         if (usersStatusFilter === 'all') return true;
@@ -677,7 +739,18 @@ export default function UsersPage() {
         const academies = userAcademiesMap[u.id] ?? [];
         return academies.includes(usersAcademyFilter);
       });
-  }, [role, users, usersAcademyFilter, usersSearch, usersStatusFilter, userAcademiesMap, userAcademyStatusMap, userRoles]);
+  }, [role, users, userNationalIdMap, usersAcademyFilter, usersSearch, usersStatusFilter, userAcademiesMap, userAcademyStatusMap, userRoles]);
+
+  const roleSummary = useMemo(() => {
+    const counts: Record<'admin' | 'coach' | 'student', number> = { admin: 0, coach: 0, student: 0 };
+    filteredUsers.forEach((u) => {
+      const roles = rolesForUser(u.id);
+      if (roles.includes('admin')) counts.admin += 1;
+      if (roles.includes('coach')) counts.coach += 1;
+      if (roles.includes('student')) counts.student += 1;
+    });
+    return counts;
+  }, [filteredUsers]);
 
   const openUserDetail = async (userId: string) => {
     setDetailOpen(true);
@@ -1069,7 +1142,7 @@ export default function UsersPage() {
                           checked={selectedRoles.includes(role)}
                           onChange={() => toggleRole(role)}
                         />
-                        <span>{role}</span>
+                        <span>{roleLabel(role)}</span>
                       </label>
                     ))}
                   </div>
@@ -1226,7 +1299,7 @@ export default function UsersPage() {
                     type="text"
                     value={usersSearch}
                     onChange={(e) => setUsersSearch(e.target.value)}
-                    placeholder="Nombre o rol"
+                    placeholder="Nombre, rol o documento"
                     className="h-10 text-base"
                   />
                 </div>
@@ -1378,13 +1451,15 @@ export default function UsersPage() {
                 <table className="min-w-full text-sm border-collapse">
                   <thead>
                     <tr className="border-b bg-gray-50">
+                      <th className="text-left py-2 px-3">#</th>
                       <th className="text-left py-2 px-3">Nombre</th>
+                      <th className="text-left py-2 px-3">Documento</th>
                       <th className="text-left py-2 px-3">Rol principal</th>
                       <th className="text-left py-2 px-3">Roles asignados</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredUsers.map((u) => {
+                    {filteredUsers.map((u, idx) => {
                       const allRoles = rolesForUser(u.id);
                       const isRowInactive =
                         isSuperAdmin &&
@@ -1399,23 +1474,32 @@ export default function UsersPage() {
                           }
                           onClick={() => openUserDetail(u.id)}
                         >
+                          <td className={"py-2 px-3 whitespace-nowrap " + (isRowInactive ? 'text-rose-700/80' : 'text-gray-700')}>
+                            {idx + 1}
+                          </td>
                           <td className={"py-2 px-3 whitespace-nowrap " + (isRowInactive ? 'text-rose-700' : '')}>
                             {u.full_name ?? '(Sin nombre)'}
                             {isRowInactive && (
                               <span className="ml-2 text-[11px] font-medium text-rose-700/90">(Inactivo)</span>
                             )}
                           </td>
+                          <td className={"py-2 px-3 whitespace-nowrap " + (isRowInactive ? 'text-rose-700/80' : 'text-gray-700')}>
+                            {userNationalIdMap[u.id] ?? '-'}
+                          </td>
                           <td className={"py-2 px-3 whitespace-nowrap " + (isRowInactive ? 'text-rose-700/80' : '')}>
-                            {u.role}
+                            {roleLabel(u.role)}
                           </td>
                           <td className={"py-2 px-3 text-xs " + (isRowInactive ? 'text-rose-700/80' : 'text-gray-700')}>
-                            {allRoles.join(', ') || '-'}
+                            {allRoles.map((r) => roleLabel(r)).join(', ') || '-'}
                           </td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
+                </div>
+                <div className="text-xs text-gray-600">
+                  Admin: {roleSummary.admin} usuarios, Profesor: {roleSummary.coach} usuarios, Alumnos: {roleSummary.student} usuarios
                 </div>
               </div>
             )}
@@ -1624,7 +1708,7 @@ export default function UsersPage() {
                             onChange={() => toggleDetailRole(role)}
                             disabled={isAdminReadOnly}
                           />
-                          <span>{role}</span>
+                          <span>{roleLabel(role)}</span>
                         </label>
                       ))}
                     </div>

@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ChevronDown } from "lucide-react";
+import { roleLabel } from "@/lib/role-label";
 
 type AppRole = "super_admin" | "admin" | "coach" | "student" | null;
 
@@ -498,7 +499,7 @@ export default function AssignmentsPage() {
                                 <p className="font-medium text-[#31435d]">
                                   {acad?.name || "Academia desconocida"}
                                 </p>
-                                <p className="text-[11px] text-gray-500">Rol: {a.role}</p>
+                                <p className="text-[11px] text-gray-500">Rol: {roleLabel(a.role)}</p>
                               </div>
                               <button
                                 type="button"
