@@ -479,6 +479,12 @@ export default function Page() {
               window.localStorage.removeItem('selectedAcademyId');
             }
           } else if (uaRows) {
+            const inactiveAcademyIds = new Set(
+              (uaRows as { academy_id: string | null; is_active: boolean | null }[])
+                .filter((row) => row.academy_id && (row.is_active ?? true) === false)
+                .map((row) => row.academy_id as string)
+            );
+
             const academyIds = Array.from(
               new Set(
                 (uaRows as { academy_id: string | null; is_active: boolean | null }[])
@@ -520,10 +526,11 @@ export default function Page() {
                   initial = validIds[0] ?? null;
                 }
 
-                if (stored && stored !== initial && typeof window !== 'undefined') {
-                  toast.error(
-                    'Tu usuario está inactivo en la academia seleccionada. Te cambiamos a una academia activa.',
-                  );
+                const shouldShowInactiveToast =
+                  !!stored && stored !== initial && inactiveAcademyIds.has(stored);
+
+                if (shouldShowInactiveToast && typeof window !== 'undefined') {
+                  toast.error('Tu usuario está inactivo en la academia seleccionada. Te cambiamos a una academia activa.');
                 }
 
                 setSelectedAcademyId(initial);
