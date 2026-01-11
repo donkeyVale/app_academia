@@ -174,6 +174,9 @@ export default function SchedulePage() {
   const [coachId, setCoachId] = useState<string>('');
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [studentQuery, setStudentQuery] = useState<string>('');
+  const [studentsPopoverOpen, setStudentsPopoverOpen] = useState(false);
+  const [remainingByStudent, setRemainingByStudent] = useState<Record<string, number>>({});
+  const [remainingLoading, setRemainingLoading] = useState(false);
   const [notes, setNotes] = useState<string>('');
   const [recurringEnabled, setRecurringEnabled] = useState(false);
   const [recurringWeekdays, setRecurringWeekdays] = useState<number[]>([]);
@@ -544,6 +547,34 @@ export default function SchedulePage() {
     })();
   }, [supabase, selectedAcademyId, academyLocationIds]);
 
+  useEffect(() => {
+    (async () => {
+      if (!studentsPopoverOpen) return;
+      if (!selectedAcademyId) return;
+      if (remainingLoading) return;
+
+      setRemainingLoading(true);
+      try {
+        const { data, error } = await supabase.rpc('get_students_remaining_classes', {
+          p_academy_id: selectedAcademyId,
+        });
+        if (error) throw error;
+        const rows = (data ?? []) as any[];
+        const map: Record<string, number> = {};
+        for (const row of rows) {
+          const sid = row?.student_id as string | undefined;
+          const remaining = Number(row?.remaining ?? 0);
+          if (sid) map[sid] = Number.isFinite(remaining) ? remaining : 0;
+        }
+        setRemainingByStudent(map);
+      } catch (e) {
+        console.error('Error cargando clases restantes por alumno', e);
+      } finally {
+        setRemainingLoading(false);
+      }
+    })();
+  }, [studentsPopoverOpen, selectedAcademyId, supabase, remainingLoading]);
+
   // Compute available time slots for selected court and day (60 min slots)
   useEffect(() => {
     (async () => {
@@ -729,6 +760,7 @@ export default function SchedulePage() {
       // Validar que cada alumno tenga saldo disponible en su plan antes de crear la clase
       const planForStudent: Record<string, string> = {};
       const remainingForStudent: Record<string, number> = {};
+      const noBalanceStudents: string[] = [];
       for (const sid of selectedStudents) {
         const { data: plans, error: planErr } = await supabase
           .from('student_plans')
@@ -744,6 +776,11 @@ export default function SchedulePage() {
         }
 
         if (!plans || plans.length === 0) {
+          if (!allowPast) {
+            noBalanceStudents.push(sid);
+            continue;
+          }
+
           const msg = 'El alumno seleccionado no tiene un plan con clases disponibles.';
           toast.error(msg);
           setSaving(false);
@@ -783,6 +820,11 @@ export default function SchedulePage() {
         }
 
         if (!chosenPlan) {
+          if (!allowPast) {
+            noBalanceStudents.push(sid);
+            continue;
+          }
+
           const msg = 'El alumno seleccionado ya no tiene clases disponibles en su plan.';
           toast.error(msg);
           setSaving(false);
@@ -828,6 +870,17 @@ export default function SchedulePage() {
 
         planForStudent[sid] = chosenPlan.id as string;
         remainingForStudent[sid] = allowPast ? Math.max(1, chosenPlanRemaining) : chosenPlanRemaining;
+      }
+
+      if (!allowPast && noBalanceStudents.length > 0) {
+        const labels = Array.from(new Set(noBalanceStudents)).map((sid) => getStudentLabel(sid));
+        const msg =
+          labels.length === 1
+            ? `El alumno ${labels[0]} ya no tiene clases disponibles en su plan.`
+            : `Los siguientes alumnos ya no tienen clases disponibles en su plan: ${labels.join(', ')}.`;
+        toast.error(msg);
+        setSaving(false);
+        return;
       }
 
       // V4: Validar que ningún alumno tenga otra clase en el mismo horario (en cualquier sede/cancha)
@@ -2048,7 +2101,7 @@ export default function SchedulePage() {
               </div>
               <div>
                 <label className="block text-sm mb-1">Alumnos (selección múltiple)</label>
-                <Popover>
+                <Popover open={studentsPopoverOpen} onOpenChange={setStudentsPopoverOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       type="button"
@@ -2108,6 +2161,7 @@ export default function SchedulePage() {
                               {limited.map((s) => {
                                 const id = s.id;
                                 const checked = selectedStudents.includes(id);
+                                const remaining = remainingByStudent[id];
                                 const toggle = () => {
                                   if (!checked && selectedStudents.length >= 4) {
                                     toast.error('Máximo 4 alumnos por clase');
@@ -2126,6 +2180,18 @@ export default function SchedulePage() {
                                   >
                                     <span className="truncate mr-2">
                                       {s.full_name ?? s.notes ?? s.level ?? s.id}
+                                      <span
+                                        className={
+                                          "ml-1 tabular-nums " +
+                                          (remaining === undefined
+                                            ? 'text-gray-400'
+                                            : remaining > 0
+                                            ? 'text-emerald-600'
+                                            : 'text-red-600')
+                                        }
+                                      >
+                                        ({remaining === undefined ? '…' : remaining})
+                                      </span>
                                     </span>
                                     <input
                                       type="checkbox"
