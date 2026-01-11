@@ -200,13 +200,6 @@ export default function SchedulePage() {
   const [coachFilterSearch, setCoachFilterSearch] = useState('');
   const [studentFilterSearch, setStudentFilterSearch] = useState('');
 
-  const [nowTick, setNowTick] = useState<number>(() => Date.now());
-
-  useEffect(() => {
-    const id = window.setInterval(() => setNowTick(Date.now()), 60 * 1000);
-    return () => window.clearInterval(id);
-  }, []);
-
   // Cargar rol del usuario actual y, si es alumno, su studentId
   useEffect(() => {
     (async () => {
@@ -1911,6 +1904,7 @@ export default function SchedulePage() {
               width={128}
               height={128}
               className="object-cover"
+              priority
             />
           </div>
           <div className="text-center">
@@ -1920,15 +1914,6 @@ export default function SchedulePage() {
       </div>
     );
   }
-
-  const upcoming7DaysCount = useMemo(() => {
-    const start = nowTick;
-    const end = start + 7 * 24 * 60 * 60 * 1000;
-    return filteredClasses.filter((cls) => {
-      const startTs = new Date(cls.date).getTime();
-      return startTs >= start && startTs < end;
-    }).length;
-  }, [filteredClasses, nowTick]);
 
   return (
     <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4 overflow-x-hidden">
@@ -1971,9 +1956,6 @@ export default function SchedulePage() {
         <div className="flex items-center gap-2">
           <CalendarIcon className="h-5 w-5 text-[#3cadaf]" />
           <h1 className="text-2xl font-semibold text-[#31435d]">Agenda</h1>
-          <span className="ml-1 inline-flex items-center rounded-full bg-[#e6f5f6] text-[#0f172a] border border-[#3cadaf]/30 px-2 py-0.5 text-[11px] font-semibold">
-            {upcoming7DaysCount} próximas (7d)
-          </span>
         </div>
         <div className="flex items-center justify-end flex-1">
           <Link href="/" className="flex items-center">
@@ -1982,6 +1964,7 @@ export default function SchedulePage() {
                 src="/icons/logoHome.png"
                 alt="Agendo"
                 fill
+                sizes="128px"
                 className="object-contain"
                 priority
               />
@@ -2972,7 +2955,6 @@ export default function SchedulePage() {
                                   headers: { 'Content-Type': 'application/json' },
                                   body: JSON.stringify({
                                     classId: cls.id,
-                                    coachId: cls.coach_id,
                                     studentIds: [studentId],
                                     dateIso: cls.date,
                                     academyId: selectedAcademyId,
@@ -2987,6 +2969,9 @@ export default function SchedulePage() {
                             }
 
                             toast.success('Reserva cancelada correctamente. Se devolvió 1 clase a tu plan.');
+                            if (typeof window !== 'undefined') {
+                              window.dispatchEvent(new Event('scheduleBadgeRefresh'));
+                            }
                           }}
                         >
                           {canStudentCancel ? 'Cancelar reserva' : 'No se puede cancelar (menos de 12h)'}
@@ -2994,9 +2979,22 @@ export default function SchedulePage() {
                       ) : (
                         <>
                           <button
+                            className="text-[11px] sm:text-xs px-3 py-1 rounded border border-[#3cadaf] text-[#3cadaf] hover:bg-[#e6f5f6]"
+                            onClick={() => openAttendance(cls)}
+                          >
+                            Asistencia
+                          </button>
+                          <button
+                            className="text-[11px] sm:text-xs px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+                            onClick={() => openEdit(cls)}
+                          >
+                            Editar
+                          </button>
+                          <button
                             className="text-[11px] sm:text-xs px-3 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50"
                             onClick={async () => {
                               const nowInner = new Date();
+                              const startTs = new Date(cls.date).getTime();
                               if (startTs <= nowInner.getTime()) {
                                 toast.error('No se puede cancelar una clase que ya comenzó.');
                                 return;
@@ -3009,7 +3007,25 @@ export default function SchedulePage() {
                                 .delete()
                                 .eq('class_id', cls.id);
                               if (delUsageErr) {
-                                toast.error('Error al devolver clases de los planes: ' + delUsageErr.message);
+                                toast.error('Error al cancelar: ' + delUsageErr.message);
+                                return;
+                              }
+
+                              const { error: delAttErr } = await supabase
+                                .from('attendance')
+                                .delete()
+                                .eq('class_id', cls.id);
+                              if (delAttErr) {
+                                toast.error('Error al cancelar: ' + delAttErr.message);
+                                return;
+                              }
+
+                              const { error: delBookErr } = await supabase
+                                .from('bookings')
+                                .delete()
+                                .eq('class_id', cls.id);
+                              if (delBookErr) {
+                                toast.error('Error al cancelar: ' + delBookErr.message);
                                 return;
                               }
 
@@ -3022,14 +3038,6 @@ export default function SchedulePage() {
                                 return;
                               }
 
-                              await logAudit('delete', 'class_session', cls.id, {
-                                date: cls.date,
-                                court_id: cls.court_id,
-                                coach_id: cls.coach_id,
-                                capacity: cls.capacity,
-                                price_cents: cls.price_cents,
-                                currency: cls.currency,
-                              });
                               setClasses((prev) => prev.filter((c) => c.id !== cls.id));
                               setBookingsCount((prev) => {
                                 const n = { ...prev };
@@ -3041,6 +3049,12 @@ export default function SchedulePage() {
                                 delete n[cls.id];
                                 return n;
                               });
+                              setAttendanceMarkedByClass((prev) => {
+                                const n = { ...prev };
+                                delete n[cls.id];
+                                return n;
+                              });
+
                               if (selectedAcademyId && currentUserId && role) {
                                 try {
                                   await fetch('/api/push/class-cancelled', {
@@ -3048,7 +3062,6 @@ export default function SchedulePage() {
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({
                                       classId: cls.id,
-                                      coachId: cls.coach_id,
                                       studentIds: studentsByClass[cls.id] ?? [],
                                       dateIso: cls.date,
                                       academyId: selectedAcademyId,
@@ -3061,22 +3074,14 @@ export default function SchedulePage() {
                                   console.error('Error enviando notificación de clase cancelada', pushErr);
                                 }
                               }
+
                               toast.success('Clase cancelada correctamente y clases devueltas a los planes.');
+                              if (typeof window !== 'undefined') {
+                                window.dispatchEvent(new Event('scheduleBadgeRefresh'));
+                              }
                             }}
                           >
                             Cancelar
-                          </button>
-                          <button
-                            className="text-[11px] sm:text-xs px-3 py-1 rounded border border-[#3cadaf] text-[#3cadaf] hover:bg-[#e6f5f6]"
-                            onClick={() => openAttendance(cls)}
-                          >
-                            Asistencia
-                          </button>
-                          <button
-                            className="text-[11px] sm:text-xs px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
-                            onClick={() => openEdit(cls)}
-                          >
-                            Editar
                           </button>
                         </>
                       )}
