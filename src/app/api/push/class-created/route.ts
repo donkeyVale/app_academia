@@ -7,13 +7,25 @@ import { createInAppNotifications } from '@/lib/in-app-notifications';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { classId, coachId, studentIds, dateIso, academyId } = body || {};
+    const { classId, coachId, studentIds, dateIso, academyId, recurringSummary, totalSessions, studentCounts } = body || {};
+
+    const isRecurringSummary = recurringSummary === true;
+    const totalSessionsNum = Number(totalSessions ?? 0);
+
+    const studentIdsFromCounts =
+      studentCounts && typeof studentCounts === 'object' && !Array.isArray(studentCounts)
+        ? Object.keys(studentCounts as Record<string, number>)
+        : [];
+
+    const studentIdsToUse: string[] = Array.isArray(studentIds)
+      ? (studentIds as any[]).filter((x) => typeof x === 'string')
+      : studentIdsFromCounts;
 
     if (!academyId || typeof academyId !== 'string') {
       return NextResponse.json({ error: 'Falta academyId.' }, { status: 400 });
     }
 
-    if (!coachId && (!studentIds || !Array.isArray(studentIds) || studentIds.length === 0)) {
+    if (!coachId && (!studentIdsToUse || !Array.isArray(studentIdsToUse) || studentIdsToUse.length === 0)) {
       return NextResponse.json({ error: 'Sin destinatarios para la clase.' }, { status: 400 });
     }
 
@@ -45,16 +57,22 @@ export async function POST(req: NextRequest) {
     }
 
     // Students -> user_id
-    if (studentIds && Array.isArray(studentIds) && studentIds.length > 0) {
+    const studentIdToUserId = new Map<string, string>();
+    if (studentIdsToUse && Array.isArray(studentIdsToUse) && studentIdsToUse.length > 0) {
       const { data: studentsRows, error: studErr } = await supabaseAdmin
         .from('students')
-        .select('user_id')
-        .in('id', studentIds);
+        .select('id,user_id')
+        .in('id', studentIdsToUse);
       if (studErr) {
         console.error('Error obteniendo students.user_id', studErr.message);
       } else {
         for (const row of studentsRows ?? []) {
-          if (row.user_id) studentUserIds.add(row.user_id as string);
+          const sid = (row as any).id as string | undefined;
+          const uid = (row as any).user_id as string | undefined;
+          if (sid && uid) {
+            studentUserIds.add(uid);
+            studentIdToUserId.set(sid, uid);
+          }
         }
       }
     }
@@ -173,12 +191,12 @@ export async function POST(req: NextRequest) {
     let firstStudentName: string | null = null;
     let studentsCount = 0;
     try {
-      if (studentIds && Array.isArray(studentIds) && studentIds.length > 0) {
-        studentsCount = Array.from(new Set(studentIds as string[])).length;
+      if (studentIdsToUse && Array.isArray(studentIdsToUse) && studentIdsToUse.length > 0) {
+        studentsCount = Array.from(new Set(studentIdsToUse as string[])).length;
         const { data: stRows, error: stErr } = await supabaseAdmin
           .from('students')
           .select('id, user_id')
-          .in('id', Array.from(new Set(studentIds as string[])));
+          .in('id', Array.from(new Set(studentIdsToUse as string[])));
         if (!stErr && stRows && stRows.length > 0) {
           const firstUserId = (stRows as any[]).find((r) => r.user_id)?.user_id as string | undefined;
           if (firstUserId) {
@@ -264,6 +282,125 @@ export async function POST(req: NextRequest) {
       body: coachBody,
       data: { url: '/schedule' },
     });
+
+    // --- Recurring summary (B1a) ---
+    if (isRecurringSummary) {
+      const studentTitle = 'Nuevas clases agendadas';
+      const coachTitle = 'Clases recurrentes creadas';
+
+      const totalForCoach = totalSessionsNum > 0 ? totalSessionsNum : 0;
+      const nextText = when ? ` Próxima: ${when}` : '';
+      const baseStudentBodyPrefix = 'Se agendaron';
+
+      // Coach body
+      const coachBodySummary = `Se crearon ${totalForCoach} ${totalForCoach === 1 ? 'clase' : 'clases'}${coachWithText}${nextText}${whereSuffix}.`;
+
+      // In-app notifications
+      try {
+        const rows: any[] = [];
+
+        // Students: 1 por usuario con count exacto
+        for (const [studentId, userId] of studentIdToUserId.entries()) {
+          if (!allowedStudentUserIds.has(userId)) continue;
+          const countRaw = (studentCounts as any)?.[studentId];
+          const count = Number(countRaw ?? 0);
+          if (!Number.isFinite(count) || count <= 0) continue;
+
+          const bodyTxt = `${baseStudentBodyPrefix} ${count} ${count === 1 ? 'clase' : 'clases'} para vos.${nextText}${whereSuffix}.`;
+          rows.push({
+            user_id: userId,
+            type: 'class_created_student_recurring',
+            title: studentTitle,
+            body: bodyTxt,
+            data: { url: '/schedule', classId, dateIso, academyId, recurringSummary: true, totalSessions: totalForCoach, count },
+          });
+        }
+
+        // Coach
+        for (const userId of Array.from(allowedCoachUserIds)) {
+          rows.push({
+            user_id: userId,
+            type: 'class_created_coach_recurring',
+            title: coachTitle,
+            body: coachBodySummary,
+            data: { url: '/schedule', classId, dateIso, academyId, recurringSummary: true, totalSessions: totalForCoach },
+          });
+        }
+
+        await createInAppNotifications(rows);
+      } catch (e) {
+        console.error('Error creando notificación in-app (class-created recurringSummary)', e);
+      }
+
+      // Push: enviar por usuario con payload personalizado
+      const studentSubs = subs.filter((s) => allowedStudentUserIds.has(s.user_id));
+      const coachSubs = subs.filter((s) => allowedCoachUserIds.has(s.user_id));
+
+      const resultsStudents = await Promise.allSettled(
+        studentSubs.map((sub) => {
+          const uid = sub.user_id as string;
+          let countForUser = 0;
+          for (const [studentId, userId] of studentIdToUserId.entries()) {
+            if (userId !== uid) continue;
+            const c = Number((studentCounts as any)?.[studentId] ?? 0);
+            if (Number.isFinite(c)) countForUser += c;
+          }
+          if (countForUser <= 0) return Promise.resolve();
+
+          const bodyTxt = `${baseStudentBodyPrefix} ${countForUser} ${countForUser === 1 ? 'clase' : 'clases'} para vos.${nextText}${whereSuffix}.`;
+          const payload = JSON.stringify({
+            title: studentTitle,
+            body: bodyTxt,
+            data: { url: '/schedule' },
+          });
+
+          return webPush.sendNotification(
+            {
+              endpoint: sub.endpoint,
+              keys: { p256dh: sub.p256dh, auth: sub.auth },
+            },
+            payload,
+          );
+        }),
+      );
+
+      const payloadCoachSummary = JSON.stringify({
+        title: coachTitle,
+        body: coachBodySummary,
+        data: { url: '/schedule' },
+      });
+
+      const resultsCoach = await Promise.allSettled(
+        coachSubs.map((sub) =>
+          webPush.sendNotification(
+            {
+              endpoint: sub.endpoint,
+              keys: { p256dh: sub.p256dh, auth: sub.auth },
+            },
+            payloadCoachSummary,
+          ),
+        ),
+      );
+
+      const results = [...resultsStudents, ...resultsCoach];
+
+      // Limpiar endpoints muertos (410/404) para mejorar confiabilidad
+      await Promise.allSettled(
+        results.map((r, idx) => {
+          if (r.status !== 'rejected') return Promise.resolve();
+          const reason: any = (r as any).reason;
+          const statusCode = Number(reason?.statusCode ?? reason?.status);
+          if (statusCode !== 404 && statusCode !== 410) return Promise.resolve();
+          const mergedSubs = [...studentSubs, ...coachSubs];
+          const endpoint = (mergedSubs as any[])[idx]?.endpoint as string | undefined;
+          if (!endpoint) return Promise.resolve();
+          return supabaseAdmin.from('push_subscriptions').delete().eq('endpoint', endpoint);
+        }),
+      );
+
+      const ok = results.filter((r) => r.status === 'fulfilled').length;
+      return NextResponse.json({ ok, total: studentSubs.length + coachSubs.length });
+    }
 
     // In-app notifications (mismos destinatarios que push)
     try {

@@ -996,8 +996,8 @@ export default function SchedulePage() {
           [createdClassId]: [...studentsToBook],
         }));
 
-        // Push solo para la primera clase creada
-        if (sessionIndex === 0 && selectedAcademyId) {
+        // Push solo para la primera clase creada (solo cuando NO es recurrente)
+        if (!recurringEnabled && sessionIndex === 0 && selectedAcademyId) {
           try {
             await fetch('/api/push/class-created', {
               method: 'POST',
@@ -1073,6 +1073,27 @@ export default function SchedulePage() {
             return { sid, label, count };
           })
           .filter((x) => x.count > 0);
+
+        // Notificación resumen B1a: 1 por alumno (count exacto) + 1 al profesor
+        if (selectedAcademyId && createdClassIds.length > 0) {
+          try {
+            await fetch('/api/push/class-created', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                academyId: selectedAcademyId,
+                coachId,
+                classId: createdClassIds[0],
+                dateIso: createdClassDates[0] ?? iso,
+                recurringSummary: true,
+                totalSessions: createdClassIds.length,
+                studentCounts: createdBookingsByStudent,
+              }),
+            });
+          } catch (pushErr) {
+            console.error('Error enviando notificación resumen de clases recurrentes', pushErr);
+          }
+        }
 
         const perStudentTxt = perStudent.length
           ? ` Reservas: ${perStudent.map((x) => `${x.label}: ${x.count}`).join(' | ')}.`
