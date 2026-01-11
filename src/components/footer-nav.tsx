@@ -11,10 +11,11 @@ interface FooterNavProps {
   canSeeFinance?: boolean;
   canSeeSettings?: boolean;
   studentsLabel?: string;
+  scheduleBadgeCount?: number;
   rightSlot: React.ReactNode;
 }
 
-export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, canSeeSettings, studentsLabel, rightSlot }: FooterNavProps) {
+export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, canSeeSettings, studentsLabel, scheduleBadgeCount, rightSlot }: FooterNavProps) {
   const showReports = canSeeReports !== false;
   const showFinance = canSeeFinance !== false;
   const showSettings = canSeeSettings === true;
@@ -23,6 +24,14 @@ export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, ca
   const isStudentCompactNav = !isAdmin && !showReports && !showFinance && showSettings;
   const [moreOpen, setMoreOpen] = useState(false);
   const useMobileAdminCompactMenu = isAdmin;
+
+  const scheduleBadgeLabel = (() => {
+    const n = Number(scheduleBadgeCount ?? 0);
+    if (!Number.isFinite(n) || n <= 0) return '';
+    if (n > 99) return '99+';
+    return String(n);
+  })();
+
   return (
     <nav
       className="fixed bottom-0 inset-x-0 border-t bg-white/95 backdrop-blur-sm"
@@ -34,16 +43,23 @@ export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, ca
             <div className="flex-1 sm:hidden flex items-center justify-between text-xs">
               <Link
                 href="/schedule"
-                className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
+                className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50 overflow-visible"
               >
-                <CalendarDays className="w-4 h-4 text-[#3b82f6]" />
+                <span className="relative inline-flex overflow-visible">
+                  <CalendarDays className="w-5 h-5 text-[#3b82f6]" />
+                  {scheduleBadgeLabel && (
+                    <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] leading-4 font-semibold text-center">
+                      {scheduleBadgeLabel}
+                    </span>
+                  )}
+                </span>
                 <span>Agenda</span>
               </Link>
               <Link
                 href={isStudent ? "/finance" : "/students"}
                 className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
               >
-                <Users className="w-4 h-4 text-[#22c55e]" />
+                <Users className="w-5 h-5 text-[#22c55e]" />
                 <span>{studentsText}</span>
               </Link>
               {showFinance ? (
@@ -51,7 +67,7 @@ export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, ca
                   href="/finance"
                   className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
                 >
-                  <CreditCard className="w-4 h-4 text-[#3cadaf]" />
+                  <CreditCard className="w-5 h-5 text-[#3cadaf]" />
                   <span>Finanzas</span>
                 </Link>
               ) : (
@@ -62,7 +78,7 @@ export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, ca
                 onClick={() => setMoreOpen(true)}
                 className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
               >
-                <MoreHorizontal className="w-4 h-4 text-[#64748b]" />
+                <MoreHorizontal className="w-5 h-5 text-[#64748b]" />
                 <span>Más</span>
               </button>
             </div>
@@ -76,16 +92,23 @@ export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, ca
             >
               <Link
                 href="/schedule"
-                className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
+                className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50 overflow-visible"
               >
-                <CalendarDays className="w-4 h-4 text-[#3b82f6]" />
+                <span className="relative inline-flex overflow-visible">
+                  <CalendarDays className="w-5 h-5 text-[#3b82f6]" />
+                  {scheduleBadgeLabel && (
+                    <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] leading-4 font-semibold text-center">
+                      {scheduleBadgeLabel}
+                    </span>
+                  )}
+                </span>
                 <span>Agenda</span>
               </Link>
               <Link
                 href={isStudent ? "/finance" : "/students"}
                 className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
               >
-                <Users className="w-4 h-4 text-[#22c55e]" />
+                <Users className="w-5 h-5 text-[#22c55e]" />
                 <span>{studentsText}</span>
               </Link>
               {showFinance && (
@@ -93,7 +116,7 @@ export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, ca
                   href="/finance"
                   className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
                 >
-                  <CreditCard className="w-4 h-4 text-[#3cadaf]" />
+                  <CreditCard className="w-5 h-5 text-[#3cadaf]" />
                   <span>Finanzas</span>
                 </Link>
               )}
@@ -102,7 +125,7 @@ export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, ca
                   href="/settings"
                   className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
                 >
-                  <Settings className="w-4 h-4 text-[#64748b]" />
+                  <Settings className="w-5 h-5 text-[#64748b]" />
                   <span>Configuración</span>
                 </Link>
               )}
@@ -111,7 +134,7 @@ export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, ca
                   href="/users"
                   className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
                 >
-                  <UserCog className="w-4 h-4 text-[#f97316]" />
+                  <UserCog className="w-5 h-5 text-[#f97316]" />
                   <span>Usuarios</span>
                 </Link>
               )}
@@ -120,7 +143,7 @@ export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, ca
                   href="/reports"
                   className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
                 >
-                  <BarChart3 className="w-4 h-4 text-[#6366f1]" />
+                  <BarChart3 className="w-5 h-5 text-[#6366f1]" />
                   <span>Reportes</span>
                 </Link>
               )}
@@ -136,16 +159,23 @@ export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, ca
           >
             <Link
               href="/schedule"
-              className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
+              className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50 overflow-visible"
             >
-              <CalendarDays className="w-4 h-4 text-[#3b82f6]" />
+              <span className="relative inline-flex overflow-visible">
+                <CalendarDays className="w-5 h-5 text-[#3b82f6]" />
+                {scheduleBadgeLabel && (
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[10px] leading-4 font-semibold text-center">
+                    {scheduleBadgeLabel}
+                  </span>
+                )}
+              </span>
               <span>Agenda</span>
             </Link>
             <Link
               href={isStudent ? "/finance" : "/students"}
               className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
             >
-              <Users className="w-4 h-4 text-[#22c55e]" />
+              <Users className="w-5 h-5 text-[#22c55e]" />
               <span>{studentsText}</span>
             </Link>
             {showFinance && (
@@ -153,7 +183,7 @@ export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, ca
                 href="/finance"
                 className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
               >
-                <CreditCard className="w-4 h-4 text-[#3cadaf]" />
+                <CreditCard className="w-5 h-5 text-[#3cadaf]" />
                 <span>Finanzas</span>
               </Link>
             )}
@@ -162,7 +192,7 @@ export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, ca
                 href="/settings"
                 className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
               >
-                <Settings className="w-4 h-4 text-[#64748b]" />
+                <Settings className="w-5 h-5 text-[#64748b]" />
                 <span>Configuración</span>
               </Link>
             )}
@@ -171,7 +201,7 @@ export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, ca
                 href="/users"
                 className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
               >
-                <UserCog className="w-4 h-4 text-[#f97316]" />
+                <UserCog className="w-5 h-5 text-[#f97316]" />
                 <span>Usuarios</span>
               </Link>
             )}
@@ -180,7 +210,7 @@ export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, ca
                 href="/reports"
                 className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
               >
-                <BarChart3 className="w-4 h-4 text-[#6366f1]" />
+                <BarChart3 className="w-5 h-5 text-[#6366f1]" />
                 <span>Reportes</span>
               </Link>
             )}
@@ -215,7 +245,7 @@ export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, ca
                   onClick={() => setMoreOpen(false)}
                   className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                 >
-                  <Settings className="w-4 h-4 text-[#64748b]" />
+                  <Settings className="w-5 h-5 text-[#64748b]" />
                   <span>Configuración</span>
                 </Link>
               )}
@@ -225,7 +255,7 @@ export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, ca
                   onClick={() => setMoreOpen(false)}
                   className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                 >
-                  <UserCog className="w-4 h-4 text-[#f97316]" />
+                  <UserCog className="w-5 h-5 text-[#f97316]" />
                   <span>Usuarios</span>
                 </Link>
               )}
@@ -235,7 +265,7 @@ export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, ca
                   onClick={() => setMoreOpen(false)}
                   className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                 >
-                  <BarChart3 className="w-4 h-4 text-[#6366f1]" />
+                  <BarChart3 className="w-5 h-5 text-[#6366f1]" />
                   <span>Reportes</span>
                 </Link>
               )}

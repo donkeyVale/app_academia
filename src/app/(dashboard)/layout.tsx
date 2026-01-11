@@ -118,6 +118,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const [userId, setUserId] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [scheduleBadgeCount, setScheduleBadgeCount] = useState(0);
+  const [scheduleBadgeTick, setScheduleBadgeTick] = useState<number>(() => Date.now());
 
   useEffect(() => {
     // Al iniciar sesión, Supabase puede hidratar la sesión async; esto asegura que
@@ -139,6 +141,153 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (unreadCount > 99) return '99+';
     return String(unreadCount);
   }, [unreadCount]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setScheduleBadgeTick(Date.now()), 60 * 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onRefresh = () => setScheduleBadgeTick(Date.now());
+    window.addEventListener('scheduleBadgeRefresh', onRefresh);
+    return () => window.removeEventListener('scheduleBadgeRefresh', onRefresh);
+  }, []);
+
+  useEffect(() => {
+    if (!userId) {
+      setScheduleBadgeCount(0);
+      return;
+    }
+    if (!selectedAcademyId) {
+      setScheduleBadgeCount(0);
+      return;
+    }
+
+    const loadScheduleBadgeCount = async () => {
+      try {
+        const fromIso = new Date().toISOString();
+        const toIso = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+        const { data: locRows, error: locErr } = await supabase
+          .from('academy_locations')
+          .select('location_id')
+          .eq('academy_id', selectedAcademyId);
+        if (locErr) throw locErr;
+
+        const locationIds = Array.from(
+          new Set(
+            ((locRows as { location_id: string | null }[] | null) ?? [])
+              .map((r) => r.location_id)
+              .filter((id): id is string => !!id)
+          )
+        );
+
+        if (locationIds.length === 0) {
+          setScheduleBadgeCount(0);
+          return;
+        }
+
+        const { data: courtRows, error: courtsErr } = await supabase
+          .from('courts')
+          .select('id')
+          .in('location_id', locationIds);
+        if (courtsErr) throw courtsErr;
+        const courtIds = Array.from(
+          new Set(
+            ((courtRows as { id: string }[] | null) ?? [])
+              .map((c) => c.id)
+              .filter((id): id is string => !!id)
+          )
+        );
+
+        if (courtIds.length === 0) {
+          setScheduleBadgeCount(0);
+          return;
+        }
+
+        // Alumno: contar reservas futuras del alumno
+        if (role === 'student') {
+          const { data: studentRow, error: studentErr } = await supabase
+            .from('students')
+            .select('id')
+            .eq('user_id', userId)
+            .maybeSingle();
+          if (studentErr) throw studentErr;
+          const studentId = (studentRow?.id as string | undefined) ?? null;
+          if (!studentId) {
+            setScheduleBadgeCount(0);
+            return;
+          }
+
+          const { data: classRows, error: classErr } = await supabase
+            .from('class_sessions')
+            .select('id')
+            .gte('date', fromIso)
+            .lte('date', toIso)
+            .in('court_id', courtIds);
+          if (classErr) throw classErr;
+          const classIds = ((classRows as { id: string }[] | null) ?? []).map((c) => c.id);
+
+          if (classIds.length === 0) {
+            setScheduleBadgeCount(0);
+            return;
+          }
+
+          const { count, error: bErr } = await supabase
+            .from('bookings')
+            .select('id', { count: 'exact', head: true })
+            .eq('student_id', studentId)
+            .eq('status', 'reserved')
+            .in('class_id', classIds);
+
+          if (bErr) throw bErr;
+          setScheduleBadgeCount(count ?? 0);
+          return;
+        }
+
+        // Profesor: contar clases futuras del coach
+        if (role === 'coach') {
+          const { data: coachRow, error: coachErr } = await supabase
+            .from('coaches')
+            .select('id')
+            .eq('user_id', userId)
+            .maybeSingle();
+          if (coachErr) throw coachErr;
+          const coachId = (coachRow?.id as string | undefined) ?? null;
+          if (!coachId) {
+            setScheduleBadgeCount(0);
+            return;
+          }
+
+          const { count, error: cErr } = await supabase
+            .from('class_sessions')
+            .select('id', { count: 'exact', head: true })
+            .eq('coach_id', coachId)
+            .gte('date', fromIso)
+            .lte('date', toIso)
+            .in('court_id', courtIds);
+          if (cErr) throw cErr;
+          setScheduleBadgeCount(count ?? 0);
+          return;
+        }
+
+        // Admin/Super admin: contar clases futuras de la academia (por sedes)
+        const { count, error: csErr } = await supabase
+          .from('class_sessions')
+          .select('id', { count: 'exact', head: true })
+          .gte('date', fromIso)
+          .lte('date', toIso)
+          .in('court_id', courtIds);
+        if (csErr) throw csErr;
+        setScheduleBadgeCount(count ?? 0);
+      } catch (e) {
+        setScheduleBadgeCount(0);
+      }
+    };
+
+    loadScheduleBadgeCount();
+  }, [supabase, userId, selectedAcademyId, role, scheduleBadgeTick]);
 
   useEffect(() => {
     async function setupPush() {
@@ -197,12 +346,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     if (!userId) return;
+    if (!selectedAcademyId) return;
 
     const loadUnread = async () => {
       const { count } = await supabase
         .from('notifications')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId)
+        .eq('data->>academyId', selectedAcademyId)
         .is('read_at', null);
       setUnreadCount(count ?? 0);
     };
@@ -228,7 +379,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, userId]);
+  }, [supabase, userId, selectedAcademyId]);
 
   useEffect(() => {
     if (!avatarMenuOpen) return;
@@ -252,6 +403,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     window.addEventListener('pointerdown', onPointerDown, { capture: true });
     return () => window.removeEventListener('pointerdown', onPointerDown, true);
   }, [avatarMenuOpen]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const onAcademyChanged = (e: Event) => {
+      const next = (e as CustomEvent<{ academyId?: string | null }>).detail?.academyId ?? null;
+      setSelectedAcademyId(next);
+    };
+
+    window.addEventListener('selectedAcademyIdChanged', onAcademyChanged);
+    return () => {
+      window.removeEventListener('selectedAcademyIdChanged', onAcademyChanged);
+    };
+  }, []);
 
   useEffect(() => {
     if (!avatarMenuOpen) return;
@@ -381,6 +546,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 setSelectedAcademyId(initial);
                 if (initial && typeof window !== 'undefined') {
                   window.localStorage.setItem('selectedAcademyId', initial);
+                  window.dispatchEvent(new CustomEvent('selectedAcademyIdChanged', { detail: { academyId: initial } }));
                 }
               }
             } else {
@@ -453,6 +619,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         canSeeFinance={role === 'admin' || role === 'super_admin'}
         canSeeSettings={role === 'admin' || role === 'coach' || role === 'student' || role === 'super_admin'}
         studentsLabel={role === 'student' ? 'Mi cuenta' : 'Alumnos'}
+        scheduleBadgeCount={scheduleBadgeCount}
         rightSlot={(
           <div ref={avatarMenuRef} className="relative flex items-center">
             <FooterAvatarButton

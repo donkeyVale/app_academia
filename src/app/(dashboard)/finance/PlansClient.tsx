@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Input } from '@/components/ui/input';
 import { Calendar } from '@/components/ui/calendar';
 import { Calendar as CalendarIcon, WalletCards, Receipt, Users, ClipboardList } from 'lucide-react';
 import { formatPyg } from '@/lib/formatters';
@@ -176,9 +177,34 @@ export default function PlansClient() {
   const [showStudentSummary, setShowStudentSummary] = useState(false);
   const [showPaymentsSection, setShowPaymentsSection] = useState(false);
   const [recentPlansSearch, setRecentPlansSearch] = useState('');
-  const [reportStudentSearch, setReportStudentSearch] = useState('');
+  const [reportStudentQuery, setReportStudentQuery] = useState('');
+  const [reportStudentOpen, setReportStudentOpen] = useState(false);
   const [assignStudentQuery, setAssignStudentQuery] = useState('');
   const [assignStudentOpen, setAssignStudentOpen] = useState(false);
+  const [assignPlanQuery, setAssignPlanQuery] = useState('');
+  const [assignPlanOpen, setAssignPlanOpen] = useState(false);
+
+  const assignStudentSearchRef = useRef<HTMLInputElement | null>(null);
+  const assignPlanSearchRef = useRef<HTMLInputElement | null>(null);
+  const reportStudentSearchRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!assignStudentOpen) return;
+    const t = window.setTimeout(() => assignStudentSearchRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [assignStudentOpen]);
+
+  useEffect(() => {
+    if (!assignPlanOpen) return;
+    const t = window.setTimeout(() => assignPlanSearchRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [assignPlanOpen]);
+
+  useEffect(() => {
+    if (!reportStudentOpen) return;
+    const t = window.setTimeout(() => reportStudentSearchRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [reportStudentOpen]);
 
   // Edición de plan existente
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
@@ -194,11 +220,45 @@ export default function PlansClient() {
   const [paymentDate, setPaymentDate] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('efectivo');
   const [paymentNotes, setPaymentNotes] = useState('');
-  const [paymentStatus, setPaymentStatus] = useState<'pagado' | 'pendiente'>('pagado');
-  const [paymentStudentSearch, setPaymentStudentSearch] = useState('');
-  const [reportStudentOpen, setReportStudentOpen] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<'pagado' | 'pendiente'>('pendiente');
+  const [paymentStudentQuery, setPaymentStudentQuery] = useState('');
   const [paymentStudentOpen, setPaymentStudentOpen] = useState(false);
+  const [paymentPlanQuery, setPaymentPlanQuery] = useState('');
+  const [paymentPlanOpen, setPaymentPlanOpen] = useState(false);
+  const [paymentMethodQuery, setPaymentMethodQuery] = useState('');
+  const [paymentMethodOpen, setPaymentMethodOpen] = useState(false);
+  const [paymentStatusQuery, setPaymentStatusQuery] = useState('');
+  const [paymentStatusOpen, setPaymentStatusOpen] = useState(false);
   const [planUsagesByPlanId, setPlanUsagesByPlanId] = useState<Record<string, number>>({});
+
+  const paymentStudentSearchRef = useRef<HTMLInputElement | null>(null);
+  const paymentPlanSearchRef = useRef<HTMLInputElement | null>(null);
+  const paymentMethodSearchRef = useRef<HTMLInputElement | null>(null);
+  const paymentStatusSearchRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!paymentStudentOpen) return;
+    const t = window.setTimeout(() => paymentStudentSearchRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [paymentStudentOpen]);
+
+  useEffect(() => {
+    if (!paymentPlanOpen) return;
+    const t = window.setTimeout(() => paymentPlanSearchRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [paymentPlanOpen]);
+
+  useEffect(() => {
+    if (!paymentMethodOpen) return;
+    const t = window.setTimeout(() => paymentMethodSearchRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [paymentMethodOpen]);
+
+  useEffect(() => {
+    if (!paymentStatusOpen) return;
+    const t = window.setTimeout(() => paymentStatusSearchRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [paymentStatusOpen]);
 
   const handleDeleteStudentPlan = async (studentPlanId: string) => {
     if (!studentPlanId) return;
@@ -670,9 +730,10 @@ export default function PlansClient() {
         .eq('student_id', reportStudentId);
       if (usagesErr) throw usagesErr;
 
-      const usedClasses = (usagesData ?? []).length;
-      const totalClasses = planRow.remaining_classes as number;
-      const remainingClasses = Math.max(0, totalClasses - usedClasses);
+      const remainingClasses = (planRow.remaining_classes ?? 0) as number;
+      const usedCountFromUsages = (usagesData ?? []).length;
+      const totalClasses = (planRow.plans?.classes_included ?? remainingClasses + usedCountFromUsages) as number;
+      const usedClasses = Math.max(0, totalClasses - remainingClasses);
 
       setReportSummary({
         planName: planRow.plans?.name ?? null,
@@ -696,6 +757,13 @@ export default function PlansClient() {
         present: !!row.present,
         consumedPlan: usedClassIds.has(row.class_id as string),
       }));
+
+      if (planRow.purchased_at) {
+        const purchasedTs = new Date(planRow.purchased_at).getTime();
+        if (!Number.isNaN(purchasedTs)) {
+          rows = rows.filter((r) => new Date(r.date).getTime() >= purchasedTs);
+        }
+      }
 
       // Filtrar por rango de fechas si se proporcionan
       if (reportFrom) {
@@ -992,7 +1060,7 @@ export default function PlansClient() {
       setPaymentDate('');
       setPaymentMethod('efectivo');
       setPaymentNotes('');
-      setPaymentStatus('pagado');
+      setPaymentStatus('pendiente');
       setPaymentModalOpen(false);
       toast.success('Pago registrado correctamente');
     } catch (err: any) {
@@ -1165,67 +1233,6 @@ export default function PlansClient() {
       <button
         type="button"
         className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
-        onClick={() => setShowPaymentsSection((v) => !v)}
-      >
-        <span className="inline-flex items-center gap-2">
-          <Receipt className="w-4 h-4 text-sky-500" />
-          <span>Pagos recientes y registro</span>
-        </span>
-        <span className="text-xs text-gray-500">{showPaymentsSection ? '▼' : '▲'}</span>
-      </button>
-      {showPaymentsSection && (
-        <div className="p-4 space-y-4">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-lg font-semibold">Pagos recientes</h2>
-            <button
-              type="button"
-              className="text-xs px-3 py-2 rounded bg-[#3cadaf] hover:bg-[#31435d] text-white"
-              onClick={() => {
-                setPaymentModalOpen(true);
-                setError(null);
-              }}
-            >
-              Registrar pago
-            </button>
-          </div>
-          {payments.length === 0 ? (
-            <p className="text-sm text-gray-600">Aún no hay pagos registrados.</p>
-          ) : (
-            <ul className="text-sm space-y-2">
-              {payments.map((p) => {
-                const studentInfo = students.find((s) => s.id === p.student_id);
-                const displayName = studentInfo?.full_name ?? studentInfo?.notes ?? studentInfo?.level ?? p.student_id;
-                const sp = studentPlans.find((sp) => sp.id === p.student_plan_id);
-                const planName = sp?.plans?.name ?? sp?.plan_id ?? '';
-                return (
-                  <li key={p.id} className="py-2 px-3 border rounded-lg bg-white flex flex-col md:flex-row md:items-center md:justify-between gap-1">
-                    <div>
-                      <div className="font-medium text-[#31435d]">{displayName}</div>
-                      <div className="text-xs text-gray-600">
-                        <span className="font-semibold">Plan:</span> {planName || 'Sin nombre'}
-                        {' • '}
-                        <span className="font-semibold">Monto:</span> {formatPyg(p.amount)} {p.currency}
-                        {' • '}
-                        <span className="font-semibold">Método:</span> {p.method}
-                      </div>
-                    </div>
-                    <div className="text-xs text-gray-500 text-right">
-                      <div>{new Date(p.payment_date).toLocaleDateString()}</div>
-                      <div className="capitalize">Estado: {p.status}</div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      )}
-    </div>
-
-    <div className="border rounded-lg bg-white shadow-sm">
-      <button
-        type="button"
-        className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
         onClick={() => setShowAssignPlan((v) => !v)}
       >
         <span className="inline-flex items-center gap-2">
@@ -1240,75 +1247,159 @@ export default function PlansClient() {
           <form onSubmit={onAssignPlan} className="grid gap-3 max-w-xl">
             <div>
               <label className="block text-sm mb-1">Alumno</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  className="border rounded px-3 w-full h-10 text-base md:text-sm"
-                  placeholder="Escribe para buscar alumno"
-                  value={assignStudentQuery}
-                  onChange={(e) => {
-                    setAssignStudentQuery(e.target.value);
-                    setAssignStudentOpen(true);
-                  }}
-                  onFocus={() => {
-                    if (assignStudentQuery.trim().length > 0) setAssignStudentOpen(true);
-                  }}
-                />
-                {assignStudentOpen && assignStudentQuery.trim().length > 0 && (
-                  <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border bg-white shadow-sm text-sm">
-                    {students
-                      .filter((s) => {
-                        const term = assignStudentQuery.toLowerCase();
-                        const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
-                        return displayName.includes(term);
-                      })
-                      .slice(0, 20)
-                      .map((s) => {
-                        const displayName = s.full_name ?? s.notes ?? s.level ?? s.id;
+              <Popover open={assignStudentOpen} onOpenChange={setAssignStudentOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-between text-sm font-normal"
+                  >
+                    <span className="truncate mr-2">
+                      {(() => {
+                        if (!selectedStudentId) return 'Seleccionar alumno';
+                        const s = students.find((x) => x.id === selectedStudentId);
+                        return (s?.full_name ?? s?.notes ?? s?.level ?? s?.id ?? 'Seleccionar alumno') as string;
+                      })()}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-3" align="start">
+                  <div className="space-y-2">
+                    <Input
+                      type="text"
+                      placeholder="Buscar alumnos..."
+                      value={assignStudentQuery}
+                      onChange={(e) => setAssignStudentQuery(e.target.value)}
+                      className="h-11 text-base"
+                      ref={assignStudentSearchRef}
+                    />
+                    <div className="max-h-52 overflow-auto border rounded-md divide-y">
+                      {(() => {
+                        const filtered = students.filter((s) => {
+                          const t = (assignStudentQuery || '').toLowerCase();
+                          if (!t) return true;
+                          const label =
+                            (s.full_name || '') +
+                            ' ' +
+                            (s.notes || '') +
+                            ' ' +
+                            (s.level || '') +
+                            ' ' +
+                            s.id;
+                          return label.toLowerCase().includes(t);
+                        });
+                        const limited = filtered.slice(0, 50);
+
+                        if (students.length === 0) {
+                          return (
+                            <div className="px-2 py-1.5 text-xs text-gray-500">No hay alumnos cargados.</div>
+                          );
+                        }
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="px-2 py-1.5 text-xs text-gray-500">
+                              No se encontraron alumnos con ese criterio de búsqueda.
+                            </div>
+                          );
+                        }
                         return (
-                          <li
-                            key={s.id}
-                            className="cursor-pointer px-3 py-1.5 hover:bg-gray-100"
-                            onClick={() => {
-                              setSelectedStudentId(s.id);
-                              setAssignStudentQuery(displayName || '');
-                              setAssignStudentOpen(false);
-                            }}
-                          >
-                            {displayName}
-                          </li>
+                          <>
+                            {limited.map((s) => {
+                              const displayName = s.full_name ?? s.notes ?? s.level ?? s.id;
+                              return (
+                                <button
+                                  key={s.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedStudentId(s.id);
+                                    setAssignStudentQuery('');
+                                    setAssignStudentOpen(false);
+                                  }}
+                                  className="w-full flex items-center justify-between px-2 py-1.5 text-sm hover:bg-slate-50"
+                                >
+                                  <span className="mr-2 truncate">{displayName}</span>
+                                </button>
+                              );
+                            })}
+                          </>
                         );
-                      })}
-                    {students.filter((s) => {
-                      const term = assignStudentQuery.toLowerCase();
-                      const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
-                      return displayName.includes(term);
-                    }).length === 0 && (
-                      <li className="px-3 py-1.5 text-gray-500">Sin resultados</li>
-                    )}
-                  </ul>
-                )}
-              </div>
+                      })()}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <label className="block text-sm mb-1">Plan</label>
-              <select
-                className="border rounded p-2 w-full"
-                value={selectedPlanId}
-                onChange={(e) => {
-                  const planId = e.target.value;
-                  setSelectedPlanId(planId);
-                  const plan = plans.find((p) => p.id === planId);
-                  if (plan) setRemainingClassesInput(String(plan.classes_included));
-                }}
-              >
-                <option value="">Selecciona un plan</option>
-                {plans.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name} ({p.classes_included} clases)
-                  </option>
-                ))}
-              </select>
+              <Popover open={assignPlanOpen} onOpenChange={setAssignPlanOpen}>
+                <PopoverTrigger asChild>
+                  <Button type="button" variant="outline" className="w-full justify-between text-sm font-normal">
+                    <span className="truncate mr-2">
+                      {(() => {
+                        if (!selectedPlanId) return 'Seleccionar plan';
+                        const p = plans.find((x) => x.id === selectedPlanId);
+                        if (!p) return 'Seleccionar plan';
+                        return `${p.name} (${p.classes_included} clases)`;
+                      })()}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-3" align="start">
+                  <div className="space-y-2">
+                    <Input
+                      type="text"
+                      placeholder="Buscar planes..."
+                      value={assignPlanQuery}
+                      onChange={(e) => setAssignPlanQuery(e.target.value)}
+                      className="h-11 text-base"
+                      ref={assignPlanSearchRef}
+                    />
+                    <div className="max-h-52 overflow-auto border rounded-md divide-y">
+                      {(() => {
+                        const filtered = plans.filter((p) => {
+                          const t = (assignPlanQuery || '').toLowerCase();
+                          if (!t) return true;
+                          const label = `${p.name || ''} ${p.classes_included ?? ''} ${p.id || ''}`;
+                          return label.toLowerCase().includes(t);
+                        });
+                        const limited = filtered.slice(0, 50);
+
+                        if (plans.length === 0) {
+                          return (
+                            <div className="px-2 py-1.5 text-xs text-gray-500">No hay planes cargados.</div>
+                          );
+                        }
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="px-2 py-1.5 text-xs text-gray-500">
+                              No se encontraron planes con ese criterio de búsqueda.
+                            </div>
+                          );
+                        }
+                        return (
+                          <>
+                            {limited.map((p) => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedPlanId(p.id);
+                                  setRemainingClassesInput(String(p.classes_included ?? ''));
+                                  setAssignPlanQuery('');
+                                  setAssignPlanOpen(false);
+                                }}
+                                className="w-full flex items-center justify-between px-2 py-1.5 text-sm hover:bg-slate-50"
+                              >
+                                <span className="mr-2 truncate">{p.name} ({p.classes_included} clases)</span>
+                              </button>
+                            ))}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div>
@@ -1479,6 +1570,70 @@ export default function PlansClient() {
       <button
         type="button"
         className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+        onClick={() => setShowPaymentsSection((v) => !v)}
+      >
+        <span className="inline-flex items-center gap-2">
+          <Receipt className="w-4 h-4 text-sky-500" />
+          <span>Pagos recientes y registros</span>
+        </span>
+        <span className="text-xs text-gray-500">{showPaymentsSection ? '▼' : '▲'}</span>
+      </button>
+      {showPaymentsSection && (
+        <div className="p-4 space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-lg font-semibold">Pagos recientes</h2>
+            <button
+              type="button"
+              className="text-xs px-3 py-2 rounded bg-[#3cadaf] hover:bg-[#31435d] text-white"
+              onClick={() => {
+                setPaymentModalOpen(true);
+                setError(null);
+              }}
+            >
+              Registrar pago
+            </button>
+          </div>
+          {payments.length === 0 ? (
+            <p className="text-sm text-gray-600">Aún no hay pagos registrados.</p>
+          ) : (
+            <ul className="text-sm space-y-2">
+              {payments.map((p) => {
+                const studentInfo = students.find((s) => s.id === p.student_id);
+                const displayName = studentInfo?.full_name ?? studentInfo?.notes ?? studentInfo?.level ?? p.student_id;
+                const sp = studentPlans.find((sp) => sp.id === p.student_plan_id);
+                const planName = sp?.plans?.name ?? sp?.plan_id ?? '';
+                return (
+                  <li
+                    key={p.id}
+                    className="py-2 px-3 border rounded-lg bg-white flex flex-col md:flex-row md:items-center md:justify-between gap-1"
+                  >
+                    <div>
+                      <div className="font-medium text-[#31435d]">{displayName}</div>
+                      <div className="text-xs text-gray-600">
+                        <span className="font-semibold">Plan:</span> {planName || 'Sin nombre'}
+                        {' • '}
+                        <span className="font-semibold">Monto:</span> {formatPyg(p.amount)} {p.currency}
+                        {' • '}
+                        <span className="font-semibold">Método:</span> {p.method}
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500 text-right">
+                      <div>{new Date(p.payment_date).toLocaleDateString()}</div>
+                      <div className="capitalize">Estado: {p.status}</div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+
+    <div className="border rounded-lg bg-white shadow-sm">
+      <button
+        type="button"
+        className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
         onClick={() => setShowStudentSummary((v) => !v)}
       >
         <span className="inline-flex items-center gap-2">
@@ -1493,55 +1648,83 @@ export default function PlansClient() {
           <form onSubmit={onLoadReport} className="grid gap-3 max-w-xl mb-4">
             <div>
               <label className="block text-sm mb-1">Alumno</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  className="border rounded px-3 w-full h-10 text-base md:text-sm"
-                  placeholder="Escribe para buscar alumno"
-                  value={reportStudentSearch}
-                  onChange={(e) => {
-                    setReportStudentSearch(e.target.value);
-                    setReportStudentOpen(true);
-                  }}
-                  onFocus={() => {
-                    if (reportStudentSearch.trim().length > 0) setReportStudentOpen(true);
-                  }}
-                />
-                {reportStudentOpen && reportStudentSearch.trim().length > 0 && (
-                  <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border bg-white shadow-sm text-sm">
-                    {students
-                      .filter((s) => {
-                        const term = reportStudentSearch.toLowerCase();
-                        const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
-                        return displayName.includes(term);
-                      })
-                      .slice(0, 20)
-                      .map((s) => {
-                        const displayName = s.full_name ?? s.notes ?? s.level ?? s.id;
+              <Popover open={reportStudentOpen} onOpenChange={setReportStudentOpen}>
+                <PopoverTrigger asChild>
+                  <Button type="button" variant="outline" className="w-full justify-between text-sm font-normal">
+                    <span className="truncate mr-2">
+                      {(() => {
+                        if (!reportStudentId) return 'Seleccionar alumno';
+                        const s = students.find((x) => x.id === reportStudentId);
+                        return (s?.full_name ?? s?.notes ?? s?.level ?? s?.id ?? 'Seleccionar alumno') as string;
+                      })()}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-3" align="start">
+                  <div className="space-y-2">
+                    <Input
+                      type="text"
+                      placeholder="Buscar alumnos..."
+                      value={reportStudentQuery}
+                      onChange={(e) => setReportStudentQuery(e.target.value)}
+                      className="h-11 text-base"
+                      ref={reportStudentSearchRef}
+                    />
+                    <div className="max-h-52 overflow-auto border rounded-md divide-y">
+                      {(() => {
+                        const filtered = students.filter((s) => {
+                          const t = (reportStudentQuery || '').toLowerCase();
+                          if (!t) return true;
+                          const label =
+                            (s.full_name || '') +
+                            ' ' +
+                            (s.notes || '') +
+                            ' ' +
+                            (s.level || '') +
+                            ' ' +
+                            s.id;
+                          return label.toLowerCase().includes(t);
+                        });
+                        const limited = filtered.slice(0, 50);
+
+                        if (students.length === 0) {
+                          return (
+                            <div className="px-2 py-1.5 text-xs text-gray-500">No hay alumnos cargados.</div>
+                          );
+                        }
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="px-2 py-1.5 text-xs text-gray-500">
+                              No se encontraron alumnos con ese criterio de búsqueda.
+                            </div>
+                          );
+                        }
                         return (
-                          <li
-                            key={s.id}
-                            className="cursor-pointer px-3 py-1.5 hover:bg-gray-100"
-                            onClick={() => {
-                              setReportStudentId(s.id);
-                              setReportStudentSearch(displayName || '');
-                              setReportStudentOpen(false);
-                            }}
-                          >
-                            {displayName}
-                          </li>
+                          <>
+                            {limited.map((s) => {
+                              const displayName = s.full_name ?? s.notes ?? s.level ?? s.id;
+                              return (
+                                <button
+                                  key={s.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setReportStudentId(s.id);
+                                    setReportStudentQuery('');
+                                    setReportStudentOpen(false);
+                                  }}
+                                  className="w-full flex items-center justify-between px-2 py-1.5 text-sm hover:bg-slate-50"
+                                >
+                                  <span className="mr-2 truncate">{displayName}</span>
+                                </button>
+                              );
+                            })}
+                          </>
                         );
-                      })}
-                    {students.filter((s) => {
-                      const term = reportStudentSearch.toLowerCase();
-                      const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
-                      return displayName.includes(term);
-                    }).length === 0 && (
-                      <li className="px-3 py-1.5 text-gray-500">Sin resultados</li>
-                    )}
-                  </ul>
-                )}
-              </div>
+                      })()}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
@@ -1571,13 +1754,24 @@ export default function PlansClient() {
           )}
 
           {reportHistory.length > 0 && (
+            <div className="text-xs text-gray-600">
+              <p>
+                <strong>Nota:</strong> El consumo se registra por reserva (puede consumir aunque figure Ausente por política de no-show).
+              </p>
+              <p>
+                También puede haber Presente sin consumo si la clase fue promocional/sin consumo.
+              </p>
+            </div>
+          )}
+
+          {reportHistory.length > 0 && (
             <ul className="text-sm divide-y">
               {reportHistory.map((row) => (
                 <li key={row.classId} className="py-2 flex flex-col md:flex-row md:items-center md:justify-between gap-1">
                   <div>
                     <span className="font-medium">{new Date(row.date).toLocaleString()}</span>
-                    {' • '}Estado: {row.present ? 'Presente' : 'Ausente'}
-                    {' • '}Consumió plan: {row.consumedPlan ? 'Sí' : 'No'}
+                    {' • '}Asistencia: {row.present ? 'Presente' : 'Ausente'}
+                    {' • '}Consumo (por reserva): {row.consumedPlan ? 'Sí' : 'No'}
                   </div>
                 </li>
               ))}
@@ -1596,86 +1790,212 @@ export default function PlansClient() {
           <form onSubmit={onCreatePayment} className="px-4 py-3 overflow-y-auto text-sm space-y-3">
             <div>
               <label className="block text-sm mb-1">Alumno</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  className="border rounded px-3 w-full h-10 text-base md:text-sm"
-                  placeholder="Escribe para buscar alumno"
-                  value={paymentStudentSearch}
-                  onChange={(e) => {
-                    setPaymentStudentSearch(e.target.value);
-                    setPaymentStudentOpen(true);
-                  }}
-                  onFocus={() => {
-                    if (paymentStudentSearch.trim().length > 0) setPaymentStudentOpen(true);
-                  }}
-                />
-                {paymentStudentOpen && paymentStudentSearch.trim().length > 0 && (
-                  <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded-md border bg-white shadow-sm text-sm">
-                    {students
-                      .filter((s) => {
-                        const term = paymentStudentSearch.toLowerCase();
-                        const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
-                        return displayName.includes(term);
-                      })
-                      .slice(0, 20)
-                      .map((s) => {
-                        const displayName = s.full_name ?? s.notes ?? s.level ?? s.id;
+              <Popover open={paymentStudentOpen} onOpenChange={setPaymentStudentOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-between text-sm font-normal"
+                  >
+                    <span className="truncate mr-2">
+                      {(() => {
+                        if (!paymentStudentId) return 'Seleccionar alumno';
+                        const s = students.find((x) => x.id === paymentStudentId);
+                        return (s?.full_name ?? s?.notes ?? s?.level ?? s?.id ?? 'Seleccionar alumno') as string;
+                      })()}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-3" align="start">
+                  <div className="space-y-2">
+                    <Input
+                      type="text"
+                      placeholder="Buscar alumnos..."
+                      value={paymentStudentQuery}
+                      onChange={(e) => setPaymentStudentQuery(e.target.value)}
+                      className="h-11 text-base"
+                      ref={paymentStudentSearchRef}
+                    />
+                    <div className="max-h-52 overflow-auto border rounded-md divide-y">
+                      {(() => {
+                        const filtered = students.filter((s) => {
+                          const t = (paymentStudentQuery || '').toLowerCase();
+                          if (!t) return true;
+                          const label =
+                            (s.full_name || '') +
+                            ' ' +
+                            (s.notes || '') +
+                            ' ' +
+                            (s.level || '') +
+                            ' ' +
+                            s.id;
+                          return label.toLowerCase().includes(t);
+                        });
+                        const limited = filtered.slice(0, 50);
+
+                        if (students.length === 0) {
+                          return (
+                            <div className="px-2 py-1.5 text-xs text-gray-500">No hay alumnos cargados.</div>
+                          );
+                        }
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="px-2 py-1.5 text-xs text-gray-500">
+                              No se encontraron alumnos con ese criterio de búsqueda.
+                            </div>
+                          );
+                        }
                         return (
-                          <li
-                            key={s.id}
-                            className="cursor-pointer px-3 py-1.5 hover:bg-gray-100"
-                            onClick={() => {
-                              setPaymentStudentId(s.id);
-                              setPaymentStudentPlanId('');
-                              setPaymentStudentSearch(displayName || '');
-                              setPaymentStudentOpen(false);
-                            }}
-                          >
-                            {displayName}
-                          </li>
+                          <>
+                            {limited.map((s) => {
+                              const displayName = s.full_name ?? s.notes ?? s.level ?? s.id;
+                              return (
+                                <button
+                                  key={s.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setPaymentStudentId(s.id);
+                                    setPaymentStudentPlanId('');
+                                    setPaymentStudentQuery('');
+                                    setPaymentStudentOpen(false);
+                                  }}
+                                  className="w-full flex items-center justify-between px-2 py-1.5 text-sm hover:bg-slate-50"
+                                >
+                                  <span className="mr-2 truncate">{displayName}</span>
+                                </button>
+                              );
+                            })}
+                          </>
                         );
-                      })}
-                    {students.filter((s) => {
-                      const term = paymentStudentSearch.toLowerCase();
-                      const displayName = (s.full_name ?? s.notes ?? s.level ?? s.id).toLowerCase();
-                      return displayName.includes(term);
-                    }).length === 0 && (
-                      <li className="px-3 py-1.5 text-gray-500">Sin resultados</li>
-                    )}
-                  </ul>
-                )}
-              </div>
+                      })()}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <label className="block text-sm mb-1">Plan del alumno</label>
-              <select
-                className="border rounded p-2 w-full text-base md:text-sm"
-                value={paymentStudentPlanId}
-                onChange={(e) => setPaymentStudentPlanId(e.target.value)}
+              <Popover
+                open={paymentPlanOpen}
+                onOpenChange={(open) => {
+                  if (!paymentStudentId) return;
+                  setPaymentPlanOpen(open);
+                }}
               >
-                <option value="">Selecciona un plan asignado</option>
-                {studentPlans
-                  .filter((sp) => sp.student_id === paymentStudentId)
-                  .filter((sp) => {
-                    const used = planUsagesByPlanId[sp.id] ?? 0;
-                    const realRemaining = Math.max(0, (sp.remaining_classes ?? 0) - used);
-                    const basePrice = sp.base_price ?? null;
-                    const finalPrice = sp.final_price ?? basePrice;
-                    const totalPaid = paymentsByPlan[sp.id] ?? 0;
-                    const balance = finalPrice != null ? Math.max(0, finalPrice - totalPaid) : 0;
-                    return !(realRemaining === 0 && balance === 0);
-                  })
-                  .map((sp) => (
-                    <option key={sp.id} value={sp.id}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-between text-sm font-normal"
+                    disabled={!paymentStudentId}
+                  >
+                    <span className="truncate mr-2">
                       {(() => {
+                        if (!paymentStudentId) return 'Seleccionar alumno primero';
+                        if (!paymentStudentPlanId) return 'Seleccionar plan asignado';
+                        const sp = studentPlans.find((x) => x.id === paymentStudentPlanId);
+                        if (!sp) return 'Seleccionar plan asignado';
                         const used = planUsagesByPlanId[sp.id] ?? 0;
                         const realRemaining = Math.max(0, (sp.remaining_classes ?? 0) - used);
                         return (sp.plans?.name ?? sp.plan_id) + ` • Restantes: ${realRemaining}`;
                       })()}
-                    </option>
-                  ))}
-              </select>
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-96 p-3" align="start">
+                  <div className="space-y-2">
+                    <Input
+                      type="text"
+                      placeholder="Buscar planes del alumno..."
+                      value={paymentPlanQuery}
+                      onChange={(e) => setPaymentPlanQuery(e.target.value)}
+                      className="h-11 text-base"
+                      ref={paymentPlanSearchRef}
+                    />
+                    <div className="max-h-56 overflow-auto border rounded-md divide-y">
+                      {(() => {
+                        if (!paymentStudentId) {
+                          return (
+                            <div className="px-2 py-1.5 text-xs text-gray-500">
+                              Seleccioná un alumno para ver sus planes.
+                            </div>
+                          );
+                        }
+
+                        const candidates = studentPlans
+                          .filter((sp) => sp.student_id === paymentStudentId)
+                          .filter((sp) => {
+                            const used = planUsagesByPlanId[sp.id] ?? 0;
+                            const realRemaining = Math.max(0, (sp.remaining_classes ?? 0) - used);
+                            const basePrice = sp.base_price ?? null;
+                            const finalPrice = sp.final_price ?? basePrice;
+                            const totalPaid = paymentsByPlan[sp.id] ?? 0;
+                            const balance = finalPrice != null ? Math.max(0, finalPrice - totalPaid) : 0;
+                            return !(realRemaining === 0 && balance === 0);
+                          });
+
+                        const filtered = candidates.filter((sp) => {
+                          const t = (paymentPlanQuery || '').toLowerCase();
+                          if (!t) return true;
+                          const planName = (sp.plans?.name ?? sp.plan_id ?? '').toLowerCase();
+                          const id = (sp.id ?? '').toLowerCase();
+                          return `${planName} ${id}`.includes(t);
+                        });
+
+                        const limited = filtered.slice(0, 50);
+
+                        if (candidates.length === 0) {
+                          return (
+                            <div className="px-2 py-1.5 text-xs text-gray-500">
+                              Este alumno no tiene planes disponibles para registrar pagos.
+                            </div>
+                          );
+                        }
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="px-2 py-1.5 text-xs text-gray-500">
+                              No se encontraron planes con ese criterio de búsqueda.
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <>
+                            {limited.map((sp) => {
+                              const used = planUsagesByPlanId[sp.id] ?? 0;
+                              const realRemaining = Math.max(0, (sp.remaining_classes ?? 0) - used);
+                              const basePrice = sp.base_price ?? null;
+                              const finalPrice = sp.final_price ?? basePrice;
+                              const totalPaid = paymentsByPlan[sp.id] ?? 0;
+                              const balance = finalPrice != null ? Math.max(0, finalPrice - totalPaid) : null;
+                              const label = (sp.plans?.name ?? sp.plan_id) + ` • Restantes: ${realRemaining}`;
+                              return (
+                                <button
+                                  key={sp.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setPaymentStudentPlanId(sp.id);
+                                    setPaymentPlanQuery('');
+                                    setPaymentPlanOpen(false);
+                                  }}
+                                  className="w-full flex flex-col items-start px-2 py-2 text-sm hover:bg-slate-50"
+                                >
+                                  <span className="w-full truncate">{label}</span>
+                                  {balance != null && (
+                                    <span className="text-[11px] text-gray-500">
+                                      Saldo: {formatPyg(balance)} PYG
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
             {paymentStudentPlanId && (
               <div className="text-xs text-gray-600 bg-gray-50 border rounded px-3 py-2">
@@ -1722,28 +2042,136 @@ export default function PlansClient() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm mb-1">Método</label>
-                <select
-                  className="border rounded p-2 w-full text-base md:text-sm"
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                >
-                  <option value="efectivo">Efectivo</option>
-                  <option value="transferencia">Transferencia</option>
-                  <option value="tarjeta">Tarjeta</option>
-                  <option value="mercadopago">MercadoPago</option>
-                  <option value="otro">Otro</option>
-                </select>
+                <Popover open={paymentMethodOpen} onOpenChange={setPaymentMethodOpen}>
+                  <PopoverTrigger asChild>
+                    <Button type="button" variant="outline" className="w-full justify-between text-sm font-normal">
+                      <span className="truncate mr-2">
+                        {paymentMethod === 'efectivo'
+                          ? 'Efectivo'
+                          : paymentMethod === 'transferencia'
+                            ? 'Transferencia'
+                            : paymentMethod === 'tarjeta'
+                              ? 'Tarjeta'
+                              : paymentMethod === 'mercadopago'
+                                ? 'MercadoPago'
+                                : 'Otro'}
+                      </span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72 p-3" align="start">
+                    <div className="space-y-2">
+                      <Input
+                        type="text"
+                        placeholder="Buscar..."
+                        value={paymentMethodQuery}
+                        onChange={(e) => setPaymentMethodQuery(e.target.value)}
+                        className="h-11 text-base"
+                        ref={paymentMethodSearchRef}
+                      />
+                      <div className="max-h-52 overflow-auto border rounded-md divide-y">
+                        {(() => {
+                          const opts: { id: string; name: string }[] = [
+                            { id: 'efectivo', name: 'Efectivo' },
+                            { id: 'transferencia', name: 'Transferencia' },
+                            { id: 'tarjeta', name: 'Tarjeta' },
+                            { id: 'mercadopago', name: 'MercadoPago' },
+                            { id: 'otro', name: 'Otro' },
+                          ];
+                          const filtered = opts.filter((o) => {
+                            const t = (paymentMethodQuery || '').toLowerCase();
+                            if (!t) return true;
+                            return o.name.toLowerCase().includes(t) || o.id.toLowerCase().includes(t);
+                          });
+                          if (filtered.length === 0) {
+                            return (
+                              <div className="px-2 py-1.5 text-xs text-gray-500">
+                                No se encontraron opciones con ese criterio de búsqueda.
+                              </div>
+                            );
+                          }
+                          return (
+                            <>
+                              {filtered.map((o) => (
+                                <button
+                                  key={o.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setPaymentMethod(o.id);
+                                    setPaymentMethodQuery('');
+                                    setPaymentMethodOpen(false);
+                                  }}
+                                  className="w-full flex items-center justify-between px-2 py-1.5 text-sm hover:bg-slate-50"
+                                >
+                                  <span className="mr-2 truncate">{o.name}</span>
+                                </button>
+                              ))}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div>
                 <label className="block text-sm mb-1">Estado</label>
-                <select
-                  className="border rounded p-2 w-full text-base md:text-sm"
-                  value={paymentStatus}
-                  onChange={(e) => setPaymentStatus(e.target.value as 'pagado' | 'pendiente')}
-                >
-                  <option value="pagado">Pagado</option>
-                  <option value="pendiente">Pendiente</option>
-                </select>
+                <Popover open={paymentStatusOpen} onOpenChange={setPaymentStatusOpen}>
+                  <PopoverTrigger asChild>
+                    <Button type="button" variant="outline" className="w-full justify-between text-sm font-normal">
+                      <span className="truncate mr-2">{paymentStatus === 'pagado' ? 'Pagado' : 'Pendiente'}</span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-72 p-3" align="start">
+                    <div className="space-y-2">
+                      <Input
+                        type="text"
+                        placeholder="Buscar..."
+                        value={paymentStatusQuery}
+                        onChange={(e) => setPaymentStatusQuery(e.target.value)}
+                        className="h-11 text-base"
+                        ref={paymentStatusSearchRef}
+                      />
+                      <div className="max-h-52 overflow-auto border rounded-md divide-y">
+                        {(() => {
+                          const opts: { id: 'pagado' | 'pendiente'; name: string }[] = [
+                            { id: 'pendiente', name: 'Pendiente' },
+                            { id: 'pagado', name: 'Pagado' },
+                          ];
+                          const filtered = opts.filter((o) => {
+                            const t = (paymentStatusQuery || '').toLowerCase();
+                            if (!t) return true;
+                            return o.name.toLowerCase().includes(t) || o.id.toLowerCase().includes(t);
+                          });
+                          if (filtered.length === 0) {
+                            return (
+                              <div className="px-2 py-1.5 text-xs text-gray-500">
+                                No se encontraron opciones con ese criterio de búsqueda.
+                              </div>
+                            );
+                          }
+                          return (
+                            <>
+                              {filtered.map((o) => (
+                                <button
+                                  key={o.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setPaymentStatus(o.id);
+                                    setPaymentStatusQuery('');
+                                    setPaymentStatusOpen(false);
+                                  }}
+                                  className="w-full flex items-center justify-between px-2 py-1.5 text-sm hover:bg-slate-50"
+                                >
+                                  <span className="mr-2 truncate">{o.name}</span>
+                                </button>
+                              ))}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
             <div>

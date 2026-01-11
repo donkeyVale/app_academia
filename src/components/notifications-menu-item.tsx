@@ -28,6 +28,11 @@ export function NotificationsMenuItem({ userId, onUnreadCountChange }: Props) {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<NotificationRow[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return window.localStorage.getItem('selectedAcademyId');
+  });
+  const [academyReady, setAcademyReady] = useState(() => typeof window !== 'undefined');
 
   useEffect(() => {
     onUnreadCountChange?.(unreadCount);
@@ -39,18 +44,53 @@ export function NotificationsMenuItem({ userId, onUnreadCountChange }: Props) {
     return String(unreadCount);
   }, [unreadCount]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const read = () => {
+      const v = window.localStorage.getItem('selectedAcademyId');
+      setSelectedAcademyId(v || null);
+    };
+
+    read();
+    setAcademyReady(true);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'selectedAcademyId') read();
+    };
+    const onAcademyChanged = () => {
+      read();
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('selectedAcademyIdChanged', onAcademyChanged);
+
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('selectedAcademyIdChanged', onAcademyChanged);
+    };
+  }, []);
+
   const load = async () => {
+    if (!academyReady) return;
+    if (!selectedAcademyId) return;
     setLoading(true);
     try {
-      const [listRes, countRes] = await Promise.all([
-        supabase
-          .from('notifications')
-          .select('id,title,body,data,created_at,read_at')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(20),
-        supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', userId).is('read_at', null),
-      ]);
+      let listQ = supabase
+        .from('notifications')
+        .select('id,title,body,data,created_at,read_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      let countQ = supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .is('read_at', null);
+
+      listQ = listQ.eq('data->>academyId', selectedAcademyId);
+      countQ = countQ.eq('data->>academyId', selectedAcademyId);
+
+      const [listRes, countRes] = await Promise.all([listQ, countQ]);
 
       if (!listRes.error) {
         setItems((listRes.data ?? []) as any);
@@ -66,7 +106,7 @@ export function NotificationsMenuItem({ userId, onUnreadCountChange }: Props) {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId]);
+  }, [userId, selectedAcademyId, academyReady]);
 
   useEffect(() => {
     const channel = supabase
@@ -80,6 +120,8 @@ export function NotificationsMenuItem({ userId, onUnreadCountChange }: Props) {
           filter: `user_id=eq.${userId}`,
         },
         () => {
+          if (!academyReady) return;
+          if (!selectedAcademyId) return;
           load();
         }
       )
@@ -102,16 +144,24 @@ export function NotificationsMenuItem({ userId, onUnreadCountChange }: Props) {
   };
 
   const markAllRead = async () => {
+    if (!academyReady) return;
+    if (!selectedAcademyId) return;
     const now = new Date().toISOString();
     setItems((prev) => prev.map((n) => (n.read_at ? n : { ...n, read_at: now })));
     setUnreadCount(0);
-    await supabase.from('notifications').update({ read_at: now }).eq('user_id', userId).is('read_at', null);
+    let q = supabase.from('notifications').update({ read_at: now }).eq('user_id', userId).is('read_at', null);
+    q = q.eq('data->>academyId', selectedAcademyId);
+    await q;
   };
 
   const clearAll = async () => {
+    if (!academyReady) return;
+    if (!selectedAcademyId) return;
     setItems([]);
     setUnreadCount(0);
-    await supabase.from('notifications').delete().eq('user_id', userId);
+    let q = supabase.from('notifications').delete().eq('user_id', userId);
+    q = q.eq('data->>academyId', selectedAcademyId);
+    await q;
   };
 
   return (

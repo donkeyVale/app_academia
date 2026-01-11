@@ -2,15 +2,16 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
 import { formatPyg } from '@/lib/formatters';
-import { Users, UserPlus, ListChecks, Calendar as CalendarIcon, Trash2 } from 'lucide-react';
+import { Users, UserPlus, ListChecks, Calendar as CalendarIcon, Trash2, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
+import { roleLabel } from '@/lib/role-label';
 import { toast } from 'sonner';
 
 const ROLES = ['admin', 'coach', 'student'] as const;
@@ -119,6 +120,14 @@ export default function UsersPage() {
   const [usersAcademyFilter, setUsersAcademyFilter] = useState<string>('all');
   const [usersStatusFilter, setUsersStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [userAcademiesMap, setUserAcademiesMap] = useState<Record<string, string[]>>({});
+
+  const [usersAcademyFilterOpen, setUsersAcademyFilterOpen] = useState(false);
+  const [usersAcademyFilterQuery, setUsersAcademyFilterQuery] = useState('');
+  const usersAcademyFilterSearchRef = useRef<HTMLInputElement | null>(null);
+
+  const [usersStatusFilterOpen, setUsersStatusFilterOpen] = useState(false);
+  const [usersStatusFilterQuery, setUsersStatusFilterQuery] = useState('');
+  const usersStatusFilterSearchRef = useRef<HTMLInputElement | null>(null);
   const [userAcademyStatusMap, setUserAcademyStatusMap] = useState<Record<string, Record<string, boolean>>>({});
 
   const [submitting, setSubmitting] = useState(false);
@@ -127,11 +136,37 @@ export default function UsersPage() {
 
   const [users, setUsers] = useState<UserRow[]>([]);
   const [userRoles, setUserRoles] = useState<UserRolesRow[]>([]);
+  const [userNationalIdMap, setUserNationalIdMap] = useState<Record<string, string | null>>({});
   const [loadingList, setLoadingList] = useState(true);
   const [forbidden, setForbidden] = useState(false);
   const [role, setRole] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
+
+  const loadUserDocuments = async (params: { currentUserId: string; userIds: string[] }) => {
+    try {
+      const res = await fetch('/api/admin/list-user-documents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentUserId: params.currentUserId, userIds: params.userIds }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        return;
+      }
+
+      const rows = (json?.rows ?? []) as { userId: string; nationalId: string | null }[];
+      const map: Record<string, string | null> = {};
+      rows.forEach((r) => {
+        if (!r?.userId) return;
+        map[r.userId] = r.nationalId ?? null;
+      });
+      setUserNationalIdMap(map);
+    } catch {
+      // no-op
+    }
+  };
 
   // UI: secciones plegables
   const [showCreateUser, setShowCreateUser] = useState(false);
@@ -158,6 +193,38 @@ export default function UsersPage() {
   const [detailCoachFeeAcademyId, setDetailCoachFeeAcademyId] = useState<string | null>(null);
   const [detailAcademyStatuses, setDetailAcademyStatuses] = useState<UserAcademyStatus[]>([]);
   const [detailStatusAcademyId, setDetailStatusAcademyId] = useState<string>('');
+
+  const [detailStatusAcademyOpen, setDetailStatusAcademyOpen] = useState(false);
+  const [detailStatusAcademyQuery, setDetailStatusAcademyQuery] = useState('');
+  const detailStatusAcademySearchRef = useRef<HTMLInputElement | null>(null);
+
+  const [detailCoachFeeAcademyOpen, setDetailCoachFeeAcademyOpen] = useState(false);
+  const [detailCoachFeeAcademyQuery, setDetailCoachFeeAcademyQuery] = useState('');
+  const detailCoachFeeAcademySearchRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!usersAcademyFilterOpen) return;
+    const t = window.setTimeout(() => usersAcademyFilterSearchRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [usersAcademyFilterOpen]);
+
+  useEffect(() => {
+    if (!usersStatusFilterOpen) return;
+    const t = window.setTimeout(() => usersStatusFilterSearchRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [usersStatusFilterOpen]);
+
+  useEffect(() => {
+    if (!detailStatusAcademyOpen) return;
+    const t = window.setTimeout(() => detailStatusAcademySearchRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [detailStatusAcademyOpen]);
+
+  useEffect(() => {
+    if (!detailCoachFeeAcademyOpen) return;
+    const t = window.setTimeout(() => detailCoachFeeAcademySearchRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [detailCoachFeeAcademyOpen]);
   const [detailIsActive, setDetailIsActive] = useState(true);
 
   // Importación masiva desde CSV
@@ -288,6 +355,13 @@ export default function UsersPage() {
 
       setUsers(finalUsers);
       setUserRoles(finalUserRoles);
+      setUserNationalIdMap({});
+      if (userId && finalUsers.length > 0) {
+        await loadUserDocuments({
+          currentUserId: userId,
+          userIds: finalUsers.map((u) => u.id),
+        });
+      }
       setLoadingList(false);
     })();
 
@@ -404,8 +478,16 @@ export default function UsersPage() {
         return;
       }
 
-      setUsers((profilesRes.data ?? []) as UserRow[]);
+      const nextUsers = (profilesRes.data ?? []) as UserRow[];
+      setUsers(nextUsers);
       setUserRoles((rolesRes.data ?? []) as UserRolesRow[]);
+      setUserNationalIdMap({});
+      if (currentUserId && nextUsers.length > 0) {
+        await loadUserDocuments({
+          currentUserId,
+          userIds: nextUsers.map((u) => u.id),
+        });
+      }
     } catch (err: any) {
       const message = err?.message ?? 'Error inesperado.';
       setError(message);
@@ -612,6 +694,13 @@ export default function UsersPage() {
 
     setUsers(finalUsers);
     setUserRoles(finalUserRoles);
+    setUserNationalIdMap({});
+    if (currentUserId && finalUsers.length > 0) {
+      await loadUserDocuments({
+        currentUserId,
+        userIds: finalUsers.map((u) => u.id),
+      });
+    }
   };
 
   const filteredUsers = useMemo(() => {
@@ -621,8 +710,21 @@ export default function UsersPage() {
         if (!term) return true;
         const name = (u.full_name ?? '').toLowerCase();
         const mainRole = String(u.role ?? '').toLowerCase();
+        const mainRoleLabel = roleLabel(u.role).toLowerCase();
         const roles = rolesForUser(u.id).join(', ').toLowerCase();
-        return name.includes(term) || mainRole.includes(term) || roles.includes(term);
+        const rolesLabel = rolesForUser(u.id)
+          .map((r) => roleLabel(r))
+          .join(', ')
+          .toLowerCase();
+        const doc = String(userNationalIdMap[u.id] ?? '').toLowerCase();
+        return (
+          name.includes(term) ||
+          mainRole.includes(term) ||
+          mainRoleLabel.includes(term) ||
+          roles.includes(term) ||
+          rolesLabel.includes(term) ||
+          doc.includes(term)
+        );
       })
       .filter((u) => {
         if (usersStatusFilter === 'all') return true;
@@ -637,7 +739,18 @@ export default function UsersPage() {
         const academies = userAcademiesMap[u.id] ?? [];
         return academies.includes(usersAcademyFilter);
       });
-  }, [role, users, usersAcademyFilter, usersSearch, usersStatusFilter, userAcademiesMap, userAcademyStatusMap, userRoles]);
+  }, [role, users, userNationalIdMap, usersAcademyFilter, usersSearch, usersStatusFilter, userAcademiesMap, userAcademyStatusMap, userRoles]);
+
+  const roleSummary = useMemo(() => {
+    const counts: Record<'admin' | 'coach' | 'student', number> = { admin: 0, coach: 0, student: 0 };
+    filteredUsers.forEach((u) => {
+      const roles = rolesForUser(u.id);
+      if (roles.includes('admin')) counts.admin += 1;
+      if (roles.includes('coach')) counts.coach += 1;
+      if (roles.includes('student')) counts.student += 1;
+    });
+    return counts;
+  }, [filteredUsers]);
 
   const openUserDetail = async (userId: string) => {
     setDetailOpen(true);
@@ -1029,7 +1142,7 @@ export default function UsersPage() {
                           checked={selectedRoles.includes(role)}
                           onChange={() => toggleRole(role)}
                         />
-                        <span>{role}</span>
+                        <span>{roleLabel(role)}</span>
                       </label>
                     ))}
                   </div>
@@ -1186,7 +1299,7 @@ export default function UsersPage() {
                     type="text"
                     value={usersSearch}
                     onChange={(e) => setUsersSearch(e.target.value)}
-                    placeholder="Nombre o rol"
+                    placeholder="Nombre, rol o documento"
                     className="h-10 text-base"
                   />
                 </div>
@@ -1195,30 +1308,141 @@ export default function UsersPage() {
                   <div className="grid gap-3 md:grid-cols-3">
                     <div>
                       <label className="block text-xs mb-1 text-gray-600">Filtrar por academia</label>
-                      <select
-                        className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/50"
-                        value={usersAcademyFilter}
-                        onChange={(e) => setUsersAcademyFilter(e.target.value)}
-                      >
-                        <option value="all">Todas</option>
-                        {academyOptions.map((a) => (
-                          <option key={a.id} value={a.id}>
-                            {a.name}
-                          </option>
-                        ))}
-                      </select>
+                      <Popover open={usersAcademyFilterOpen} onOpenChange={setUsersAcademyFilterOpen}>
+                        <PopoverTrigger asChild>
+                          <Button type="button" variant="outline" className="w-full justify-between text-sm font-normal">
+                            <span className="truncate mr-2">
+                              {(() => {
+                                if (usersAcademyFilter === 'all') return 'Todas';
+                                const a = academyOptions.find((x) => x.id === usersAcademyFilter);
+                                return a?.name ?? 'Todas';
+                              })()}
+                            </span>
+                            <ChevronDown className="h-4 w-4 text-gray-500" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80 p-3" align="start">
+                          <div className="space-y-2">
+                            <Input
+                              type="text"
+                              placeholder="Buscar academias..."
+                              value={usersAcademyFilterQuery}
+                              onChange={(e) => setUsersAcademyFilterQuery(e.target.value)}
+                              className="h-11 text-base"
+                              ref={usersAcademyFilterSearchRef}
+                            />
+                            <div className="max-h-52 overflow-auto border rounded-md divide-y">
+                              {(() => {
+                                const opts = [{ id: 'all', name: 'Todas' }, ...academyOptions];
+                                const filtered = opts.filter((a) => {
+                                  const t = (usersAcademyFilterQuery || '').toLowerCase();
+                                  if (!t) return true;
+                                  return `${a.name || ''} ${a.id || ''}`.toLowerCase().includes(t);
+                                });
+                                const limited = filtered.slice(0, 50);
+                                if (opts.length === 0) {
+                                  return (
+                                    <div className="px-2 py-1.5 text-xs text-gray-500">No hay academias.</div>
+                                  );
+                                }
+                                if (filtered.length === 0) {
+                                  return (
+                                    <div className="px-2 py-1.5 text-xs text-gray-500">
+                                      No se encontraron academias con ese criterio de búsqueda.
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <>
+                                    {limited.map((a) => (
+                                      <button
+                                        key={a.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setUsersAcademyFilter(a.id);
+                                          setUsersAcademyFilterQuery('');
+                                          setUsersAcademyFilterOpen(false);
+                                        }}
+                                        className="w-full flex items-center justify-between px-2 py-1.5 text-sm hover:bg-slate-50"
+                                      >
+                                        <span className="mr-2 truncate">{a.name}</span>
+                                      </button>
+                                    ))}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                     <div>
                       <label className="block text-xs mb-1 text-gray-600">Filtrar por estado</label>
-                      <select
-                        className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/50"
-                        value={usersStatusFilter}
-                        onChange={(e) => setUsersStatusFilter(e.target.value as any)}
-                      >
-                        <option value="all">Todos</option>
-                        <option value="active">Activos</option>
-                        <option value="inactive">Inactivos</option>
-                      </select>
+                      <Popover open={usersStatusFilterOpen} onOpenChange={setUsersStatusFilterOpen}>
+                        <PopoverTrigger asChild>
+                          <Button type="button" variant="outline" className="w-full justify-between text-sm font-normal">
+                            <span className="truncate mr-2">
+                              {usersStatusFilter === 'all'
+                                ? 'Todos'
+                                : usersStatusFilter === 'active'
+                                ? 'Activos'
+                                : 'Inactivos'}
+                            </span>
+                            <ChevronDown className="h-4 w-4 text-gray-500" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-72 p-3" align="start">
+                          <div className="space-y-2">
+                            <Input
+                              type="text"
+                              placeholder="Buscar..."
+                              value={usersStatusFilterQuery}
+                              onChange={(e) => setUsersStatusFilterQuery(e.target.value)}
+                              className="h-11 text-base"
+                              ref={usersStatusFilterSearchRef}
+                            />
+                            <div className="max-h-52 overflow-auto border rounded-md divide-y">
+                              {(() => {
+                                const opts: { id: 'all' | 'active' | 'inactive'; name: string }[] = [
+                                  { id: 'all', name: 'Todos' },
+                                  { id: 'active', name: 'Activos' },
+                                  { id: 'inactive', name: 'Inactivos' },
+                                ];
+                                const filtered = opts.filter((o) => {
+                                  const t = (usersStatusFilterQuery || '').toLowerCase();
+                                  if (!t) return true;
+                                  return o.name.toLowerCase().includes(t) || o.id.toLowerCase().includes(t);
+                                });
+                                if (filtered.length === 0) {
+                                  return (
+                                    <div className="px-2 py-1.5 text-xs text-gray-500">
+                                      No se encontraron opciones con ese criterio de búsqueda.
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <>
+                                    {filtered.map((o) => (
+                                      <button
+                                        key={o.id}
+                                        type="button"
+                                        onClick={() => {
+                                          setUsersStatusFilter(o.id);
+                                          setUsersStatusFilterQuery('');
+                                          setUsersStatusFilterOpen(false);
+                                        }}
+                                        className="w-full flex items-center justify-between px-2 py-1.5 text-sm hover:bg-slate-50"
+                                      >
+                                        <span className="mr-2 truncate">{o.name}</span>
+                                      </button>
+                                    ))}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   </div>
                 )}
@@ -1227,13 +1451,15 @@ export default function UsersPage() {
                 <table className="min-w-full text-sm border-collapse">
                   <thead>
                     <tr className="border-b bg-gray-50">
+                      <th className="text-left py-2 px-3">#</th>
                       <th className="text-left py-2 px-3">Nombre</th>
+                      <th className="text-left py-2 px-3">Documento</th>
                       <th className="text-left py-2 px-3">Rol principal</th>
                       <th className="text-left py-2 px-3">Roles asignados</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredUsers.map((u) => {
+                    {filteredUsers.map((u, idx) => {
                       const allRoles = rolesForUser(u.id);
                       const isRowInactive =
                         isSuperAdmin &&
@@ -1248,23 +1474,32 @@ export default function UsersPage() {
                           }
                           onClick={() => openUserDetail(u.id)}
                         >
+                          <td className={"py-2 px-3 whitespace-nowrap " + (isRowInactive ? 'text-rose-700/80' : 'text-gray-700')}>
+                            {idx + 1}
+                          </td>
                           <td className={"py-2 px-3 whitespace-nowrap " + (isRowInactive ? 'text-rose-700' : '')}>
                             {u.full_name ?? '(Sin nombre)'}
                             {isRowInactive && (
                               <span className="ml-2 text-[11px] font-medium text-rose-700/90">(Inactivo)</span>
                             )}
                           </td>
+                          <td className={"py-2 px-3 whitespace-nowrap " + (isRowInactive ? 'text-rose-700/80' : 'text-gray-700')}>
+                            {userNationalIdMap[u.id] ?? '-'}
+                          </td>
                           <td className={"py-2 px-3 whitespace-nowrap " + (isRowInactive ? 'text-rose-700/80' : '')}>
-                            {u.role}
+                            {roleLabel(u.role)}
                           </td>
                           <td className={"py-2 px-3 text-xs " + (isRowInactive ? 'text-rose-700/80' : 'text-gray-700')}>
-                            {allRoles.join(', ') || '-'}
+                            {allRoles.map((r) => roleLabel(r)).join(', ') || '-'}
                           </td>
                         </tr>
                       );
                     })}
                   </tbody>
                 </table>
+                </div>
+                <div className="text-xs text-gray-600">
+                  Admin: {roleSummary.admin} usuarios, Profesor: {roleSummary.coach} usuarios, Alumnos: {roleSummary.student} usuarios
                 </div>
               </div>
             )}
@@ -1315,32 +1550,84 @@ export default function UsersPage() {
 
                       <div>
                         <label className="block text-xs mb-1 text-gray-600">Academia</label>
-                        <select
-                          className="w-full rounded border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/50"
-                          value={detailStatusAcademyId}
-                          onChange={(e) => {
-                            const nextAcademyId = e.target.value;
-                            setDetailStatusAcademyId(nextAcademyId);
-                            const nextActive =
-                              detailAcademyStatuses.find((s) => s.academy_id === nextAcademyId)?.is_active ??
-                              true;
-                            setDetailIsActive(nextActive);
-                          }}
-                          disabled={detailAcademyStatuses.length === 0}
-                        >
-                          {detailAcademyStatuses.length === 0 ? (
-                            <option value="">Sin academias asignadas</option>
-                          ) : (
-                            detailAcademyStatuses.map((s) => {
-                              const name = academyOptions.find((a) => a.id === s.academy_id)?.name ?? s.academy_id;
-                              return (
-                                <option key={s.academy_id} value={s.academy_id}>
-                                  {name}
-                                </option>
-                              );
-                            })
-                          )}
-                        </select>
+                        <Popover open={detailStatusAcademyOpen} onOpenChange={setDetailStatusAcademyOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              disabled={detailAcademyStatuses.length === 0}
+                              className="w-full justify-between text-sm font-normal"
+                            >
+                              <span className="truncate mr-2">
+                                {(() => {
+                                  if (detailAcademyStatuses.length === 0) return 'Sin academias asignadas';
+                                  const id = detailStatusAcademyId;
+                                  const name = academyOptions.find((a) => a.id === id)?.name ?? id;
+                                  return name || 'Seleccionar academia';
+                                })()}
+                              </span>
+                              <ChevronDown className="h-4 w-4 text-gray-500" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-80 p-3" align="start">
+                            <div className="space-y-2">
+                              <Input
+                                type="text"
+                                placeholder="Buscar academias..."
+                                value={detailStatusAcademyQuery}
+                                onChange={(e) => setDetailStatusAcademyQuery(e.target.value)}
+                                className="h-11 text-base"
+                                ref={detailStatusAcademySearchRef}
+                              />
+                              <div className="max-h-52 overflow-auto border rounded-md divide-y">
+                                {(() => {
+                                  const opts = detailAcademyStatuses.map((s) => {
+                                    const name = academyOptions.find((a) => a.id === s.academy_id)?.name ?? s.academy_id;
+                                    return { id: s.academy_id, name: name ?? s.academy_id, is_active: s.is_active };
+                                  });
+                                  const filtered = opts.filter((o) => {
+                                    const t = (detailStatusAcademyQuery || '').toLowerCase();
+                                    if (!t) return true;
+                                    return `${o.name || ''} ${o.id || ''}`.toLowerCase().includes(t);
+                                  });
+                                  const limited = filtered.slice(0, 50);
+                                  if (opts.length === 0) {
+                                    return (
+                                      <div className="px-2 py-1.5 text-xs text-gray-500">Sin academias asignadas</div>
+                                    );
+                                  }
+                                  if (filtered.length === 0) {
+                                    return (
+                                      <div className="px-2 py-1.5 text-xs text-gray-500">
+                                        No se encontraron academias con ese criterio de búsqueda.
+                                      </div>
+                                    );
+                                  }
+                                  return (
+                                    <>
+                                      {limited.map((o) => (
+                                        <button
+                                          key={o.id}
+                                          type="button"
+                                          onClick={() => {
+                                            setDetailStatusAcademyId(o.id);
+                                            setDetailIsActive(o.is_active ?? true);
+                                            setDetailStatusAcademyQuery('');
+                                            setDetailStatusAcademyOpen(false);
+                                          }}
+                                          className="w-full flex items-center justify-between px-2 py-1.5 text-sm hover:bg-slate-50"
+                                        >
+                                          <span className="mr-2 truncate">{o.name}</span>
+                                          <span className="text-[11px] text-gray-500">{o.is_active ? 'Activo' : 'Inactivo'}</span>
+                                        </button>
+                                      ))}
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     </div>
                   )}
@@ -1421,7 +1708,7 @@ export default function UsersPage() {
                             onChange={() => toggleDetailRole(role)}
                             disabled={isAdminReadOnly}
                           />
-                          <span>{role}</span>
+                          <span>{roleLabel(role)}</span>
                         </label>
                       ))}
                     </div>
@@ -1432,26 +1719,79 @@ export default function UsersPage() {
                       {role === 'super_admin' && detailCoachAcademies.length > 1 && detailUserId && (
                         <div className="mb-2">
                           <label className="block text-sm mb-1">Academia para la tarifa</label>
-                          <select
-                            value={detailCoachFeeAcademyId ?? ''}
-                            onChange={async (e) => {
-                              const next = e.target.value || null;
-                              setDetailCoachFeeAcademyId(next);
-                              setDetailCoachAcademyId(next);
-                              if (next) {
-                                await loadCoachFee({ targetUserId: detailUserId, academyId: next });
-                              } else {
-                                setDetailCoachFee('');
-                              }
-                            }}
-                            className="w-full rounded-md border border-gray-300 px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#3cadaf] focus:border-[#3cadaf] bg-white"
-                          >
-                            {detailCoachAcademies.map((a) => (
-                              <option key={a.id} value={a.id}>
-                                {a.name}
-                              </option>
-                            ))}
-                          </select>
+                          <Popover open={detailCoachFeeAcademyOpen} onOpenChange={setDetailCoachFeeAcademyOpen}>
+                            <PopoverTrigger asChild>
+                              <Button type="button" variant="outline" className="w-full justify-between text-sm font-normal">
+                                <span className="truncate mr-2">
+                                  {(() => {
+                                    const id = detailCoachFeeAcademyId ?? '';
+                                    const a = detailCoachAcademies.find((x) => x.id === id);
+                                    return a?.name ?? 'Seleccionar academia';
+                                  })()}
+                                </span>
+                                <ChevronDown className="h-4 w-4 text-gray-500" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80 p-3" align="start">
+                              <div className="space-y-2">
+                                <Input
+                                  type="text"
+                                  placeholder="Buscar academias..."
+                                  value={detailCoachFeeAcademyQuery}
+                                  onChange={(e) => setDetailCoachFeeAcademyQuery(e.target.value)}
+                                  className="h-11 text-base"
+                                  ref={detailCoachFeeAcademySearchRef}
+                                />
+                                <div className="max-h-52 overflow-auto border rounded-md divide-y">
+                                  {(() => {
+                                    const filtered = detailCoachAcademies.filter((a) => {
+                                      const t = (detailCoachFeeAcademyQuery || '').toLowerCase();
+                                      if (!t) return true;
+                                      return `${a.name || ''} ${a.id || ''}`.toLowerCase().includes(t);
+                                    });
+                                    const limited = filtered.slice(0, 50);
+                                    if (detailCoachAcademies.length === 0) {
+                                      return (
+                                        <div className="px-2 py-1.5 text-xs text-gray-500">No hay academias.</div>
+                                      );
+                                    }
+                                    if (filtered.length === 0) {
+                                      return (
+                                        <div className="px-2 py-1.5 text-xs text-gray-500">
+                                          No se encontraron academias con ese criterio de búsqueda.
+                                        </div>
+                                      );
+                                    }
+                                    return (
+                                      <>
+                                        {limited.map((a) => (
+                                          <button
+                                            key={a.id}
+                                            type="button"
+                                            onClick={async () => {
+                                              const next = a.id || null;
+                                              setDetailCoachFeeAcademyId(next);
+                                              setDetailCoachAcademyId(next);
+                                              setDetailCoachFeeAcademyQuery('');
+                                              setDetailCoachFeeAcademyOpen(false);
+                                              if (next) {
+                                                await loadCoachFee({ targetUserId: detailUserId, academyId: next });
+                                              } else {
+                                                setDetailCoachFee('');
+                                              }
+                                            }}
+                                            className="w-full flex items-center justify-between px-2 py-1.5 text-sm hover:bg-slate-50"
+                                          >
+                                            <span className="mr-2 truncate">{a.name}</span>
+                                          </button>
+                                        ))}
+                                      </>
+                                    );
+                                  })()}
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
                         </div>
                       )}
                       <label className="block text-sm mb-1">

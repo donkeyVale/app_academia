@@ -115,7 +115,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 
 type AppRole = 'super_admin' | 'admin' | 'coach' | 'student' | null;
 
-export default function HomePage() {
+export default function Page() {
   const supabase = createClientBrowser();
   const router = useRouter();
   const avatarMenuRef = useRef<HTMLDivElement | null>(null);
@@ -132,8 +132,13 @@ export default function HomePage() {
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [scheduleBadgeCount, setScheduleBadgeCount] = useState(0);
+  const [scheduleBadgeTick, setScheduleBadgeTick] = useState<number>(() => Date.now());
+  const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return window.localStorage.getItem('selectedAcademyId');
+  });
   const [academyOptions, setAcademyOptions] = useState<{ id: string; name: string }[]>([]);
-  const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
   const [hasAcademies, setHasAcademies] = useState<boolean | null>(null);
   const [academyLocationIds, setAcademyLocationIds] = useState<Set<string>>(new Set());
   const [activePlansCount, setActivePlansCount] = useState(0);
@@ -164,6 +169,146 @@ export default function HomePage() {
   }, [unreadCount]);
 
   useEffect(() => {
+    const id = window.setInterval(() => setScheduleBadgeTick(Date.now()), 60 * 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onRefresh = () => setScheduleBadgeTick(Date.now());
+    window.addEventListener('scheduleBadgeRefresh', onRefresh);
+    return () => window.removeEventListener('scheduleBadgeRefresh', onRefresh);
+  }, []);
+
+  useEffect(() => {
+    const roleResolved = role === 'super_admin' || role === 'admin' || role === 'coach' || role === 'student';
+    if (!roleResolved || !userId || !selectedAcademyId) {
+      setScheduleBadgeCount(0);
+      return;
+    }
+
+    const loadScheduleBadgeCount = async () => {
+      try {
+        const fromIso = new Date().toISOString();
+        const toIso = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+        const { data: locRows, error: locErr } = await supabase
+          .from('academy_locations')
+          .select('location_id')
+          .eq('academy_id', selectedAcademyId);
+        if (locErr) throw locErr;
+
+        const locationIds = Array.from(
+          new Set(
+            ((locRows as { location_id: string | null }[] | null) ?? [])
+              .map((r) => r.location_id)
+              .filter((id): id is string => !!id)
+          )
+        );
+
+        if (locationIds.length === 0) {
+          setScheduleBadgeCount(0);
+          return;
+        }
+
+        const { data: courtRows, error: courtsErr } = await supabase
+          .from('courts')
+          .select('id')
+          .in('location_id', locationIds);
+        if (courtsErr) throw courtsErr;
+
+        const courtIds = Array.from(
+          new Set(
+            ((courtRows as { id: string }[] | null) ?? [])
+              .map((c) => c.id)
+              .filter((id): id is string => !!id)
+          )
+        );
+
+        if (courtIds.length === 0) {
+          setScheduleBadgeCount(0);
+          return;
+        }
+
+        if (role === 'student') {
+          const { data: studentRow, error: studentErr } = await supabase
+            .from('students')
+            .select('id')
+            .eq('user_id', userId)
+            .maybeSingle();
+          if (studentErr) throw studentErr;
+          const studentId = (studentRow?.id as string | undefined) ?? null;
+          if (!studentId) {
+            setScheduleBadgeCount(0);
+            return;
+          }
+
+          const { data: classRows, error: classErr } = await supabase
+            .from('class_sessions')
+            .select('id')
+            .gte('date', fromIso)
+            .lte('date', toIso)
+            .in('court_id', courtIds);
+          if (classErr) throw classErr;
+          const classIds = ((classRows as { id: string }[] | null) ?? []).map((c) => c.id);
+          if (classIds.length === 0) {
+            setScheduleBadgeCount(0);
+            return;
+          }
+
+          const { count, error: bErr } = await supabase
+            .from('bookings')
+            .select('id', { count: 'exact', head: true })
+            .eq('student_id', studentId)
+            .eq('status', 'reserved')
+            .in('class_id', classIds);
+          if (bErr) throw bErr;
+          setScheduleBadgeCount(count ?? 0);
+          return;
+        }
+
+        if (role === 'coach') {
+          const { data: coachRow, error: coachErr } = await supabase
+            .from('coaches')
+            .select('id')
+            .eq('user_id', userId)
+            .maybeSingle();
+          if (coachErr) throw coachErr;
+          const coachId = (coachRow?.id as string | undefined) ?? null;
+          if (!coachId) {
+            setScheduleBadgeCount(0);
+            return;
+          }
+
+          const { count, error: cErr } = await supabase
+            .from('class_sessions')
+            .select('id', { count: 'exact', head: true })
+            .eq('coach_id', coachId)
+            .gte('date', fromIso)
+            .lte('date', toIso)
+            .in('court_id', courtIds);
+          if (cErr) throw cErr;
+          setScheduleBadgeCount(count ?? 0);
+          return;
+        }
+
+        const { count, error: csErr } = await supabase
+          .from('class_sessions')
+          .select('id', { count: 'exact', head: true })
+          .gte('date', fromIso)
+          .lte('date', toIso)
+          .in('court_id', courtIds);
+        if (csErr) throw csErr;
+        setScheduleBadgeCount(count ?? 0);
+      } catch {
+        setScheduleBadgeCount(0);
+      }
+    };
+
+    loadScheduleBadgeCount();
+  }, [supabase, userId, selectedAcademyId, role, scheduleBadgeTick]);
+
+  useEffect(() => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -177,13 +322,31 @@ export default function HomePage() {
   }, [supabase]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'selectedAcademyId') {
+        setSelectedAcademyId(e.newValue || null);
+      }
+    };
+    const onAcademyChanged = (e: Event) => {
+      const next = (e as CustomEvent<{ academyId?: string | null }>).detail?.academyId ?? null;
+      setSelectedAcademyId(next);
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('selectedAcademyIdChanged', onAcademyChanged);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  useEffect(() => {
     if (!userId) return;
+    if (!selectedAcademyId) return;
 
     const loadUnread = async () => {
       const { count } = await supabase
         .from('notifications')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId)
+        .eq('data->>academyId', selectedAcademyId)
         .is('read_at', null);
       setUnreadCount(count ?? 0);
     };
@@ -209,7 +372,7 @@ export default function HomePage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, userId]);
+  }, [supabase, userId, selectedAcademyId]);
 
   useEffect(() => {
     if (!avatarMenuOpen) return;
@@ -458,6 +621,12 @@ export default function HomePage() {
               window.localStorage.removeItem('selectedAcademyId');
             }
           } else if (uaRows) {
+            const inactiveAcademyIds = new Set(
+              (uaRows as { academy_id: string | null; is_active: boolean | null }[])
+                .filter((row) => row.academy_id && (row.is_active ?? true) === false)
+                .map((row) => row.academy_id as string)
+            );
+
             const academyIds = Array.from(
               new Set(
                 (uaRows as { academy_id: string | null; is_active: boolean | null }[])
@@ -499,10 +668,11 @@ export default function HomePage() {
                   initial = validIds[0] ?? null;
                 }
 
-                if (stored && stored !== initial && typeof window !== 'undefined') {
-                  toast.error(
-                    'Tu usuario está inactivo en la academia seleccionada. Te cambiamos a una academia activa.',
-                  );
+                const shouldShowInactiveToast =
+                  !!stored && stored !== initial && inactiveAcademyIds.has(stored);
+
+                if (shouldShowInactiveToast && typeof window !== 'undefined') {
+                  toast.error('Tu usuario está inactivo en la academia seleccionada. Te cambiamos a una academia activa.');
                 }
 
                 setSelectedAcademyId(initial);
@@ -1286,6 +1456,7 @@ export default function HomePage() {
         canSeeFinance={role === 'admin' || role === 'super_admin'}
         canSeeSettings={role === 'admin' || role === 'coach' || role === 'student' || role === 'super_admin'}
         studentsLabel={role === 'student' ? 'Mi cuenta' : 'Alumnos'}
+        scheduleBadgeCount={scheduleBadgeCount}
         rightSlot={(
           <div ref={avatarMenuRef} className="relative flex items-center">
             <FooterAvatarButton

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
 import { logAudit } from '@/lib/audit';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,6 +11,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectTrigger,
@@ -49,6 +57,19 @@ function formatYmd(date: Date): string {
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const d = String(date.getDate()).padStart(2, '0');
   return `${y}-${m}-${d}`;
+}
+
+function formatPastLabel(ymd: string, hhmm: string): string {
+  const [y, m, d] = ymd.split('-');
+  const yy = (y || '').slice(-2);
+  const dd = (d || '').padStart(2, '0');
+  const mm = (m || '').padStart(2, '0');
+  return `${dd}/${mm}/${yy} ${hhmm}`;
+}
+
+function weekdayAbbrevEs(date: Date): string {
+  const labels = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+  return labels[date.getDay()] ?? '';
 }
 
 function formatDisplay(date: Date | null): string {
@@ -108,8 +129,9 @@ type ClassSession = {
   coach_id: string | null;
   court_id: string | null;
   notes?: string | null;
-  price_cents: number;
-  currency: string;
+  price_cents?: number | null;
+  currency?: string | null;
+  attendance_pending?: boolean | null;
 };
 type Student = {
   id: string;
@@ -152,10 +174,17 @@ export default function SchedulePage() {
   const [coachId, setCoachId] = useState<string>('');
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [studentQuery, setStudentQuery] = useState<string>('');
+  const [studentsPopoverOpen, setStudentsPopoverOpen] = useState(false);
+  const studentsSearchRef = useRef<HTMLInputElement | null>(null);
+  const [remainingByStudent, setRemainingByStudent] = useState<Record<string, number>>({});
+  const [remainingLoading, setRemainingLoading] = useState(false);
   const [notes, setNotes] = useState<string>('');
   const [recurringEnabled, setRecurringEnabled] = useState(false);
   const [recurringWeekdays, setRecurringWeekdays] = useState<number[]>([]);
   const [recurringTimesByWeekday, setRecurringTimesByWeekday] = useState<Record<number, string>>({});
+
+  const [pastWarningOpen, setPastWarningOpen] = useState(false);
+  const [pastWarningLabel, setPastWarningLabel] = useState<string>('');
 
   // Filters for list
   const [filterLocationId, setFilterLocationId] = useState<string>('');
@@ -399,11 +428,26 @@ export default function SchedulePage() {
         .select('*')
         .gte('date', from.toISOString())
         .lte('date', to.toISOString())
-        .order('date', { ascending: true })
-        .limit(500);
-      if (e3) setError(e3.message);
+        .order('date', { ascending: true });
+      if (e3) throw e3;
 
-      let finalClasses: ClassSession[] = (clsData as ClassSession[]) ?? [];
+      const { data: pendingData, error: pendingErr } = await supabase
+        .from('class_sessions')
+        .select('*')
+        .eq('attendance_pending', true)
+        .order('date', { ascending: true });
+      if (pendingErr) throw pendingErr;
+
+      const mergedById = new Map<string, any>();
+      (clsData as any[] | null | undefined)?.forEach((c) => {
+        if (c?.id) mergedById.set(c.id, c);
+      });
+      (pendingData as any[] | null | undefined)?.forEach((c) => {
+        if (c?.id) mergedById.set(c.id, c);
+      });
+      const merged = Array.from(mergedById.values()).sort((a, b) => String(a.date).localeCompare(String(b.date)));
+
+      let finalClasses: ClassSession[] = (merged as ClassSession[]) ?? [];
       if (selectedAcademyId && academyLocationIds.size > 0 && finalClasses.length > 0) {
         finalClasses = finalClasses.filter((cls) => {
           if (!cls.court_id) return false;
@@ -463,8 +507,8 @@ export default function SchedulePage() {
       }
 
       // Fetch bookings for these classes to compute alumnos count y mapear alumnos por clase
-      if ((clsData ?? []).length) {
-        const classIds = (clsData ?? []).map((c) => c.id);
+      if (finalClasses.length) {
+        const classIds = finalClasses.map((c) => c.id);
         const { data: bData, error: bErr } = await supabase
           .from('bookings')
           .select('id,class_id,student_id')
@@ -503,6 +547,40 @@ export default function SchedulePage() {
       setLoading(false);
     })();
   }, [supabase, selectedAcademyId, academyLocationIds]);
+
+  useEffect(() => {
+    (async () => {
+      if (!studentsPopoverOpen) return;
+      if (!selectedAcademyId) return;
+      if (remainingLoading) return;
+
+      setRemainingLoading(true);
+      try {
+        const { data, error } = await supabase.rpc('get_students_remaining_classes', {
+          p_academy_id: selectedAcademyId,
+        });
+        if (error) throw error;
+        const rows = (data ?? []) as any[];
+        const map: Record<string, number> = {};
+        for (const row of rows) {
+          const sid = row?.student_id as string | undefined;
+          const remaining = Number(row?.remaining ?? 0);
+          if (sid) map[sid] = Number.isFinite(remaining) ? remaining : 0;
+        }
+        setRemainingByStudent(map);
+      } catch (e) {
+        console.error('Error cargando clases restantes por alumno', e);
+      } finally {
+        setRemainingLoading(false);
+      }
+    })();
+  }, [studentsPopoverOpen, selectedAcademyId, supabase, remainingLoading]);
+
+  useEffect(() => {
+    if (!studentsPopoverOpen) return;
+    const t = window.setTimeout(() => studentsSearchRef.current?.focus(), 0);
+    return () => window.clearTimeout(t);
+  }, [studentsPopoverOpen]);
 
   // Compute available time slots for selected court and day (60 min slots)
   useEffect(() => {
@@ -555,8 +633,7 @@ export default function SchedulePage() {
     return candidates;
   }, []);
 
-  const onCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const createClassSessions = async (allowPast: boolean) => {
     setSaving(true);
     setError(null);
     try {
@@ -645,9 +722,9 @@ export default function SchedulePage() {
       {
         const now = new Date();
         const classStart = new Date(iso);
-        if (classStart.getTime() <= now.getTime()) {
-          const msg = 'No podés crear una clase en una fecha y hora que ya pasaron.';
-          toast.error(msg);
+        if (!allowPast && classStart.getTime() <= now.getTime()) {
+          setPastWarningLabel(formatPastLabel(day, baseTime));
+          setPastWarningOpen(true);
           setSaving(false);
           return;
         }
@@ -690,6 +767,7 @@ export default function SchedulePage() {
       // Validar que cada alumno tenga saldo disponible en su plan antes de crear la clase
       const planForStudent: Record<string, string> = {};
       const remainingForStudent: Record<string, number> = {};
+      const noBalanceStudents: string[] = [];
       for (const sid of selectedStudents) {
         const { data: plans, error: planErr } = await supabase
           .from('student_plans')
@@ -705,6 +783,11 @@ export default function SchedulePage() {
         }
 
         if (!plans || plans.length === 0) {
+          if (!allowPast) {
+            noBalanceStudents.push(sid);
+            continue;
+          }
+
           const msg = 'El alumno seleccionado no tiene un plan con clases disponibles.';
           toast.error(msg);
           setSaving(false);
@@ -713,6 +796,8 @@ export default function SchedulePage() {
 
         let chosenPlan: any = null;
         let chosenPlanRemaining: number | null = null;
+        // Para carga histórica (allowPast=true), no bloqueamos por saldo.
+        // Aun así, intentamos elegir un plan con saldo; si no hay, tomamos el primero.
         for (const p of plans as any[]) {
           const { count: usedCount, error: usageCountErr } = await supabase
             .from('plan_usages')
@@ -735,7 +820,18 @@ export default function SchedulePage() {
           }
         }
 
+        if (!chosenPlan && allowPast) {
+          chosenPlan = (plans as any[])[0] ?? null;
+          const totalFromPlan = (chosenPlan?.remaining_classes as number) ?? 0;
+          chosenPlanRemaining = Math.max(1, totalFromPlan);
+        }
+
         if (!chosenPlan) {
+          if (!allowPast) {
+            noBalanceStudents.push(sid);
+            continue;
+          }
+
           const msg = 'El alumno seleccionado ya no tiene clases disponibles en su plan.';
           toast.error(msg);
           setSaving(false);
@@ -750,34 +846,48 @@ export default function SchedulePage() {
         }
 
         // V3: limitar cantidad de clases futuras reservadas al total de clases del plan
-        const totalFromPlan = (chosenPlan.remaining_classes as number) ?? 0;
-        if (totalFromPlan > 0) {
-          const nowIso = new Date().toISOString();
-          const { data: futureBookings, error: futureErr } = await supabase
-            .from('bookings')
-            .select('id, class_sessions!inner(id,date)')
-            .eq('student_id', sid)
-            .gt('class_sessions.date', nowIso);
+        // Para carga histórica (allowPast=true), no aplica.
+        if (!allowPast) {
+          const totalFromPlan = (chosenPlan.remaining_classes as number) ?? 0;
+          if (totalFromPlan > 0) {
+            const nowIso = new Date().toISOString();
+            const { data: futureBookings, error: futureErr } = await supabase
+              .from('bookings')
+              .select('id, class_sessions!inner(id,date)')
+              .eq('student_id', sid)
+              .gt('class_sessions.date', nowIso);
 
-          if (futureErr) {
-            const msg = 'No se pudo verificar las clases futuras del alumno. Intenta nuevamente.';
-            toast.error(msg);
-            setSaving(false);
-            return;
-          }
+            if (futureErr) {
+              const msg = 'No se pudo verificar las clases futuras del alumno. Intenta nuevamente.';
+              toast.error(msg);
+              setSaving(false);
+              return;
+            }
 
-          const futureCount = (futureBookings ?? []).length;
-          if (futureCount >= totalFromPlan) {
-            const label = getStudentLabel(sid);
-            const msg = `El alumno ${label} ya tiene ${futureCount} clases futuras reservadas, que es el máximo permitido por su plan.`;
-            toast.error(msg);
-            setSaving(false);
-            return;
+            const futureCount = (futureBookings ?? []).length;
+            if (futureCount >= totalFromPlan) {
+              const label = getStudentLabel(sid);
+              const msg = `El alumno ${label} ya tiene ${futureCount} clases futuras reservadas, que es el máximo permitido por su plan.`;
+              toast.error(msg);
+              setSaving(false);
+              return;
+            }
           }
         }
 
         planForStudent[sid] = chosenPlan.id as string;
-        remainingForStudent[sid] = chosenPlanRemaining;
+        remainingForStudent[sid] = allowPast ? Math.max(1, chosenPlanRemaining) : chosenPlanRemaining;
+      }
+
+      if (!allowPast && noBalanceStudents.length > 0) {
+        const labels = Array.from(new Set(noBalanceStudents)).map((sid) => getStudentLabel(sid));
+        const msg =
+          labels.length === 1
+            ? `El alumno ${labels[0]} ya no tiene clases disponibles en su plan.`
+            : `Los siguientes alumnos ya no tienen clases disponibles en su plan: ${labels.join(', ')}.`;
+        toast.error(msg);
+        setSaving(false);
+        return;
       }
 
       // V4: Validar que ningún alumno tenga otra clase en el mismo horario (en cualquier sede/cancha)
@@ -825,6 +935,12 @@ export default function SchedulePage() {
       const createOneSession = async (sessionIso: string, sessionIndex: number) => {
         const studentsToBook = selectedStudents.filter((sid) => (remainingForStudent[sid] ?? 0) >= sessionIndex + 1);
         if (studentsToBook.length === 0) return;
+
+        const now = new Date();
+        const startTs = new Date(sessionIso).getTime();
+        const endTs = startTs + 60 * 60 * 1000;
+        const olderThan24h = endTs < (now.getTime() - 24 * 60 * 60 * 1000);
+        const needsAttendancePending = allowPast && olderThan24h;
 
         // Anti-race: misma cancha y misma hora
         {
@@ -882,6 +998,7 @@ export default function SchedulePage() {
             coach_id: coachId,
             capacity: capacityForSession,
             type: typeForSession,
+            attendance_pending: needsAttendancePending,
             // price_cents y currency pueden tener defaults en la DB; si no, se agregan luego.
           })
           .select('*')
@@ -942,8 +1059,8 @@ export default function SchedulePage() {
           [createdClassId]: [...studentsToBook],
         }));
 
-        // Push solo para la primera clase creada
-        if (sessionIndex === 0 && selectedAcademyId) {
+        // Push solo para la primera clase creada (solo cuando NO es recurrente)
+        if (!recurringEnabled && selectedAcademyId) {
           try {
             await fetch('/api/push/class-created', {
               method: 'POST',
@@ -1020,6 +1137,27 @@ export default function SchedulePage() {
           })
           .filter((x) => x.count > 0);
 
+        // Notificación resumen B1a: 1 por alumno (count exacto) + 1 al profesor
+        if (selectedAcademyId && createdClassIds.length > 0) {
+          try {
+            await fetch('/api/push/class-created', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                academyId: selectedAcademyId,
+                coachId,
+                classId: createdClassIds[0],
+                dateIso: createdClassDates[0] ?? iso,
+                recurringSummary: true,
+                totalSessions: createdClassIds.length,
+                studentCounts: createdBookingsByStudent,
+              }),
+            });
+          } catch (pushErr) {
+            console.error('Error enviando notificación resumen de clases recurrentes', pushErr);
+          }
+        }
+
         const perStudentTxt = perStudent.length
           ? ` Reservas: ${perStudent.map((x) => `${x.label}: ${x.count}`).join(' | ')}.`
           : '';
@@ -1053,6 +1191,11 @@ export default function SchedulePage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const onCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await createClassSessions(false);
   };
 
   const locationsMap = useMemo(() => Object.fromEntries(locations.map((x) => [x.id, x] as const)), [locations]);
@@ -1143,8 +1286,8 @@ export default function SchedulePage() {
       const endTs = startTs + 60 * 60 * 1000;
       // ya terminadas
       if (endTs >= now.getTime()) return false;
-      // solo últimas 24h
-      if (startTs < cutoff.getTime()) return false;
+      // solo últimas 24h (o históricas recién creadas para asistencia)
+      if (startTs < cutoff.getTime() && !cls.attendance_pending) return false;
       if (attendanceMarkedByClass[cls.id]) return false;
       return true;
     });
@@ -1366,6 +1509,16 @@ export default function SchedulePage() {
         }));
         const { error: insErr } = await supabase.from('attendance').insert(rows);
         if (insErr) throw insErr;
+
+        const { error: updPendingErr } = await supabase
+          .from('class_sessions')
+          .update({ attendance_pending: false })
+          .eq('id', attendanceClass.id);
+        if (updPendingErr) {
+          console.error('Error limpiando attendance_pending', updPendingErr.message);
+        } else {
+          setClasses((prev) => prev.map((c) => (c.id === attendanceClass.id ? ({ ...c, attendance_pending: false } as any) : c)));
+        }
 
         await logAudit('attendance_update', 'class_session', attendanceClass.id, {
           attendance: rows,
@@ -1751,6 +1904,7 @@ export default function SchedulePage() {
               width={128}
               height={128}
               className="object-cover"
+              priority
             />
           </div>
           <div className="text-center">
@@ -1763,6 +1917,41 @@ export default function SchedulePage() {
 
   return (
     <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4 overflow-x-hidden">
+      <Dialog open={pastWarningOpen} onOpenChange={setPastWarningOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Crear clase en fecha/hora pasada</DialogTitle>
+            <DialogDescription>
+              Estás por cargar una clase histórica ({pastWarningLabel}). Esto sirve para migrar clases anteriores al
+              uso de Agendo y reflejar el consumo real de planes.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="text-sm text-gray-700 space-y-2">
+            <p>Confirmá solo si los datos son correctos y querés que esta clase cuente para el seguimiento.</p>
+            <div className="space-y-1">
+              <p>- Se crearán reservas para los alumnos seleccionados.</p>
+              <p>- Puede impactar el saldo/consumo de planes y reportes.</p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={() => setPastWarningOpen(false)} disabled={saving}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              className="bg-[#3cadaf] hover:bg-[#31435d]"
+              onClick={async () => {
+                setPastWarningOpen(false);
+                await createClassSessions(true);
+              }}
+              disabled={saving}
+            >
+              Confirmar y crear
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <CalendarIcon className="h-5 w-5 text-[#3cadaf]" />
@@ -1775,6 +1964,7 @@ export default function SchedulePage() {
                 src="/icons/logoHome.png"
                 alt="Agendo"
                 fill
+                sizes="128px"
                 className="object-contain"
                 priority
               />
@@ -1920,7 +2110,7 @@ export default function SchedulePage() {
               </div>
               <div>
                 <label className="block text-sm mb-1">Alumnos (selección múltiple)</label>
-                <Popover>
+                <Popover open={studentsPopoverOpen} onOpenChange={setStudentsPopoverOpen}>
                   <PopoverTrigger asChild>
                     <Button
                       type="button"
@@ -1944,6 +2134,7 @@ export default function SchedulePage() {
                         value={studentQuery}
                         onChange={(e) => setStudentQuery(e.target.value)}
                         className="h-11 text-base"
+                        ref={studentsSearchRef}
                       />
                       <div className="max-h-52 overflow-auto border rounded-md divide-y">
                         {(() => {
@@ -1980,6 +2171,7 @@ export default function SchedulePage() {
                               {limited.map((s) => {
                                 const id = s.id;
                                 const checked = selectedStudents.includes(id);
+                                const remaining = remainingByStudent[id];
                                 const toggle = () => {
                                   if (!checked && selectedStudents.length >= 4) {
                                     toast.error('Máximo 4 alumnos por clase');
@@ -1988,6 +2180,7 @@ export default function SchedulePage() {
                                   setSelectedStudents((prev) =>
                                     checked ? prev.filter((x) => x !== id) : [...prev, id]
                                   );
+                                  setStudentQuery('');
                                 };
                                 return (
                                   <button
@@ -1998,6 +2191,18 @@ export default function SchedulePage() {
                                   >
                                     <span className="truncate mr-2">
                                       {s.full_name ?? s.notes ?? s.level ?? s.id}
+                                      <span
+                                        className={
+                                          "ml-1 tabular-nums " +
+                                          (remaining === undefined
+                                            ? 'text-gray-400'
+                                            : remaining > 0
+                                            ? 'text-emerald-600'
+                                            : 'text-red-600')
+                                        }
+                                      >
+                                        ({remaining === undefined ? '…' : remaining})
+                                      </span>
                                     </span>
                                     <input
                                       type="checkbox"
@@ -2059,7 +2264,7 @@ export default function SchedulePage() {
                   <div className="space-y-2 border rounded-md p-2 bg-slate-50">
                     <div className="flex flex-wrap gap-2 items-center">
                       <span className="text-xs text-gray-600 mr-1">Días de la semana:</span>
-                      {['D', 'L', 'M', 'X', 'J', 'V', 'S'].map((label, idx) => {
+                      {['D', 'L', 'M', 'Mi', 'J', 'V', 'S'].map((label, idx) => {
                         const wd = idx; // 0=Domingo
                         const active = recurringWeekdays.includes(wd);
                         return (
@@ -2098,8 +2303,8 @@ export default function SchedulePage() {
                         .sort((a, b) => a - b)
                         .map((wd) => (
                           <div key={`wd-time-${wd}`} className="flex items-center gap-2">
-                            <span className="text-xs text-gray-700 w-6">
-                              {['D', 'L', 'M', 'X', 'J', 'V', 'S'][wd]}
+                            <span className="text-xs font-medium text-slate-700 w-10">
+                              {['D', 'L', 'M', 'Mi', 'J', 'V', 'S'][wd]}
                             </span>
                             <Select
                               value={recurringTimesByWeekday[wd] || ''}
@@ -2170,6 +2375,7 @@ export default function SchedulePage() {
                 <ul className="space-y-3">
                   {(showAllStudentHistory ? studentPastClasses : studentPastClasses.slice(0, 5)).map((cls) => {
                     const d = new Date(cls.date);
+                    const wd = weekdayAbbrevEs(d);
                     const yyyy = d.getFullYear();
                     const mm = String(d.getMonth() + 1).padStart(2, '0');
                     const dd = String(d.getDate()).padStart(2, '0');
@@ -2185,12 +2391,12 @@ export default function SchedulePage() {
                         className="max-w-full overflow-hidden rounded-lg border bg-white p-3 text-xs shadow-sm transition hover:border-[#dbeafe] hover:shadow-md sm:text-sm"
                       >
                         <div className="flex max-w-full flex-col items-start justify-between gap-2 sm:flex-row">
-                          <div className="min-w-0 space-y-1">
+                          <div className="min-w-0 space-y-1.5">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="inline-flex items-center rounded-full bg-[#e0f2fe] px-2 py-0.5 text-[11px] font-medium text-[#075985]">
-                                {dd}/{mm}/{yyyy} • {hh}:{min}
+                                {wd} {dd}/{mm}/{yyyy} • {hh}:{min}
                               </span>
-                              <span className="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200">
+                              <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
                                 {location?.name ?? 'Sede sin asignar'}
                               </span>
                             </div>
@@ -2624,6 +2830,7 @@ export default function SchedulePage() {
               const alumnos = bookingsCount[cls.id] ?? 0;
 
               const d = new Date(cls.date);
+              const wd = weekdayAbbrevEs(d);
               const yyyy = d.getFullYear();
               const mm = String(d.getMonth() + 1).padStart(2, '0');
               const dd = String(d.getDate()).padStart(2, '0');
@@ -2646,7 +2853,7 @@ export default function SchedulePage() {
                     <div className="space-y-1.5 min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="inline-flex items-center rounded-full bg-[#e0f2fe] px-2 py-0.5 text-[11px] font-medium text-[#075985]">
-                          {dd}/{mm}/{yyyy} • {hh}:{min}
+                          {wd} {dd}/{mm}/{yyyy} • {hh}:{min}
                         </span>
                         <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700">
                           {location?.name ?? 'Sede sin asignar'}
@@ -2748,7 +2955,6 @@ export default function SchedulePage() {
                                   headers: { 'Content-Type': 'application/json' },
                                   body: JSON.stringify({
                                     classId: cls.id,
-                                    coachId: cls.coach_id,
                                     studentIds: [studentId],
                                     dateIso: cls.date,
                                     academyId: selectedAcademyId,
@@ -2763,6 +2969,9 @@ export default function SchedulePage() {
                             }
 
                             toast.success('Reserva cancelada correctamente. Se devolvió 1 clase a tu plan.');
+                            if (typeof window !== 'undefined') {
+                              window.dispatchEvent(new Event('scheduleBadgeRefresh'));
+                            }
                           }}
                         >
                           {canStudentCancel ? 'Cancelar reserva' : 'No se puede cancelar (menos de 12h)'}
@@ -2770,9 +2979,22 @@ export default function SchedulePage() {
                       ) : (
                         <>
                           <button
+                            className="text-[11px] sm:text-xs px-3 py-1 rounded border border-[#3cadaf] text-[#3cadaf] hover:bg-[#e6f5f6]"
+                            onClick={() => openAttendance(cls)}
+                          >
+                            Asistencia
+                          </button>
+                          <button
+                            className="text-[11px] sm:text-xs px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+                            onClick={() => openEdit(cls)}
+                          >
+                            Editar
+                          </button>
+                          <button
                             className="text-[11px] sm:text-xs px-3 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50"
                             onClick={async () => {
                               const nowInner = new Date();
+                              const startTs = new Date(cls.date).getTime();
                               if (startTs <= nowInner.getTime()) {
                                 toast.error('No se puede cancelar una clase que ya comenzó.');
                                 return;
@@ -2785,7 +3007,25 @@ export default function SchedulePage() {
                                 .delete()
                                 .eq('class_id', cls.id);
                               if (delUsageErr) {
-                                toast.error('Error al devolver clases de los planes: ' + delUsageErr.message);
+                                toast.error('Error al cancelar: ' + delUsageErr.message);
+                                return;
+                              }
+
+                              const { error: delAttErr } = await supabase
+                                .from('attendance')
+                                .delete()
+                                .eq('class_id', cls.id);
+                              if (delAttErr) {
+                                toast.error('Error al cancelar: ' + delAttErr.message);
+                                return;
+                              }
+
+                              const { error: delBookErr } = await supabase
+                                .from('bookings')
+                                .delete()
+                                .eq('class_id', cls.id);
+                              if (delBookErr) {
+                                toast.error('Error al cancelar: ' + delBookErr.message);
                                 return;
                               }
 
@@ -2798,14 +3038,6 @@ export default function SchedulePage() {
                                 return;
                               }
 
-                              await logAudit('delete', 'class_session', cls.id, {
-                                date: cls.date,
-                                court_id: cls.court_id,
-                                coach_id: cls.coach_id,
-                                capacity: cls.capacity,
-                                price_cents: cls.price_cents,
-                                currency: cls.currency,
-                              });
                               setClasses((prev) => prev.filter((c) => c.id !== cls.id));
                               setBookingsCount((prev) => {
                                 const n = { ...prev };
@@ -2817,6 +3049,12 @@ export default function SchedulePage() {
                                 delete n[cls.id];
                                 return n;
                               });
+                              setAttendanceMarkedByClass((prev) => {
+                                const n = { ...prev };
+                                delete n[cls.id];
+                                return n;
+                              });
+
                               if (selectedAcademyId && currentUserId && role) {
                                 try {
                                   await fetch('/api/push/class-cancelled', {
@@ -2824,7 +3062,6 @@ export default function SchedulePage() {
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({
                                       classId: cls.id,
-                                      coachId: cls.coach_id,
                                       studentIds: studentsByClass[cls.id] ?? [],
                                       dateIso: cls.date,
                                       academyId: selectedAcademyId,
@@ -2837,22 +3074,14 @@ export default function SchedulePage() {
                                   console.error('Error enviando notificación de clase cancelada', pushErr);
                                 }
                               }
+
                               toast.success('Clase cancelada correctamente y clases devueltas a los planes.');
+                              if (typeof window !== 'undefined') {
+                                window.dispatchEvent(new Event('scheduleBadgeRefresh'));
+                              }
                             }}
                           >
                             Cancelar
-                          </button>
-                          <button
-                            className="text-[11px] sm:text-xs px-3 py-1 rounded border border-[#3cadaf] text-[#3cadaf] hover:bg-[#e6f5f6]"
-                            onClick={() => openAttendance(cls)}
-                          >
-                            Asistencia
-                          </button>
-                          <button
-                            className="text-[11px] sm:text-xs px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
-                            onClick={() => openEdit(cls)}
-                          >
-                            Editar
                           </button>
                         </>
                       )}
@@ -2916,6 +3145,7 @@ export default function SchedulePage() {
                   <ul className="space-y-3">
                     {(showAllRecent ? recentClasses : recentClasses.slice(0, 5)).map((cls) => {
                       const d = new Date(cls.date);
+                      const wd = weekdayAbbrevEs(d);
                       const yyyy = d.getFullYear();
                       const mm = String(d.getMonth() + 1).padStart(2, '0');
                       const dd = String(d.getDate()).padStart(2, '0');
@@ -2923,7 +3153,7 @@ export default function SchedulePage() {
                       const min = String(d.getMinutes()).padStart(2, '0');
                       const court = cls.court_id ? courtsMap[cls.court_id] : undefined;
                       const studentIds = studentsByClass[cls.id] ?? [];
-                      const studentsCountLabel = studentIds.length === 0 ? '-' : `${studentIds.length}`;
+                      const alumnos = bookingsCount[cls.id] ?? studentIds.length;
                       return (
                         <li
                           key={cls.id}
@@ -2933,14 +3163,18 @@ export default function SchedulePage() {
                             <div className="min-w-0 space-y-1">
                               <div className="flex flex-wrap items-center gap-2">
                                 <span className="inline-flex items-center rounded-full bg-[#e0f2fe] px-2 py-0.5 text-[11px] font-medium text-[#075985]">
-                                  {dd}/{mm}/{yyyy} • {hh}:{min}
+                                  {wd} {dd}/{mm}/{yyyy} • {hh}:{min}
                                 </span>
                                 <span className="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200">
                                   Cancha: {court?.name ?? '-'}
                                 </span>
-                                <span className="inline-flex items-center rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 border border-slate-200">
-                                  Alumnos: {studentsCountLabel}
-                                </span>
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center rounded-full bg-slate-50 text-slate-700 border border-slate-200 px-2 py-0.5 text-[11px] font-medium hover:bg-slate-100"
+                                  onClick={() => setStudentsModalClass(cls)}
+                                >
+                                  {alumnos}/{cls.capacity} alumnos
+                                </button>
                               </div>
                             </div>
                             <div className="flex w-full items-center justify-start gap-2 sm:w-auto sm:justify-end">
@@ -3131,6 +3365,7 @@ export default function SchedulePage() {
                                 ? prev.filter((x) => x !== id)
                                 : [...prev, id];
                             });
+                            setEditStudentQuery('');
                           };
                           return (
                             <button

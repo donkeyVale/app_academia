@@ -3,7 +3,7 @@
 import type React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createClientBrowser } from "@/lib/supabase";
 import { formatPyg } from "@/lib/formatters";
 import { toast } from "sonner";
@@ -40,13 +40,6 @@ import {
   Eraser,
   Banknote,
 } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 type RentMode = "per_student" | "per_hour" | "both";
 
@@ -122,6 +115,88 @@ interface StudentOption {
 interface CoachOption {
   id: string;
   label: string;
+}
+
+function SearchableSelect({
+  value,
+  onValueChange,
+  options,
+  placeholder,
+  disabled,
+  contentClassName,
+}: {
+  value: string;
+  onValueChange: (val: string) => void;
+  options: { id: string; label: string }[];
+  placeholder: string;
+  disabled?: boolean;
+  contentClassName?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+
+  const selectedLabel = useMemo(() => {
+    if (!value) return null;
+    return options.find((o) => o.id === value)?.label ?? null;
+  }, [options, value]);
+
+  const filteredOptions = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter((o) => o.label.toLowerCase().includes(q));
+  }, [options, query]);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          className="w-full text-sm border rounded-md px-3 py-2 bg-white hover:bg-gray-50 disabled:opacity-50 flex items-center justify-between gap-2"
+        >
+          <span className={selectedLabel ? "truncate" : "truncate text-gray-400"}>
+            {selectedLabel ?? placeholder}
+          </span>
+          <span className="text-gray-400">▾</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className={`p-3 max-w-[calc(100vw-2rem)] ${contentClassName ?? "w-80"}`}
+      >
+        <Input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar..."
+          className="h-11 text-base"
+          autoFocus
+        />
+
+        <div className="mt-2 max-h-52 overflow-auto border rounded-md divide-y text-sm bg-white">
+          {filteredOptions.length === 0 ? (
+            <div className="px-3 py-2 text-xs text-gray-500">Sin resultados</div>
+          ) : (
+            filteredOptions.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                className={`w-full text-left px-3 py-2 hover:bg-gray-50 ${
+                  o.id === value ? "bg-gray-50" : ""
+                }`}
+                onClick={() => {
+                  onValueChange(o.id);
+                  setOpen(false);
+                  setQuery("");
+                }}
+              >
+                {o.label}
+              </button>
+            ))
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 interface CoachClassRow {
@@ -2923,21 +2998,14 @@ export default function ReportsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="md:col-span-2">
                   <label className="block text-sm mb-1">Alumno</label>
-                  <Select
+                  <SearchableSelect
                     value={attendanceStudentId}
                     onValueChange={(val) => setAttendanceStudentId(val)}
-                  >
-                    <SelectTrigger className="w-full text-sm">
-                      <SelectValue placeholder="Selecciona un alumno" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {attendanceStudents.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    options={attendanceStudents}
+                    placeholder="Selecciona un alumno"
+                    disabled={attendanceStudents.length === 0}
+                    contentClassName="w-80"
+                  />
                 </div>
                 <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Desde</label>
@@ -3233,18 +3301,14 @@ export default function ReportsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="md:col-span-2">
                   <label className="block text-sm mb-1">Profesor</label>
-                  <Select value={coachId} onValueChange={(val) => setCoachId(val)}>
-                    <SelectTrigger className="w-full text-sm">
-                      <SelectValue placeholder="Selecciona un profesor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {coachOptions.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={coachId}
+                    onValueChange={(val) => setCoachId(val)}
+                    options={coachOptions}
+                    placeholder="Selecciona un profesor"
+                    disabled={coachOptions.length === 0}
+                    contentClassName="w-80"
+                  />
                 </div>
                 <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Desde</label>
@@ -3512,45 +3576,30 @@ export default function ReportsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-sm mb-1">Sede</label>
-                  <Select
+                  <SearchableSelect
                     value={locationId}
                     onValueChange={(val) => {
                       setLocationId(val);
                       setCourtId("");
                     }}
-                  >
-                    <SelectTrigger className="w-full text-sm">
-                      <SelectValue placeholder="Selecciona una sede" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {locationOptions.map((l) => (
-                        <SelectItem key={l.id} value={l.id}>
-                          {l.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    options={locationOptions}
+                    placeholder="Selecciona una sede"
+                    disabled={locationOptions.length === 0}
+                    contentClassName="w-64"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm mb-1">Cancha (opcional)</label>
-                  <Select
+                  <SearchableSelect
                     value={courtId}
                     onValueChange={(val) => setCourtId(val)}
-                    disabled={!locationId}
-                  >
-                    <SelectTrigger className="w-full text-sm">
-                      <SelectValue placeholder="Todas las canchas" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {courtOptions
-                        .filter((c) => !locationId || c.location_id === locationId)
-                        .map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.label}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
+                    options={courtOptions
+                      .filter((c) => !locationId || c.location_id === locationId)
+                      .map((c) => ({ id: c.id, label: c.label }))}
+                    placeholder="Todas las canchas"
+                    disabled={!locationId || courtOptions.length === 0}
+                    contentClassName="w-64"
+                  />
                 </div>
                 <div className="min-w-0 flex flex-col items-start">
                   <label className="block text-sm mb-1">Desde</label>
