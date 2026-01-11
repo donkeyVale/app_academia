@@ -197,12 +197,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     if (!userId) return;
+    if (!selectedAcademyId) return;
 
     const loadUnread = async () => {
       const { count } = await supabase
         .from('notifications')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId)
+        .eq('data->>academyId', selectedAcademyId)
         .is('read_at', null);
       setUnreadCount(count ?? 0);
     };
@@ -228,7 +230,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, userId]);
+  }, [supabase, userId, selectedAcademyId]);
 
   useEffect(() => {
     if (!avatarMenuOpen) return;
@@ -252,6 +254,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     window.addEventListener('pointerdown', onPointerDown, { capture: true });
     return () => window.removeEventListener('pointerdown', onPointerDown, true);
   }, [avatarMenuOpen]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const onAcademyChanged = (e: Event) => {
+      const next = (e as CustomEvent<{ academyId?: string | null }>).detail?.academyId ?? null;
+      setSelectedAcademyId(next);
+    };
+
+    window.addEventListener('selectedAcademyIdChanged', onAcademyChanged);
+    return () => {
+      window.removeEventListener('selectedAcademyIdChanged', onAcademyChanged);
+    };
+  }, []);
 
   useEffect(() => {
     if (!avatarMenuOpen) return;
@@ -381,6 +397,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 setSelectedAcademyId(initial);
                 if (initial && typeof window !== 'undefined') {
                   window.localStorage.setItem('selectedAcademyId', initial);
+                  window.dispatchEvent(new CustomEvent('selectedAcademyIdChanged', { detail: { academyId: initial } }));
                 }
               }
             } else {

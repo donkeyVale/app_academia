@@ -657,6 +657,7 @@ const onSaveRentFees = async () => {
                   setSelectedAcademyId(next);
                   if (typeof window !== "undefined" && next) {
                     window.localStorage.setItem("selectedAcademyId", next);
+                    window.dispatchEvent(new CustomEvent('selectedAcademyIdChanged', { detail: { academyId: next } }));
                   }
 
                   // Guardar academia por defecto a nivel de usuario

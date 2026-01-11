@@ -115,7 +115,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 
 type AppRole = 'super_admin' | 'admin' | 'coach' | 'student' | null;
 
-export default function HomePage() {
+export default function Page() {
   const supabase = createClientBrowser();
   const router = useRouter();
   const avatarMenuRef = useRef<HTMLDivElement | null>(null);
@@ -132,8 +132,11 @@ export default function HomePage() {
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return window.localStorage.getItem('selectedAcademyId');
+  });
   const [academyOptions, setAcademyOptions] = useState<{ id: string; name: string }[]>([]);
-  const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
   const [hasAcademies, setHasAcademies] = useState<boolean | null>(null);
   const [academyLocationIds, setAcademyLocationIds] = useState<Set<string>>(new Set());
   const [activePlansCount, setActivePlansCount] = useState(0);
@@ -177,13 +180,31 @@ export default function HomePage() {
   }, [supabase]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'selectedAcademyId') {
+        setSelectedAcademyId(e.newValue || null);
+      }
+    };
+    const onAcademyChanged = (e: Event) => {
+      const next = (e as CustomEvent<{ academyId?: string | null }>).detail?.academyId ?? null;
+      setSelectedAcademyId(next);
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('selectedAcademyIdChanged', onAcademyChanged);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  useEffect(() => {
     if (!userId) return;
+    if (!selectedAcademyId) return;
 
     const loadUnread = async () => {
       const { count } = await supabase
         .from('notifications')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', userId)
+        .eq('data->>academyId', selectedAcademyId)
         .is('read_at', null);
       setUnreadCount(count ?? 0);
     };
@@ -209,7 +230,7 @@ export default function HomePage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [supabase, userId]);
+  }, [supabase, userId, selectedAcademyId]);
 
   useEffect(() => {
     if (!avatarMenuOpen) return;

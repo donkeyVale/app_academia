@@ -24,6 +24,11 @@ export function NotificationsBell() {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<NotificationRow[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return window.localStorage.getItem('selectedAcademyId');
+  });
+  const [academyReady, setAcademyReady] = useState(() => typeof window !== 'undefined');
 
   const unreadLabel = useMemo(() => {
     if (unreadCount <= 0) return '';
@@ -32,17 +37,27 @@ export function NotificationsBell() {
   }, [unreadCount]);
 
   const load = async (uid: string) => {
+    if (!academyReady) return;
+    if (!selectedAcademyId) return;
     setLoading(true);
     try {
-      const [listRes, countRes] = await Promise.all([
-        supabase
-          .from('notifications')
-          .select('id,title,body,data,created_at,read_at')
-          .eq('user_id', uid)
-          .order('created_at', { ascending: false })
-          .limit(20),
-        supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('user_id', uid).is('read_at', null),
-      ]);
+      let listQ = supabase
+        .from('notifications')
+        .select('id,title,body,data,created_at,read_at')
+        .eq('user_id', uid)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      let countQ = supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', uid)
+        .is('read_at', null);
+
+      listQ = listQ.eq('data->>academyId', selectedAcademyId);
+      countQ = countQ.eq('data->>academyId', selectedAcademyId);
+
+      const [listRes, countRes] = await Promise.all([listQ, countQ]);
 
       if (!listRes.error) {
         setItems((listRes.data ?? []) as any);
@@ -62,13 +77,45 @@ export function NotificationsBell() {
       if (!active) return;
       if (!uid) return;
       setUserId(uid);
-      await load(uid);
     })();
 
     return () => {
       active = false;
     };
   }, [supabase]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const read = () => {
+      const v = window.localStorage.getItem('selectedAcademyId');
+      setSelectedAcademyId(v || null);
+    };
+
+    read();
+    setAcademyReady(true);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'selectedAcademyId') read();
+    };
+    const onAcademyChanged = () => {
+      read();
+    };
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('selectedAcademyIdChanged', onAcademyChanged);
+
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('selectedAcademyIdChanged', onAcademyChanged);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!userId) return;
+    if (!academyReady) return;
+    if (!selectedAcademyId) return;
+    load(userId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, selectedAcademyId, academyReady]);
 
   useEffect(() => {
     if (!userId) return;
@@ -84,6 +131,8 @@ export function NotificationsBell() {
           filter: `user_id=eq.${userId}`,
         },
         () => {
+          if (!academyReady) return;
+          if (!selectedAcademyId) return;
           load(userId);
         }
       )
@@ -102,8 +151,12 @@ export function NotificationsBell() {
 
   const markAllRead = async () => {
     if (!userId) return;
+    if (!academyReady) return;
+    if (!selectedAcademyId) return;
     const now = new Date().toISOString();
-    await supabase.from('notifications').update({ read_at: now }).eq('user_id', userId).is('read_at', null);
+    let q = supabase.from('notifications').update({ read_at: now }).eq('user_id', userId).is('read_at', null);
+    q = q.eq('data->>academyId', selectedAcademyId);
+    await q;
   };
 
   const handleOpen = async () => {
