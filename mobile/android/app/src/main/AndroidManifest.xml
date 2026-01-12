@@ -28,7 +28,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data
                     android:scheme="https"
-                    android:host="capacitor.nativatech.com.py"
+                    android:host="agendo.nativatech.com.py"
                     android:pathPrefix="/" />
             </intent-filter>
 
