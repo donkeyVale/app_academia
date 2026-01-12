@@ -459,7 +459,8 @@ export async function POST(req: NextRequest) {
 
         if (superAdminIds.length > 0) {
           const title = 'Usuario creado por admin de academia';
-          const bodyText = `${adminName} creó a ${fullName} (${email}) en ${academyName}.`;
+          const rolesText = uniqueRoles.length ? uniqueRoles.join(', ') : '-';
+          const bodyText = `${adminName} creó a ${fullName} (${email}) en ${academyName}. Rol(es): ${rolesText}.`;
 
           await createInAppNotifications(
             superAdminIds.map((id) => ({
