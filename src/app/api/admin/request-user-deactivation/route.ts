@@ -5,6 +5,15 @@ import nodemailer from 'nodemailer';
 import webPush from 'web-push';
 import { createInAppNotifications } from '@/lib/in-app-notifications';
 
+function getNotificationCcEmails(): string[] {
+  const raw = (process.env.NOTIFICATION_CC_EMAILS || 'alisamudio1@gmail.com,nativatechpy@gmail.com').trim();
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => !!s);
+}
+
 async function sendDeactivationRequestEmail(params: {
   to: string;
   academyName: string;
@@ -56,6 +65,7 @@ async function sendDeactivationRequestEmail(params: {
   await transporter.sendMail({
     from,
     to: params.to,
+    cc: getNotificationCcEmails(),
     subject: 'Inactivación de usuario (solicitud)',
     html,
   });

@@ -5,6 +5,15 @@ import nodemailer from 'nodemailer';
 import webPush from 'web-push';
 import { createInAppNotifications } from '@/lib/in-app-notifications';
 
+function getNotificationCcEmails(): string[] {
+  const raw = (process.env.NOTIFICATION_CC_EMAILS || 'alisamudio1@gmail.com,nativatechpy@gmail.com').trim();
+  if (!raw) return [];
+  return raw
+    .split(',')
+    .map((s) => s.trim())
+    .filter((s) => !!s);
+}
+
 type SubscriptionRow = {
   endpoint: string;
   p256dh: string;
@@ -124,6 +133,7 @@ async function sendAdminCreatedUserEmail(params: {
   await transporter.sendMail({
     from,
     to: params.to,
+    cc: getNotificationCcEmails(),
     subject: 'Alta de usuario (creado por admin de academia)',
     html,
   });
