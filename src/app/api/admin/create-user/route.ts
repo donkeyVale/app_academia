@@ -56,6 +56,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const {
+      currentUserId,
+      academyId,
       firstName,
       lastName,
       nationalId,
@@ -64,6 +66,8 @@ export async function POST(req: NextRequest) {
       birthDate,
       roles,
     } = body as {
+      currentUserId?: string;
+      academyId?: string;
       firstName?: string;
       lastName?: string;
       nationalId?: string;
@@ -72,6 +76,45 @@ export async function POST(req: NextRequest) {
       birthDate?: string;
       roles?: string[];
     };
+
+    if (!currentUserId) {
+      return NextResponse.json({ error: 'currentUserId es requerido.' }, { status: 400 });
+    }
+
+    const { data: currentProfile, error: currentProfileErr } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', currentUserId)
+      .maybeSingle();
+
+    if (currentProfileErr) {
+      return NextResponse.json({ error: 'No se pudo verificar permisos.' }, { status: 403 });
+    }
+
+    const currentRole = (currentProfile?.role as string | null) ?? null;
+    const isSuperAdmin = currentRole === 'super_admin';
+    const isAdmin = currentRole === 'admin';
+    if (!isSuperAdmin && !isAdmin) {
+      return NextResponse.json({ error: 'No autorizado.' }, { status: 403 });
+    }
+
+    if (isAdmin) {
+      if (!academyId) {
+        return NextResponse.json({ error: 'academyId es requerido.' }, { status: 400 });
+      }
+
+      const { data: uaRow, error: uaErr } = await supabaseAdmin
+        .from('user_academies')
+        .select('id')
+        .eq('user_id', currentUserId)
+        .eq('academy_id', academyId)
+        .eq('role', 'admin')
+        .eq('is_active', true)
+        .maybeSingle();
+      if (uaErr || !uaRow) {
+        return NextResponse.json({ error: 'No autorizado para esta academia.' }, { status: 403 });
+      }
+    }
 
     if (!firstName || !lastName || !nationalId || !phone || !email || !birthDate) {
       return NextResponse.json(
@@ -85,6 +128,12 @@ export async function POST(req: NextRequest) {
         { error: 'Debe seleccionar al menos un rol.' },
         { status: 400 }
       );
+    }
+
+    const uniqueRoles = Array.from(new Set(roles));
+    const allowedRoles = new Set(['admin', 'coach', 'student']);
+    if (!uniqueRoles.every((r) => allowedRoles.has(r))) {
+      return NextResponse.json({ error: 'Roles inválidos.' }, { status: 400 });
     }
 
     // Verificar duplicados de documento y teléfono en metadata de usuarios existentes
@@ -168,8 +217,8 @@ export async function POST(req: NextRequest) {
 
     // Definir un rol principal para profiles
     let mainRole: 'admin' | 'coach' | 'student' = 'student';
-    if (roles.includes('admin')) mainRole = 'admin';
-    else if (roles.includes('coach')) mainRole = 'coach';
+    if (uniqueRoles.includes('admin')) mainRole = 'admin';
+    else if (uniqueRoles.includes('coach')) mainRole = 'coach';
 
     const { error: profileInsertError } = await supabaseAdmin
       .from('profiles')
@@ -187,7 +236,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Insertar roles en user_roles
-    const uniqueRoles = Array.from(new Set(roles));
     const rolesPayload = uniqueRoles.map((role) => ({ user_id: newUserId, role }));
 
     const { error: rolesError } = await supabaseAdmin
@@ -199,6 +247,27 @@ export async function POST(req: NextRequest) {
         { error: 'Perfil creado, pero falló el guardado de roles.' },
         { status: 500 }
       );
+    }
+
+    if (academyId) {
+      const { error: uaInsertError } = await supabaseAdmin
+        .from('user_academies')
+        .upsert(
+          {
+            user_id: newUserId,
+            academy_id: academyId,
+            role: mainRole,
+            is_active: true,
+          },
+          { onConflict: 'user_id,academy_id,role' },
+        );
+
+      if (uaInsertError) {
+        return NextResponse.json(
+          { error: uaInsertError.message ?? 'Usuario creado, pero falló la asignación a la academia.' },
+          { status: 400 },
+        );
+      }
     }
 
     // Si el usuario tiene rol de profesor, asegurar su registro en coaches

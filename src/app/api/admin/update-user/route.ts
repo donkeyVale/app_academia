@@ -94,12 +94,43 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No se pudo verificar permisos.' }, { status: 403 });
     }
 
-    if ((currentProfile?.role as string | null) !== 'super_admin') {
+    const currentRole = (currentProfile?.role as string | null) ?? null;
+    const isSuperAdmin = currentRole === 'super_admin';
+    const isAdmin = currentRole === 'admin';
+    if (!isSuperAdmin && !isAdmin) {
       return NextResponse.json({ error: 'No autorizado.' }, { status: 403 });
     }
 
     if (!userId) {
       return NextResponse.json({ error: 'userId es requerido.' }, { status: 400 });
+    }
+
+    if (isAdmin) {
+      if (!academyId) {
+        return NextResponse.json({ error: 'academyId es requerido.' }, { status: 400 });
+      }
+
+      const { data: uaRow, error: uaErr } = await supabaseAdmin
+        .from('user_academies')
+        .select('id')
+        .eq('user_id', currentUserId)
+        .eq('academy_id', academyId)
+        .eq('role', 'admin')
+        .eq('is_active', true)
+        .maybeSingle();
+      if (uaErr || !uaRow) {
+        return NextResponse.json({ error: 'No autorizado para esta academia.' }, { status: 403 });
+      }
+
+      const { data: targetUa, error: targetUaErr } = await supabaseAdmin
+        .from('user_academies')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('academy_id', academyId)
+        .maybeSingle();
+      if (targetUaErr || !targetUa) {
+        return NextResponse.json({ error: 'No autorizado para editar este usuario.' }, { status: 403 });
+      }
     }
 
     if (!firstName || !lastName || !nationalId || !phone || !email || !birthDate) {
@@ -114,6 +145,12 @@ export async function POST(req: NextRequest) {
         { error: 'Debe seleccionar al menos un rol.' },
         { status: 400 }
       );
+    }
+
+    const uniqueRoles = Array.from(new Set(roles));
+    const allowedRoles = new Set(['admin', 'coach', 'student']);
+    if (!uniqueRoles.every((r) => allowedRoles.has(r))) {
+      return NextResponse.json({ error: 'Roles inválidos.' }, { status: 400 });
     }
 
     const { data: authBefore, error: authBeforeErr } = await supabaseAdmin.auth.admin.getUserById(userId);
@@ -151,8 +188,8 @@ export async function POST(req: NextRequest) {
 
     // Rol principal
     let mainRole: 'admin' | 'coach' | 'student' = 'student';
-    if (roles.includes('admin')) mainRole = 'admin';
-    else if (roles.includes('coach')) mainRole = 'coach';
+    if (uniqueRoles.includes('admin')) mainRole = 'admin';
+    else if (uniqueRoles.includes('coach')) mainRole = 'coach';
 
     // Actualizar profile
     const { error: profileError } = await supabaseAdmin
@@ -180,7 +217,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const uniqueRoles = Array.from(new Set(roles));
     const rolesPayload = uniqueRoles.map((role) => ({ user_id: userId, role }));
 
     const { error: insertRolesError } = await supabaseAdmin
@@ -208,7 +244,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (academyId && typeof academyIsActive === 'boolean') {
+    if (isSuperAdmin && academyId && typeof academyIsActive === 'boolean') {
       const { error: uaUpdateErr } = await supabaseAdmin
         .from('user_academies')
         .update({ is_active: academyIsActive })

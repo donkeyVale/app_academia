@@ -10,9 +10,15 @@ export default async function middleware(req: NextRequest) {
   const supabase = createMiddlewareClient({ req, res });
 
   // Refresh the session if needed. This sets auth cookies on the response.
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  let session: any = null;
+  try {
+    const {
+      data: { session: s },
+    } = await supabase.auth.getSession();
+    session = s;
+  } catch {
+    session = null;
+  }
 
   const isLogin = req.nextUrl.pathname.startsWith('/login');
 

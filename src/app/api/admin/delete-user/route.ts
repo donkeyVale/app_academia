@@ -4,7 +4,25 @@ import { supabaseAdmin } from '@/lib/supabase-service';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { userId } = body as { userId?: string };
+    const { currentUserId, userId } = body as { currentUserId?: string; userId?: string };
+
+    if (!currentUserId) {
+      return NextResponse.json({ error: 'currentUserId es requerido.' }, { status: 400 });
+    }
+
+    const { data: currentProfile, error: currentProfileErr } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', currentUserId)
+      .maybeSingle();
+
+    if (currentProfileErr) {
+      return NextResponse.json({ error: 'No se pudo verificar permisos.' }, { status: 403 });
+    }
+
+    if ((currentProfile?.role as string | null) !== 'super_admin') {
+      return NextResponse.json({ error: 'No autorizado.' }, { status: 403 });
+    }
 
     if (!userId) {
       return NextResponse.json({ error: 'userId es requerido.' }, { status: 400 });

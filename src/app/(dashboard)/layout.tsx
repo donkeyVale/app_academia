@@ -484,6 +484,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       const user = data.user;
       const userId = user?.id;
       if (userId) setUserId(userId);
+      if (userId && typeof window !== 'undefined') {
+        try {
+          window.localStorage.setItem('currentUserId', userId);
+          window.dispatchEvent(new CustomEvent('currentUserIdChanged', { detail: { userId } }));
+        } catch {
+          // ignore
+        }
+      }
 
       let displayName: string | null = null;
 
@@ -504,6 +512,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           setRole(r);
         } else {
           setRole(null);
+        }
+        if (typeof window !== 'undefined') {
+          try {
+            const nextRole = r && (r === 'super_admin' || r === 'admin' || r === 'coach' || r === 'student') ? r : '';
+            if (nextRole) {
+              window.localStorage.setItem('currentUserRole', nextRole);
+            } else {
+              window.localStorage.removeItem('currentUserRole');
+            }
+            window.dispatchEvent(new CustomEvent('currentUserRoleChanged', { detail: { role: nextRole || null } }));
+          } catch {
+            // ignore
+          }
         }
 
         // Cargar academias asignadas al usuario (para selector de academia actual)

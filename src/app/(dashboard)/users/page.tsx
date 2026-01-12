@@ -139,8 +139,24 @@ export default function UsersPage() {
   const [userNationalIdMap, setUserNationalIdMap] = useState<Record<string, string | null>>({});
   const [loadingList, setLoadingList] = useState(true);
   const [forbidden, setForbidden] = useState(false);
-  const [role, setRole] = useState<string | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [role, setRole] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const r = window.localStorage.getItem('currentUserRole');
+      return r && r.trim() ? r : null;
+    } catch {
+      return null;
+    }
+  });
+  const [currentUserId, setCurrentUserId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const id = window.localStorage.getItem('currentUserId');
+      return id && id.trim() ? id : null;
+    } catch {
+      return null;
+    }
+  });
   const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
 
   const loadUserDocuments = async (params: { currentUserId: string; userIds: string[] }) => {
@@ -226,6 +242,25 @@ export default function UsersPage() {
     return () => window.clearTimeout(t);
   }, [detailCoachFeeAcademyOpen]);
   const [detailIsActive, setDetailIsActive] = useState(true);
+
+  useEffect(() => {
+    const onRoleChanged = (e: Event) => {
+      const next = (e as CustomEvent<{ role?: string | null }>).detail?.role ?? null;
+      setRole(next);
+    };
+
+    const onUserIdChanged = (e: Event) => {
+      const next = (e as CustomEvent<{ userId?: string | null }>).detail?.userId ?? null;
+      setCurrentUserId(next);
+    };
+
+    window.addEventListener('currentUserRoleChanged', onRoleChanged);
+    window.addEventListener('currentUserIdChanged', onUserIdChanged);
+    return () => {
+      window.removeEventListener('currentUserRoleChanged', onRoleChanged);
+      window.removeEventListener('currentUserIdChanged', onUserIdChanged);
+    };
+  }, []);
 
   // Importación masiva desde CSV
   const [importFile, setImportFile] = useState<File | null>(null);
@@ -423,9 +458,25 @@ export default function UsersPage() {
     setError(null);
     setSuccess(null);
 
+    if (!currentUserId) {
+      const message = 'No se pudo identificar al usuario actual.';
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
     // Validaciones de campos obligatorios al crear usuario
     if (!nationalId.trim() || !phone.trim() || !email.trim() || !birthDate.trim()) {
       const message = 'Completá número de documento, teléfono, correo y fecha de nacimiento.';
+      setError(message);
+      toast.error(message);
+      return;
+    }
+
+    const isSuperAdmin = role === 'super_admin';
+    const isAdmin = role === 'admin';
+    if (isAdmin && !selectedAcademyId) {
+      const message = 'Seleccioná una academia para crear usuarios.';
       setError(message);
       toast.error(message);
       return;
@@ -440,6 +491,8 @@ export default function UsersPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          currentUserId,
+          academyId: isSuperAdmin ? selectedAcademyId : selectedAcademyId,
           firstName,
           lastName,
           nationalId,
@@ -468,26 +521,8 @@ export default function UsersPage() {
       setBirthDate('');
       setSelectedRoles(['student']);
 
-      // recargar lista
-      const [profilesRes, rolesRes] = await Promise.all([
-        supabase.from('profiles').select('id, full_name, role'),
-        supabase.from('user_roles').select('user_id, role'),
-      ]);
-
-      if (profilesRes.error || rolesRes.error) {
-        return;
-      }
-
-      const nextUsers = (profilesRes.data ?? []) as UserRow[];
-      setUsers(nextUsers);
-      setUserRoles((rolesRes.data ?? []) as UserRolesRow[]);
-      setUserNationalIdMap({});
-      if (currentUserId && nextUsers.length > 0) {
-        await loadUserDocuments({
-          currentUserId,
-          userIds: nextUsers.map((u) => u.id),
-        });
-      }
+      // recargar lista (incluye filtro por academia y estado por academia)
+      await reloadUsersList();
     } catch (err: any) {
       const message = err?.message ?? 'Error inesperado.';
       setError(message);
@@ -870,57 +905,74 @@ export default function UsersPage() {
 
   const handleUpdateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!detailUserId) return;
-    setDetailError(null);
-    setDetailSubmitting(true);
-    try {
-      const res = await fetch('/api/admin/update-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          currentUserId,
-          userId: detailUserId,
-          firstName: detailFirstName,
-          lastName: detailLastName,
-          nationalId: detailNationalId,
-          phone: detailPhone,
-          email: detailEmail,
-          birthDate: detailBirthDate,
-          roles: detailRoles,
-          academyId: isSuperAdmin ? (detailStatusAcademyId || null) : null,
-          academyIsActive: isSuperAdmin ? detailIsActive : null,
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok) {
-        const message = json?.error ?? 'No se pudo actualizar el usuario.';
+    const handleDetailSave = async () => {
+      setDetailError(null);
+      setDetailSubmitting(true);
+      try {
+        if (!currentUserId) {
+          setDetailError('No se pudo identificar al usuario actual.');
+          return;
+        }
+
+        const isSuperAdmin = role === 'super_admin';
+        const isAdmin = role === 'admin';
+        if (isAdmin && !selectedAcademyId) {
+          setDetailError('Seleccioná una academia para editar usuarios.');
+          return;
+        }
+
+        const res = await fetch('/api/admin/update-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            currentUserId,
+            userId: detailUserId,
+            firstName: detailFirstName,
+            lastName: detailLastName,
+            nationalId: detailNationalId,
+            phone: detailPhone,
+            email: detailEmail,
+            birthDate: detailBirthDate,
+            roles: detailRoles,
+            academyId: isSuperAdmin ? (detailStatusAcademyId || null) : selectedAcademyId,
+            academyIsActive: isSuperAdmin ? detailIsActive : null,
+          }),
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          const message = json?.error ?? 'No se pudo actualizar el usuario.';
+          setDetailError(message);
+          toast.error(message);
+          return;
+        }
+        await reloadUsersList();
+        setDetailOpen(false);
+        toast.success('Usuario actualizado correctamente.');
+      } catch (e: any) {
+        const message = e?.message ?? 'Error inesperado actualizando el usuario.';
         setDetailError(message);
         toast.error(message);
-        return;
+      } finally {
+        setDetailSubmitting(false);
       }
-      await reloadUsersList();
-      setDetailOpen(false);
-      toast.success('Usuario actualizado correctamente.');
-    } catch (e: any) {
-      const message = e?.message ?? 'Error inesperado actualizando el usuario.';
-      setDetailError(message);
-      toast.error(message);
-    } finally {
-      setDetailSubmitting(false);
-    }
+    };
+    handleDetailSave();
   };
 
-  const handleDeleteUser = async () => {
+  const handleDetailDelete = async () => {
     if (!detailUserId) return;
-    const confirmDelete = window.confirm('¿Eliminar este usuario? Esta acción no se puede deshacer.');
-    if (!confirmDelete) return;
+    if (!confirm('¿Eliminar este usuario? Esta acción es irreversible.')) return;
     setDetailError(null);
     setDetailDeleting(true);
     try {
+      if (!currentUserId) {
+        setDetailError('No se pudo identificar al usuario actual.');
+        return;
+      }
       const res = await fetch('/api/admin/delete-user', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: detailUserId }),
+        body: JSON.stringify({ currentUserId, userId: detailUserId }),
       });
       const json = await res.json();
       if (!res.ok) {
@@ -983,12 +1035,13 @@ export default function UsersPage() {
       const message = e?.message ?? 'Error inesperado guardando la tarifa del profesor.';
       toast.error(message);
     } finally {
-      setDetailCoachFeeSaving(false);
+      setDetailSubmitting(false);
     }
   };
 
   const isSuperAdmin = role === 'super_admin';
-  const isAdminReadOnly = role === 'admin';
+  const canEditUsers = role === 'admin' || role === 'super_admin';
+  const canDeleteUsers = role === 'super_admin';
 
   if (forbidden) {
     return (
@@ -1032,7 +1085,7 @@ export default function UsersPage() {
               </p>
             ) : (
               <p className="text-sm text-gray-600">
-                Como admin podés consultar usuarios de tu academia. Solo el super admin puede crear o editar.
+                Como admin podés crear y editar usuarios de tu academia.
               </p>
             )}
           </div>
@@ -1052,226 +1105,226 @@ export default function UsersPage() {
         </div>
       </div>
 
-      {isSuperAdmin && (
-        <div className="border rounded-lg bg-white shadow-sm">
-          <button
-            type="button"
-            className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
-            onClick={() => setShowCreateUser((v) => !v)}
-          >
-            <span className="inline-flex items-center gap-2">
-              <UserPlus className="w-4 h-4 text-emerald-500" />
-              <span>Crear y gestionar usuarios</span>
-            </span>
-            <span className="text-xs text-gray-500">{showCreateUser ? '▼' : '▲'}</span>
-          </button>
-          {showCreateUser && (
-            <div className="p-4 space-y-3">
-              <form onSubmit={handleSubmit} className="space-y-3 max-w-xl">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm mb-1">Nombre</label>
-                    <input
-                      className="border rounded px-3 w-full h-10 text-base md:text-sm"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm mb-1">Apellido</label>
-                    <input
-                      className="border rounded px-3 w-full h-10 text-base md:text-sm"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm mb-1">N° de cédula</label>
-                    <input
-                      className="border rounded px-3 w-full h-10 text-base md:text-sm"
-                      value={nationalId}
-                      onChange={(e) => setNationalId(e.target.value)}
-                      required
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      Esta será la contraseña inicial del usuario.
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-sm mb-1">Teléfono (+595...)</label>
-                    <input
-                      className="border rounded px-3 w-full h-10 text-base md:text-sm"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm mb-1">Correo electrónico</label>
-                    <input
-                      type="text"
-                      inputMode="email"
-                      autoComplete="email"
-                      className="border rounded px-3 w-full h-10 text-base md:text-sm"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm mb-1">Fecha de nacimiento</label>
-                    <DatePickerField value={birthDate} onChange={setBirthDate} />
-                  </div>
-                </div>
-
+    {canEditUsers && (
+      <div className="border rounded-lg bg-white shadow-sm">
+        <button
+          type="button"
+          className="w-full flex items-center justify-between px-4 py-2 text-left text-sm font-medium bg-gray-50 hover:bg-gray-100 rounded-t-lg"
+          onClick={() => setShowCreateUser((v) => !v)}
+        >
+          <span className="inline-flex items-center gap-2">
+            <UserPlus className="w-4 h-4 text-emerald-500" />
+            <span>Crear y gestionar usuarios</span>
+          </span>
+          <span className="text-xs text-gray-500">{showCreateUser ? '▼' : '▲'}</span>
+        </button>
+        {showCreateUser && (
+          <div className="p-4 space-y-3">
+            <form onSubmit={handleSubmit} className="space-y-3 max-w-xl">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm mb-1">Roles</label>
-                  <div className="flex flex-wrap gap-3 text-sm">
-                    {ROLES.map((role) => (
-                      <label key={role} className="inline-flex items-center gap-1">
-                        <input
-                          type="checkbox"
-                          checked={selectedRoles.includes(role)}
-                          onChange={() => toggleRole(role)}
-                        />
-                        <span>{roleLabel(role)}</span>
-                      </label>
-                    ))}
-                  </div>
+                  <label className="block text-sm mb-1">Nombre</label>
+                  <input
+                    className="border rounded px-3 w-full h-10 text-base md:text-sm"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">Apellido</label>
+                  <input
+                    className="border rounded px-3 w-full h-10 text-base md:text-sm"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm mb-1">N° de cédula</label>
+                  <input
+                    className="border rounded px-3 w-full h-10 text-base md:text-sm"
+                    value={nationalId}
+                    onChange={(e) => setNationalId(e.target.value)}
+                    required
+                  />
                   <p className="text-xs text-gray-500 mt-1">
-                    Podés asignar más de un rol. Si marcás "admin", el usuario tendrá acceso completo.
+                    Esta será la contraseña inicial del usuario.
                   </p>
                 </div>
+                <div>
+                  <label className="block text-sm mb-1">Teléfono (+595...)</label>
+                  <input
+                    className="border rounded px-3 w-full h-10 text-base md:text-sm"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
 
-                <button
-                  type="submit"
-                  className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 text-sm disabled:opacity-50"
-                  disabled={submitting}
-                >
-                  {submitting ? 'Creando usuario...' : 'Crear usuario'}
-                </button>
-              </form>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm mb-1">Correo electrónico</label>
+                  <input
+                    type="text"
+                    inputMode="email"
+                    autoComplete="email"
+                    className="border rounded px-3 w-full h-10 text-base md:text-sm"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm mb-1">Fecha de nacimiento</label>
+                  <DatePickerField value={birthDate} onChange={setBirthDate} />
+                </div>
+              </div>
 
-              <div className="mt-6 border-t pt-4 space-y-3 max-w-xl">
-                <h3 className="text-sm font-semibold text-[#31435d] flex items-center gap-2">
-                  <CalendarIcon className="w-4 h-4 text-emerald-500" />
-                  Importar usuarios desde CSV
-                </h3>
-                <p className="text-xs text-gray-600">
-                  Subí un archivo CSV exportado desde Google Sheets con los siguientes encabezados en la primera
-                  fila: <strong>nombre</strong>, <strong>apellido</strong>, <strong>numero_de_documento</strong>,{' '}
-                  <strong>telefono</strong>, <strong>correo</strong>, <strong>fecha_de_nacimiento</strong>,{' '}
-                  <strong>role</strong>, <strong>academias</strong>.
+              <div>
+                <label className="block text-sm mb-1">Roles</label>
+                <div className="flex flex-wrap gap-3 text-sm">
+                  {ROLES.map((role) => (
+                    <label key={role} className="inline-flex items-center gap-1">
+                      <input
+                        type="checkbox"
+                        checked={selectedRoles.includes(role)}
+                        onChange={() => toggleRole(role)}
+                      />
+                      <span>{roleLabel(role)}</span>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Podés asignar más de un rol. Si marcás "admin", el usuario tendrá acceso completo.
                 </p>
-                <p className="text-xs text-gray-600">
-                  La fecha debe estar en formato <strong>DD/MM/YYYY</strong>. El campo{' '}
-                  <strong>academias</strong> acepta uno o varios IDs de academia separados por punto y coma (;).
-                </p>
-                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-start">
-                  <div className="flex flex-col gap-1">
-                    <input
-                      type="file"
-                      accept=".csv,text/csv"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0] ?? null;
-                        setImportFile(file);
-                      }}
-                      className="hidden"
-                      id="import-users-csv-input"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 px-3 text-xs flex items-center gap-2"
-                      onClick={() => {
-                        const input = document.getElementById('import-users-csv-input') as HTMLInputElement | null;
-                        input?.click();
-                      }}
-                    >
-                      Seleccionar archivo CSV
-                    </Button>
-                    <span className="text-[11px] text-gray-600 break-all">
-                      {importFile ? `Archivo seleccionado: ${importFile.name}` : 'Ningún archivo seleccionado'}
-                    </span>
-                  </div>
+              </div>
+
+              <button
+                type="submit"
+                className="bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 text-sm disabled:opacity-50"
+                disabled={submitting}
+              >
+                {submitting ? 'Creando usuario...' : 'Crear usuario'}
+              </button>
+            </form>
+
+            <div className="mt-6 border-t pt-4 space-y-3 max-w-xl">
+              <h3 className="text-sm font-semibold text-[#31435d] flex items-center gap-2">
+                <CalendarIcon className="w-4 h-4 text-emerald-500" />
+                Importar usuarios desde CSV
+              </h3>
+              <p className="text-xs text-gray-600">
+                Subí un archivo CSV exportado desde Google Sheets con los siguientes encabezados en la primera
+                fila: <strong>nombre</strong>, <strong>apellido</strong>, <strong>numero_de_documento</strong>,{' '}
+                <strong>telefono</strong>, <strong>correo</strong>, <strong>fecha_de_nacimiento</strong>,{' '}
+                <strong>role</strong>, <strong>academias</strong>.
+              </p>
+              <p className="text-xs text-gray-600">
+                La fecha debe estar en formato <strong>DD/MM/YYYY</strong>. El campo{' '}
+                <strong>academias</strong> acepta uno o varios IDs de academia separados por punto y coma (;).
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-start">
+                <div className="flex flex-col gap-1">
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] ?? null;
+                      setImportFile(file);
+                    }}
+                    className="hidden"
+                    id="import-users-csv-input"
+                  />
                   <Button
                     type="button"
+                    variant="outline"
                     size="sm"
-                    className="h-8 px-3 bg-sky-500 hover:bg-sky-600 text-white text-xs disabled:opacity-50"
-                    disabled={importUploading || !importFile}
-                    onClick={handleImportCsv}
+                    className="h-8 px-3 text-xs flex items-center gap-2"
+                    onClick={() => {
+                      const input = document.getElementById('import-users-csv-input') as HTMLInputElement | null;
+                      input?.click();
+                    }}
                   >
-                    {importUploading ? 'Procesando archivo...' : 'Procesar archivo'}
+                    Seleccionar archivo CSV
+                  </Button>
+                  <span className="text-[11px] text-gray-600 break-all">
+                    {importFile ? `Archivo seleccionado: ${importFile.name}` : 'Ningún archivo seleccionado'}
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-8 px-3 bg-sky-500 hover:bg-sky-600 text-white text-xs disabled:opacity-50"
+                  disabled={importUploading || !importFile}
+                  onClick={handleImportCsv}
+                >
+                  {importUploading ? 'Procesando archivo...' : 'Procesar archivo'}
+                </Button>
+              </div>
+
+              {(importSummary || importResults.length > 0) && (
+                <div className="flex items-center justify-between gap-3 text-xs text-gray-700">
+                  {importSummary && (
+                    <p>
+                      Total filas procesadas: <strong>{importSummary.total}</strong>. Usuarios creados:{' '}
+                      <strong>{importSummary.ok}</strong>. Errores: <strong>{importSummary.error}</strong>.
+                    </p>
+                  )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 text-[11px] ml-auto flex items-center gap-1"
+                    onClick={() => {
+                      setImportResults([]);
+                      setImportSummary(null);
+                      setImportFile(null);
+                    }}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                    Limpiar resultados
                   </Button>
                 </div>
+              )}
 
-                {(importSummary || importResults.length > 0) && (
-                  <div className="flex items-center justify-between gap-3 text-xs text-gray-700">
-                    {importSummary && (
-                      <p>
-                        Total filas procesadas: <strong>{importSummary.total}</strong>. Usuarios creados:{' '}
-                        <strong>{importSummary.ok}</strong>. Errores: <strong>{importSummary.error}</strong>.
-                      </p>
-                    )}
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 px-2 text-[11px] ml-auto flex items-center gap-1"
-                      onClick={() => {
-                        setImportResults([]);
-                        setImportSummary(null);
-                        setImportFile(null);
-                      }}
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      Limpiar resultados
-                    </Button>
-                  </div>
-                )}
-
-                {importResults.length > 0 && (
-                  <div className="max-h-64 overflow-auto border rounded mt-2">
-                    <table className="min-w-full text-xs border-collapse">
-                      <thead>
-                        <tr className="bg-gray-50 border-b">
-                          <th className="text-left py-1 px-2">Fila</th>
-                          <th className="text-left py-1 px-2">Estado</th>
-                          <th className="text-left py-1 px-2">Detalle</th>
+              {importResults.length > 0 && (
+                <div className="max-h-64 overflow-auto border rounded mt-2">
+                  <table className="min-w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50 border-b">
+                        <th className="text-left py-1 px-2">Fila</th>
+                        <th className="text-left py-1 px-2">Estado</th>
+                        <th className="text-left py-1 px-2">Detalle</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importResults.map((r) => (
+                        <tr key={r.index} className="border-b last:border-b-0">
+                          <td className="py-1 px-2 whitespace-nowrap">{r.index + 2}</td>
+                          <td className="py-1 px-2 whitespace-nowrap">
+                            {r.status === 'ok' ? (
+                              <span className="text-emerald-600 font-medium">OK</span>
+                            ) : (
+                              <span className="text-red-600 font-medium">Error</span>
+                            )}
+                          </td>
+                          <td className="py-1 px-2 text-gray-700">{r.message}</td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {importResults.map((r) => (
-                          <tr key={r.index} className="border-b last:border-b-0">
-                            <td className="py-1 px-2 whitespace-nowrap">{r.index + 2}</td>
-                            <td className="py-1 px-2 whitespace-nowrap">
-                              {r.status === 'ok' ? (
-                                <span className="text-emerald-600 font-medium">OK</span>
-                              ) : (
-                                <span className="text-red-600 font-medium">Error</span>
-                              )}
-                            </td>
-                            <td className="py-1 px-2 text-gray-700">{r.message}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
+    )}
 
       <div className="border rounded-lg bg-white shadow-sm">
         <button
@@ -1448,57 +1501,57 @@ export default function UsersPage() {
                 )}
 
                 <div className="overflow-x-auto">
-                <table className="min-w-full text-sm border-collapse">
-                  <thead>
-                    <tr className="border-b bg-gray-50">
-                      <th className="text-left py-2 px-3">#</th>
-                      <th className="text-left py-2 px-3">Nombre</th>
-                      <th className="text-left py-2 px-3">Documento</th>
-                      <th className="text-left py-2 px-3">Rol principal</th>
-                      <th className="text-left py-2 px-3">Roles asignados</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredUsers.map((u, idx) => {
-                      const allRoles = rolesForUser(u.id);
-                      const isRowInactive =
-                        isSuperAdmin &&
-                        usersAcademyFilter !== 'all' &&
-                        (userAcademyStatusMap[u.id]?.[usersAcademyFilter] ?? true) === false;
-                      return (
-                        <tr
-                          key={u.id}
-                          className={
-                            'border-b last:border-b-0 cursor-pointer ' +
-                            (isRowInactive ? 'bg-rose-50/60 hover:bg-rose-50 ' : 'hover:bg-gray-50 ')
-                          }
-                          onClick={() => openUserDetail(u.id)}
-                        >
-                          <td className={"py-2 px-3 whitespace-nowrap " + (isRowInactive ? 'text-rose-700/80' : 'text-gray-700')}>
-                            {idx + 1}
-                          </td>
-                          <td className={"py-2 px-3 whitespace-nowrap " + (isRowInactive ? 'text-rose-700' : '')}>
-                            {u.full_name ?? '(Sin nombre)'}
-                            {isRowInactive && (
-                              <span className="ml-2 text-[11px] font-medium text-rose-700/90">(Inactivo)</span>
-                            )}
-                          </td>
-                          <td className={"py-2 px-3 whitespace-nowrap " + (isRowInactive ? 'text-rose-700/80' : 'text-gray-700')}>
-                            {userNationalIdMap[u.id] ?? '-'}
-                          </td>
-                          <td className={"py-2 px-3 whitespace-nowrap " + (isRowInactive ? 'text-rose-700/80' : '')}>
-                            {roleLabel(u.role)}
-                          </td>
-                          <td className={"py-2 px-3 text-xs " + (isRowInactive ? 'text-rose-700/80' : 'text-gray-700')}>
-                            {allRoles.map((r) => roleLabel(r)).join(', ') || '-'}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                  <table className="min-w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="border-b bg-gray-50">
+                        <th className="text-left py-2 px-3">#</th>
+                        <th className="text-left py-2 px-3">Nombre</th>
+                        <th className="text-left py-2 px-3">Documento</th>
+                        <th className="text-left py-2 px-3">Rol principal</th>
+                        <th className="text-left py-2 px-3">Roles asignados</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredUsers.map((u, idx) => {
+                        const allRoles = rolesForUser(u.id);
+                        const isRowInactive =
+                          isSuperAdmin &&
+                          usersAcademyFilter !== 'all' &&
+                          (userAcademyStatusMap[u.id]?.[usersAcademyFilter] ?? true) === false;
+                        return (
+                          <tr
+                            key={u.id}
+                            className={
+                              'border-b last:border-b-0 cursor-pointer ' +
+                              (isRowInactive ? 'bg-rose-50/60 hover:bg-rose-50 ' : 'hover:bg-gray-50 ')
+                            }
+                            onClick={() => openUserDetail(u.id)}
+                          >
+                            <td className={"py-2 px-3 whitespace-nowrap " + (isRowInactive ? 'text-rose-700/80' : 'text-gray-700')}>
+                              {idx + 1}
+                            </td>
+                            <td className={"py-2 px-3 whitespace-nowrap " + (isRowInactive ? 'text-rose-700' : '')}>
+                              {u.full_name ?? '(Sin nombre)'}
+                              {isRowInactive && (
+                                <span className="ml-2 text-[11px] font-medium text-rose-700/90">(Inactivo)</span>
+                              )}
+                            </td>
+                            <td className={"py-2 px-3 whitespace-nowrap " + (isRowInactive ? 'text-rose-700/80' : 'text-gray-700')}>
+                              {userNationalIdMap[u.id] ?? '-'}
+                            </td>
+                            <td className={"py-2 px-3 whitespace-nowrap " + (isRowInactive ? 'text-rose-700/80' : '')}>
+                              {roleLabel(u.role)}
+                            </td>
+                            <td className={"py-2 px-3 text-xs " + (isRowInactive ? 'text-rose-700/80' : 'text-gray-700')}>
+                              {allRoles.map((r) => roleLabel(r)).join(', ') || '-'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-                <div className="text-xs text-gray-600">
+                <div className="text-xs text-gray-600 font-semibold">
                   Admin: {roleSummary.admin} usuarios, Profesor: {roleSummary.coach} usuarios, Alumnos: {roleSummary.student} usuarios
                 </div>
               </div>
@@ -1525,7 +1578,7 @@ export default function UsersPage() {
                 <p className="text-sm text-gray-600">Cargando usuario...</p>
               ) : (
                 <form
-                  onSubmit={isAdminReadOnly ? (e) => e.preventDefault() : handleUpdateUser}
+                  onSubmit={canEditUsers ? handleUpdateUser : (e) => e.preventDefault()}
                   className="space-y-3"
                 >
                   {isSuperAdmin && (
@@ -1550,7 +1603,13 @@ export default function UsersPage() {
 
                       <div>
                         <label className="block text-xs mb-1 text-gray-600">Academia</label>
-                        <Popover open={detailStatusAcademyOpen} onOpenChange={setDetailStatusAcademyOpen}>
+                        <Popover
+                          open={detailStatusAcademyOpen}
+                          onOpenChange={(open) => {
+                            setDetailStatusAcademyOpen(open);
+                            if (!open) setDetailStatusAcademyQuery('');
+                          }}
+                        >
                           <PopoverTrigger asChild>
                             <Button
                               type="button"
@@ -1566,7 +1625,7 @@ export default function UsersPage() {
                                   return name || 'Seleccionar academia';
                                 })()}
                               </span>
-                              <ChevronDown className="h-4 w-4 text-gray-500" />
+                              <ChevronDown className="h-4 w-4 opacity-50" />
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-80 p-3" align="start">
@@ -1639,7 +1698,7 @@ export default function UsersPage() {
                         value={detailFirstName}
                         onChange={(e) => setDetailFirstName(e.target.value)}
                         required
-                        disabled={isAdminReadOnly}
+                        disabled={!canEditUsers}
                       />
                     </div>
                     <div>
@@ -1649,7 +1708,7 @@ export default function UsersPage() {
                         value={detailLastName}
                         onChange={(e) => setDetailLastName(e.target.value)}
                         required
-                        disabled={isAdminReadOnly}
+                        disabled={!canEditUsers}
                       />
                     </div>
                   </div>
@@ -1662,7 +1721,7 @@ export default function UsersPage() {
                         value={detailNationalId}
                         onChange={(e) => setDetailNationalId(e.target.value)}
                         required
-                        disabled={isAdminReadOnly}
+                        disabled={!canEditUsers}
                       />
                     </div>
                     <div>
@@ -1672,7 +1731,7 @@ export default function UsersPage() {
                         value={detailPhone}
                         onChange={(e) => setDetailPhone(e.target.value)}
                         required
-                        disabled={isAdminReadOnly}
+                        disabled={!canEditUsers}
                       />
                     </div>
                   </div>
@@ -1688,7 +1747,7 @@ export default function UsersPage() {
                         value={detailEmail}
                         onChange={(e) => setDetailEmail(e.target.value)}
                         required
-                        disabled={isAdminReadOnly}
+                        disabled={!canEditUsers}
                       />
                     </div>
                     <div>
@@ -1706,7 +1765,7 @@ export default function UsersPage() {
                             type="checkbox"
                             checked={detailRoles.includes(role)}
                             onChange={() => toggleDetailRole(role)}
-                            disabled={isAdminReadOnly}
+                            disabled={!canEditUsers}
                           />
                           <span>{roleLabel(role)}</span>
                         </label>
@@ -1804,7 +1863,7 @@ export default function UsersPage() {
                           value={detailCoachFee}
                           onChange={(e) => setDetailCoachFee(e.target.value)}
                           onBlur={() => {
-                            const clean = detailCoachFee.replace(/[^0-9]/g, '');
+                            const clean = detailCoachFee.replace(/[^0-9]/g, '').replace(',', '.').trim();
                             if (!clean) {
                               setDetailCoachFee('');
                               return;
@@ -1831,23 +1890,25 @@ export default function UsersPage() {
                   )}
 
                   <div className="flex justify-between items-center gap-2 pt-2 border-t mt-2">
-                    {isAdminReadOnly ? (
+                    {!canEditUsers ? (
                       <p className="text-xs text-gray-600">
-                        Solo el super administrador puede editar o eliminar usuarios.
+                        No tenés permisos para editar usuarios.
                       </p>
                     ) : (
                       <>
-                        <button
-                          type="button"
-                          className="px-3 py-2 border rounded text-xs text-red-600 border-red-200 hover:bg-red-50"
-                          onClick={handleDeleteUser}
-                          disabled={detailDeleting || detailSubmitting}
-                        >
-                          {detailDeleting ? 'Eliminando...' : 'Eliminar usuario'}
-                        </button>
+                        {canDeleteUsers && (
+                          <Button
+                            variant="destructive"
+                            className="shrink-0 h-8 px-3 text-xs"
+                            onClick={handleDetailDelete}
+                            disabled={detailDeleting}
+                          >
+                            {detailDeleting ? 'Eliminando...' : 'Eliminar usuario'}
+                          </Button>
+                        )}
                         <button
                           type="submit"
-                          className="px-3 py-2 bg-[#3cadaf] hover:bg-[#31435d] text-white rounded text-xs disabled:opacity-50"
+                          className="h-8 px-3 bg-[#3cadaf] hover:bg-[#31435d] text-white rounded text-xs disabled:opacity-50"
                           disabled={detailSubmitting || detailDeleting}
                         >
                           {detailSubmitting ? 'Guardando cambios...' : 'Guardar cambios'}
