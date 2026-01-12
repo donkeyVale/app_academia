@@ -1,0 +1,13 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.nativatech.agendo",
+      "sha256_cert_fingerprints": [
+        "A1:FD:05:3C:CF:5D:1F:B5:66:3D:0B:15:BB:42:22:BF:F1:A2:52:67:CE:01:F4:96:1C:80:F5:00:44:3B:C2:DF",
+        "50:A1:C4:18:4F:10:33:B5:62:BA:B7:3B:E9:F4:10:69:8A:2A:F7:92:DD:1A:BA:88:59:91:0A:DC:F5:6F:22:D1"
+      ]
+    }
+  }
+]
