@@ -184,6 +184,51 @@ export default function UsersPage() {
     }
   };
 
+  const handleRequestDeactivation = async () => {
+    if (!detailUserId) return;
+    if (!currentUserId) {
+      setDeactivationRequestError('No se pudo identificar al usuario actual.');
+      return;
+    }
+    if (!selectedAcademyId) {
+      setDeactivationRequestError('Seleccioná una academia para solicitar inactivación.');
+      return;
+    }
+
+    setDeactivationRequestSubmitting(true);
+    setDeactivationRequestError(null);
+    try {
+      const res = await fetch('/api/admin/request-user-deactivation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentUserId,
+          targetUserId: detailUserId,
+          academyId: selectedAcademyId,
+          reason: deactivationRequestReason,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        const message = json?.error ?? 'No se pudo registrar la solicitud.';
+        setDeactivationRequestError(message);
+        toast.error(message);
+        return;
+      }
+
+      toast.success('Solicitud enviada al super admin.');
+      setDeactivationRequestOpen(false);
+      setDeactivationRequestReason('');
+    } catch (e: any) {
+      const message = e?.message ?? 'Error inesperado enviando la solicitud.';
+      setDeactivationRequestError(message);
+      toast.error(message);
+    } finally {
+      setDeactivationRequestSubmitting(false);
+    }
+  };
+
   // UI: secciones plegables
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [showUsersList, setShowUsersList] = useState(false);
@@ -195,6 +240,10 @@ export default function UsersPage() {
   const [detailSubmitting, setDetailSubmitting] = useState(false);
   const [detailDeleting, setDetailDeleting] = useState(false);
   const [detailUserId, setDetailUserId] = useState<string | null>(null);
+  const [deactivationRequestOpen, setDeactivationRequestOpen] = useState(false);
+  const [deactivationRequestReason, setDeactivationRequestReason] = useState('');
+  const [deactivationRequestSubmitting, setDeactivationRequestSubmitting] = useState(false);
+  const [deactivationRequestError, setDeactivationRequestError] = useState<string | null>(null);
   const [detailFirstName, setDetailFirstName] = useState('');
   const [detailLastName, setDetailLastName] = useState('');
   const [detailNationalId, setDetailNationalId] = useState('');
@@ -793,6 +842,10 @@ export default function UsersPage() {
     setDetailError(null);
     setDetailSubmitting(false);
     setDetailDeleting(false);
+    setDeactivationRequestOpen(false);
+    setDeactivationRequestReason('');
+    setDeactivationRequestSubmitting(false);
+    setDeactivationRequestError(null);
     setDetailCoachFee('');
     setDetailCoachAcademyId(null);
     setDetailCoachAcademies([]);
@@ -1568,7 +1621,10 @@ export default function UsersPage() {
               <button
                 type="button"
                 className="text-xs text-gray-500 hover:text-gray-700"
-                onClick={() => setDetailOpen(false)}
+                onClick={() => {
+                  setDetailOpen(false);
+                  setDeactivationRequestOpen(false);
+                }}
               >
                 Cerrar
               </button>
@@ -1688,6 +1744,34 @@ export default function UsersPage() {
                           </PopoverContent>
                         </Popover>
                       </div>
+                    </div>
+                  )}
+
+                  {role === 'admin' && (
+                    <div className="border rounded-md bg-amber-50/60 px-3 py-2">
+                      <div className="text-sm font-medium text-amber-900">Inactivación de alumno</div>
+                      <div className="text-xs text-amber-900/80 mt-1">
+                        Como admin podés solicitar la inactivación de alumnos, pero la acción la realiza el super admin.
+                      </div>
+                      <div className="mt-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-8 px-3 text-xs"
+                          disabled={!detailRoles.includes('student') || !selectedAcademyId}
+                          onClick={() => {
+                            setDeactivationRequestError(null);
+                            setDeactivationRequestOpen(true);
+                          }}
+                        >
+                          Solicitar inactivación
+                        </Button>
+                      </div>
+                      {!detailRoles.includes('student') && (
+                        <div className="text-[11px] text-amber-900/80 mt-2">
+                          Solo disponible para usuarios con rol de alumno.
+                        </div>
+                      )}
                     </div>
                   )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1920,6 +2004,60 @@ export default function UsersPage() {
               )}
             </div>
           </div>
+
+          {deactivationRequestOpen && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+              <div className="bg-white w-full max-w-md rounded-lg shadow-lg">
+                <div className="flex items-center justify-between px-4 pt-4 pb-2 border-b">
+                  <h3 className="text-base font-semibold text-[#31435d]">Solicitar inactivación</h3>
+                  <button
+                    type="button"
+                    className="text-xs text-gray-500 hover:text-gray-700"
+                    onClick={() => setDeactivationRequestOpen(false)}
+                  >
+                    Cerrar
+                  </button>
+                </div>
+                <div className="px-4 py-3 space-y-3 text-sm">
+                  <p className="text-sm text-gray-700">
+                    Esta acción no inactiva al alumno automáticamente. Se notificará al super admin para que decida.
+                  </p>
+                  <div>
+                    <label className="block text-xs mb-1 text-gray-600">Motivo (opcional)</label>
+                    <Input
+                      type="text"
+                      value={deactivationRequestReason}
+                      onChange={(e) => setDeactivationRequestReason(e.target.value)}
+                      className="h-10 text-base"
+                      placeholder="Ej: Alumno ya no entrena en la academia"
+                    />
+                  </div>
+                  {deactivationRequestError && (
+                    <div className="text-xs text-rose-700">{deactivationRequestError}</div>
+                  )}
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-8 px-3 text-xs"
+                      onClick={() => setDeactivationRequestOpen(false)}
+                      disabled={deactivationRequestSubmitting}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="button"
+                      className="h-8 px-3 text-xs"
+                      onClick={handleRequestDeactivation}
+                      disabled={deactivationRequestSubmitting}
+                    >
+                      {deactivationRequestSubmitting ? 'Enviando...' : 'Enviar solicitud'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </section>
