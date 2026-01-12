@@ -56,7 +56,7 @@ async function sendDeactivationRequestEmail(params: {
   await transporter.sendMail({
     from,
     to: params.to,
-    subject: 'Solicitud de inactivación de alumno',
+    subject: 'Inactivación de usuario (solicitud)',
     html,
   });
 

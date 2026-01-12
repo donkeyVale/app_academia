@@ -124,7 +124,7 @@ async function sendAdminCreatedUserEmail(params: {
   await transporter.sendMail({
     from,
     to: params.to,
-    subject: 'Nuevo usuario creado por admin (Academia)',
+    subject: 'Alta de usuario (creado por admin de academia)',
     html,
   });
 
