@@ -2,6 +2,7 @@ package com.nativatech.agendo;
 
 import android.Manifest;
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Build;
 
 import androidx.core.app.ActivityCompat;
@@ -22,11 +23,52 @@ public class MainActivity extends BridgeActivity {
       } catch (Throwable t) {
       }
     }
+
+    try {
+      handleDeepLink(getIntent());
+    } catch (Throwable t) {
+    }
   }
 
   @Override
   protected void onNewIntent(Intent intent) {
     super.onNewIntent(intent);
     setIntent(intent);
+
+    try {
+      handleDeepLink(intent);
+    } catch (Throwable t) {
+    }
+  }
+
+  private void handleDeepLink(Intent intent) {
+    if (intent == null) return;
+    Uri data = intent.getData();
+    if (data == null) return;
+
+    String url = data.toString();
+    if (url == null || url.trim().isEmpty()) return;
+
+    String finalUrl = null;
+    if (url.startsWith("agendo://")) {
+      String rest = url.substring("agendo://".length());
+      if (!rest.startsWith("/")) rest = "/" + rest;
+      finalUrl = "https://agendo.nativatech.com.py" + rest;
+    } else if (url.startsWith("https://agendo.nativatech.com.py") || url.startsWith("http://agendo.nativatech.com.py")) {
+      finalUrl = url;
+    }
+
+    if (finalUrl == null) return;
+
+    final String toLoad = finalUrl;
+    runOnUiThread(
+        () -> {
+          try {
+            if (getBridge() != null && getBridge().getWebView() != null) {
+              getBridge().getWebView().loadUrl(toLoad);
+            }
+          } catch (Throwable t) {
+          }
+        });
   }
 }
