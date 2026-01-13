@@ -36,7 +36,9 @@ public class ApplicationClass extends Application {
                 finalUrl = "https://agendo.nativatech.com.py" + finalUrl;
               }
 
-              Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(finalUrl));
+              Intent intent = new Intent(getApplicationContext(), MainActivity.class);
+              intent.setAction(Intent.ACTION_VIEW);
+              intent.setData(Uri.parse(finalUrl));
               intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
               startActivity(intent);
             } catch (Throwable t) {
