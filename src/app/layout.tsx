@@ -57,6 +57,7 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.json" />
         <meta name="apple-mobile-web-app-title" content="AGENDO" />
         <meta name="theme-color" content="#3cadaf" />
+        <script src="capacitor://localhost/capacitor.js"></script>
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#f5f7fa] text-[#31435d]`}
