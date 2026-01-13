@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "456359970450",
+    "project_id": "agendo-31604",
+    "storage_bucket": "agendo-31604.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:456359970450:android:2c20ea9c0126c59196c84b",
+        "android_client_info": {
+          "package_name": "com.nativatech.agendo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCeQhs9Xz7ZjR-cQKQz0F0RrjXSELQ2XYY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
