@@ -36,7 +36,19 @@ export default function LoginPage() {
       const params = new URLSearchParams(window.location.search);
       const next = params.get('next');
       if (next && next.startsWith('/')) window.location.href = next;
-      else window.location.href = '/';
+      else {
+        try {
+          const pending = window.localStorage.getItem('pendingDeepLink');
+          if (pending && pending.startsWith('/')) {
+            window.localStorage.removeItem('pendingDeepLink');
+            window.location.href = pending;
+            setLoading(false);
+            return;
+          }
+        } catch {
+        }
+        window.location.href = '/';
+      }
     }
     setLoading(false);
   };
