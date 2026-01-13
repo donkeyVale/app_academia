@@ -51,6 +51,14 @@ public class MainActivity extends BridgeActivity {
     if (url == null || url.trim().isEmpty()) return;
 
     try {
+      int embedded = url.indexOf("agendo://");
+      if (embedded > 0) {
+        url = url.substring(embedded);
+      }
+    } catch (Throwable t) {
+    }
+
+    try {
       Log.d("AgendoDeepLink", "intentUrl=" + url);
     } catch (Throwable t) {
     }
@@ -81,7 +89,40 @@ public class MainActivity extends BridgeActivity {
 
       finalUrl = "https://agendo.nativatech.com.py" + path;
     } else if (url.startsWith("https://agendo.nativatech.com.py") || url.startsWith("http://agendo.nativatech.com.py")) {
-      finalUrl = url;
+      try {
+        Uri u = Uri.parse(url);
+        String p = u.getPath();
+        if (p != null && p.startsWith("/agendo://")) {
+          url = "agendo://" + p.substring("/agendo://".length());
+          String rest = url.substring("agendo://".length());
+          int cut = rest.length();
+          int q = rest.indexOf('?');
+          int h = rest.indexOf('#');
+          if (q >= 0 && q < cut) cut = q;
+          if (h >= 0 && h < cut) cut = h;
+          rest = rest.substring(0, cut);
+          while (rest.startsWith("/")) rest = rest.substring(1);
+          while (rest.endsWith("/")) rest = rest.substring(0, rest.length() - 1);
+
+          String routeKey = rest;
+          int slash = routeKey.indexOf('/');
+          if (slash >= 0) routeKey = routeKey.substring(0, slash);
+
+          String path = null;
+          if (routeKey.equals("schedule")) path = "/schedule";
+          else if (routeKey.equals("finance")) path = "/finance";
+          else if (routeKey.equals("students")) path = "/students";
+          else if (routeKey.equals("users")) path = "/users";
+          else if (routeKey.isEmpty()) path = "/";
+          else path = "/" + routeKey;
+
+          finalUrl = "https://agendo.nativatech.com.py" + path;
+        } else {
+          finalUrl = url;
+        }
+      } catch (Throwable t) {
+        finalUrl = url;
+      }
     }
 
     if (finalUrl == null) return;
