@@ -27,6 +27,33 @@ public class ApplicationClass extends Application {
               JSONObject data = event.getNotification().getAdditionalData();
               String url = data != null ? data.optString("url", null) : null;
               if (url == null || url.trim().isEmpty()) {
+                url = data != null ? data.optString("u", null) : null;
+              }
+              if (url == null || url.trim().isEmpty()) {
+                url = data != null ? data.optString("launch_url", null) : null;
+              }
+              if (url == null || url.trim().isEmpty()) {
+                url = data != null ? data.optString("launchURL", null) : null;
+              }
+              if (url == null || url.trim().isEmpty()) {
+                try {
+                  Object notif = event.getNotification();
+                  java.lang.reflect.Method m = notif.getClass().getMethod("getLaunchURL");
+                  Object v = m.invoke(notif);
+                  if (v instanceof String) url = (String) v;
+                } catch (Throwable t) {
+                }
+              }
+              if (url == null || url.trim().isEmpty()) {
+                try {
+                  Object notif = event.getNotification();
+                  java.lang.reflect.Method m = notif.getClass().getMethod("getLaunchUrl");
+                  Object v = m.invoke(notif);
+                  if (v instanceof String) url = (String) v;
+                } catch (Throwable t) {
+                }
+              }
+              if (url == null || url.trim().isEmpty()) {
                 return;
               }
 
