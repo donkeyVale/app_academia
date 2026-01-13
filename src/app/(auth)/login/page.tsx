@@ -32,7 +32,12 @@ export default function LoginPage() {
     setInfo(null);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) setError(error.message);
-    else window.location.href = '/';
+    else {
+      const params = new URLSearchParams(window.location.search);
+      const next = params.get('next');
+      if (next && next.startsWith('/')) window.location.href = next;
+      else window.location.href = '/';
+    }
     setLoading(false);
   };
 

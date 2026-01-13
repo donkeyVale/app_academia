@@ -25,10 +25,19 @@ export default async function middleware(req: NextRequest) {
   if (!session && !isLogin) {
     const url = req.nextUrl.clone();
     url.pathname = '/login';
+    const nextPath = req.nextUrl.pathname + req.nextUrl.search;
+    url.searchParams.set('next', nextPath);
     return NextResponse.redirect(url);
   }
 
   if (session && isLogin) {
+    const next = req.nextUrl.searchParams.get('next');
+    if (next && next.startsWith('/')) {
+      const url = req.nextUrl.clone();
+      url.pathname = next;
+      url.search = '';
+      return NextResponse.redirect(url);
+    }
     const url = req.nextUrl.clone();
     url.pathname = '/';
     return NextResponse.redirect(url);
