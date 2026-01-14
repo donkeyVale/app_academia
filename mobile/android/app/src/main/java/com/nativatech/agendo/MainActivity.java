@@ -9,6 +9,7 @@ import android.util.Log;
 import androidx.core.app.ActivityCompat;
 
 import com.getcapacitor.BridgeActivity;
+import com.onesignal.OneSignal;
 
 public class MainActivity extends BridgeActivity {
 
@@ -22,6 +23,11 @@ public class MainActivity extends BridgeActivity {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
       try {
         ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIFICATIONS);
+      } catch (Throwable t) {
+      }
+    } else {
+      try {
+        OneSignal.getNotifications().requestPermission(true);
       } catch (Throwable t) {
       }
     }
@@ -143,5 +149,17 @@ public class MainActivity extends BridgeActivity {
           } catch (Throwable t) {
           }
         });
+  }
+
+  @Override
+  public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+    super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+
+    if (requestCode == REQ_NOTIFICATIONS) {
+      try {
+        OneSignal.getNotifications().requestPermission(true);
+      } catch (Throwable t) {
+      }
+    }
   }
 }
