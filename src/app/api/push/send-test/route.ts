@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // @ts-ignore - web-push no tiene tipos instalados en este proyecto
 import webPush from 'web-push';
 import { supabaseAdmin } from '@/lib/supabase-service';
+import { sendOneSignalNotification } from '@/lib/onesignal-server';
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,6 +41,19 @@ export async function POST(req: NextRequest) {
       body: 'Si ves esto, las notificaciones push están funcionando.',
       data: { url: '/' },
     });
+
+    // OneSignal (Android/iOS) - best effort
+    try {
+      await sendOneSignalNotification({
+        externalUserIds: [userId],
+        title: 'Notificación de prueba',
+        body: 'Si ves esto, las notificaciones push están funcionando.',
+        launchUrl: 'agendo://schedule',
+        data: { url: '/schedule' },
+      });
+    } catch (e) {
+      console.error('Error enviando OneSignal send-test', e);
+    }
 
     const results = await Promise.allSettled(
       subs.map((sub: any) =>
