@@ -7,6 +7,7 @@ import android.os.Build;
 import android.util.Log;
 
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
 import com.getcapacitor.BridgeActivity;
 import com.onesignal.OneSignal;
@@ -22,7 +23,12 @@ public class MainActivity extends BridgeActivity {
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
       try {
-        ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIFICATIONS);
+        int granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS);
+        if (granted == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+          oneSignalOptInBestEffort();
+        } else {
+          ActivityCompat.requestPermissions(this, new String[] {Manifest.permission.POST_NOTIFICATIONS}, REQ_NOTIFICATIONS);
+        }
       } catch (Throwable t) {
       }
     } else {

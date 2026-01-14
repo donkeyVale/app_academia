@@ -38,21 +38,30 @@ export async function POST(req: NextRequest) {
       data: { url: '/' },
     });
 
+    let oneSignalId: string | null = null;
+    let oneSignalError: string | null = null;
+
     // OneSignal (Android/iOS) - best effort
     try {
-      await sendOneSignalNotification({
+      const res = await sendOneSignalNotification({
         externalUserIds: [userId],
         title: 'Notificación de prueba',
         body: 'Si ves esto, las notificaciones push están funcionando.',
         launchUrl: 'agendo://schedule',
         data: { url: '/schedule' },
       });
+      oneSignalId = (res as any)?.id ?? null;
     } catch (e) {
+      try {
+        oneSignalError = (e as any)?.message ?? String(e);
+      } catch {
+        oneSignalError = 'unknown_error';
+      }
       console.error('Error enviando OneSignal send-test', e);
     }
 
     if (!subs || subs.length === 0) {
-      return NextResponse.json({ ok: 0, total: 0, skipped: 'no_push_subscriptions' });
+      return NextResponse.json({ ok: 0, total: 0, skipped: 'no_push_subscriptions', onesignal_id: oneSignalId, onesignal_error: oneSignalError });
     }
 
     const results = await Promise.allSettled(
@@ -85,7 +94,7 @@ export async function POST(req: NextRequest) {
 
     const ok = results.filter((r) => r.status === 'fulfilled').length;
 
-    return NextResponse.json({ ok, total: subs.length });
+    return NextResponse.json({ ok, total: subs.length, onesignal_id: oneSignalId, onesignal_error: oneSignalError });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? 'Error enviando notificación de prueba' }, { status: 500 });
   }
