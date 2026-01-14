@@ -263,6 +263,16 @@ export default function SchedulePage() {
     setSelectedAcademyReady(true);
   }, []);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !selectedAcademyReady) return;
+    // Evitar pestaneo al cambiar de academia: limpiar inmediatamente los datos previos.
+    setClasses([]);
+    setBookingsCount({});
+    setStudentsByClass({});
+    setAttendanceMarkedByClass({});
+    setCoachNameByCoachId({});
+  }, [selectedAcademyId, selectedAcademyReady]);
+
   // Cargar locations vinculadas a la academia seleccionada
   useEffect(() => {
     setAcademyLocationsReady(false);
@@ -3176,7 +3186,7 @@ export default function SchedulePage() {
                 <p className="text-xs text-gray-500">
                   Usá esta lista para marcar asistencia en clases que ya terminaron pero aún son recientes (últimas 24 horas).
                 </p>
-                {loading ? (
+                {loading || (selectedAcademyId && !academyLocationsReady) ? (
                   <p className="text-sm text-gray-600">Cargando clases...</p>
                 ) : recentClasses.length === 0 ? (
                   <p className="text-sm text-gray-600">
