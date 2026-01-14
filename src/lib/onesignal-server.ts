@@ -23,7 +23,10 @@ export async function sendOneSignalNotification(params: OneSignalNotificationPar
   };
 
   const baseUrlRaw = process.env.NEXT_PUBLIC_BASE_URL ?? process.env.APP_BASE_URL ?? 'https://agendo.nativatech.com.py';
-  const baseUrl = typeof baseUrlRaw === 'string' ? baseUrlRaw.replace(/\/+$/, '') : 'https://agendo.nativatech.com.py';
+  const baseUrlCandidate = typeof baseUrlRaw === 'string' ? baseUrlRaw.replace(/\/+$/, '') : 'https://agendo.nativatech.com.py';
+  const baseUrl = /^(https?:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?$/i.test(baseUrlCandidate)
+    ? 'https://agendo.nativatech.com.py'
+    : baseUrlCandidate;
   payload.large_icon = `${baseUrl}/icons/logoHome.png`;
 
   if (params.launchUrl) payload.url = params.launchUrl;
