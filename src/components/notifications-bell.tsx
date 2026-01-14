@@ -54,8 +54,10 @@ export function NotificationsBell() {
         .eq('user_id', uid)
         .is('read_at', null);
 
-      listQ = listQ.eq('data->>academyId', selectedAcademyId);
-      countQ = countQ.eq('data->>academyId', selectedAcademyId);
+      if (selectedAcademyId) {
+        listQ = listQ.eq('data->>academyId', selectedAcademyId);
+        countQ = countQ.eq('data->>academyId', selectedAcademyId);
+      }
 
       const [listRes, countRes] = await Promise.all([listQ, countQ]);
 
@@ -112,7 +114,6 @@ export function NotificationsBell() {
   useEffect(() => {
     if (!userId) return;
     if (!academyReady) return;
-    if (!selectedAcademyId) return;
     load(userId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, selectedAcademyId, academyReady]);
@@ -132,7 +133,6 @@ export function NotificationsBell() {
         },
         () => {
           if (!academyReady) return;
-          if (!selectedAcademyId) return;
           load(userId);
         }
       )

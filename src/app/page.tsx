@@ -159,10 +159,6 @@ export default function Page() {
   const [studentRemainingClasses, setStudentRemainingClasses] = useState<number | null>(null);
 
   const handleLogout = async () => {
-    try {
-      await oneSignalLogout();
-    } catch {
-    }
     await supabase.auth.signOut();
     window.location.href = '/login';
   };
