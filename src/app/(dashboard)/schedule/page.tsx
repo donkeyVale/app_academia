@@ -304,6 +304,12 @@ export default function SchedulePage() {
       if (selectedAcademyId && !academyLocationsReady) return;
 
       setLoading(true);
+      // Evitar pestaneo: limpiar datos previos mientras recargamos para otra academia.
+      setClasses([]);
+      setBookingsCount({});
+      setStudentsByClass({});
+      setAttendanceMarkedByClass({});
+      setCoachNameByCoachId({});
       setError(null);
       // Load locations
       const { data: locs, error: eLoc } = await supabase
@@ -3170,7 +3176,9 @@ export default function SchedulePage() {
                 <p className="text-xs text-gray-500">
                   Usá esta lista para marcar asistencia en clases que ya terminaron pero aún son recientes (últimas 24 horas).
                 </p>
-                {recentClasses.length === 0 ? (
+                {loading ? (
+                  <p className="text-sm text-gray-600">Cargando clases...</p>
+                ) : recentClasses.length === 0 ? (
                   <p className="text-sm text-gray-600">
                     No hay clases recientes para marcar asistencia.
                   </p>
