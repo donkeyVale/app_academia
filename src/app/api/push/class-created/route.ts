@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import webPush from 'web-push';
 import { supabaseAdmin } from '@/lib/supabase-service';
 import { createInAppNotifications } from '@/lib/in-app-notifications';
+import { sendOneSignalNotification } from '@/lib/onesignal-server';
 
 export async function POST(req: NextRequest) {
   try {
@@ -422,6 +423,35 @@ export async function POST(req: NextRequest) {
       ]);
     } catch (e) {
       console.error('Error creando notificación in-app (class-created)', e);
+    }
+
+    // OneSignal (Android/iOS) - best effort
+    try {
+      if (allowedStudentUserIds.size > 0) {
+        await sendOneSignalNotification({
+          externalUserIds: Array.from(allowedStudentUserIds),
+          title: 'Nueva clase creada',
+          body: studentBody,
+          launchUrl: 'agendo://schedule',
+          data: { url: '/schedule', classId, dateIso, academyId },
+        });
+      }
+    } catch (e) {
+      console.error('Error enviando OneSignal class-created (students)', e);
+    }
+
+    try {
+      if (allowedCoachUserIds.size > 0) {
+        await sendOneSignalNotification({
+          externalUserIds: Array.from(allowedCoachUserIds),
+          title: 'Nueva clase creada',
+          body: coachBody,
+          launchUrl: 'agendo://schedule',
+          data: { url: '/schedule', classId, dateIso, academyId },
+        });
+      }
+    } catch (e) {
+      console.error('Error enviando OneSignal class-created (coach)', e);
     }
 
     const studentSubs = subs.filter((s) => allowedStudentUserIds.has(s.user_id));

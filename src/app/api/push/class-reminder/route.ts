@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import webPush from 'web-push';
 import { supabaseAdmin } from '@/lib/supabase-service';
 import { createInAppNotifications } from '@/lib/in-app-notifications';
+import { sendOneSignalNotification } from '@/lib/onesignal-server';
 
 type SubscriptionRow = {
   user_id: string;
@@ -127,6 +128,19 @@ export async function POST(req: NextRequest) {
       inAppInserted = res.inserted;
     } catch (e) {
       console.error('Error creando notificación in-app (class-reminder)', e);
+    }
+
+    // OneSignal (Android/iOS) - best effort
+    try {
+      await sendOneSignalNotification({
+        externalUserIds: [studentUserId],
+        title: 'Recordatorio',
+        body: bodyText ?? 'Recordá que tenés clases agendadas, revisá tu agenda!!',
+        launchUrl: 'agendo://schedule',
+        data: { url: '/schedule', classId, dateIso },
+      });
+    } catch (e) {
+      console.error('Error enviando OneSignal class-reminder', e);
     }
 
     if (subs.length === 0) {

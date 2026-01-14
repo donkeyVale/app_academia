@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import webPush from 'web-push';
 import { supabaseAdmin } from '@/lib/supabase-service';
 import { createInAppNotifications } from '@/lib/in-app-notifications';
+import { sendOneSignalNotification } from '@/lib/onesignal-server';
 
 function formatWhen(iso?: string | null) {
   if (!iso) return '';
@@ -226,6 +227,35 @@ export async function POST(req: NextRequest) {
       await createInAppNotifications(inAppRows);
     } catch (e) {
       console.error('Error creando notificación in-app (payment-pending)', e);
+    }
+
+    // OneSignal (Android/iOS) - best effort
+    try {
+      if (allowedStudent) {
+        await sendOneSignalNotification({
+          externalUserIds: [studentUserId],
+          title: 'Pago pendiente',
+          body: `Se asignó el plan “${planName}” y aún no se registró el pago. Si ya pagaste, avisá al admin para que lo registre.`,
+          launchUrl: 'agendo://finance',
+          data: { url: '/finance', academyId, studentId, studentPlanId },
+        });
+      }
+    } catch (e) {
+      console.error('Error enviando OneSignal payment-pending (student)', e);
+    }
+
+    try {
+      if (allowedAdminIds.length > 0) {
+        await sendOneSignalNotification({
+          externalUserIds: allowedAdminIds,
+          title: 'Pago pendiente',
+          body: `${who}Plan “${planName}” asignado${purchasedAtText ? ` el ${purchasedAtText}` : ''} y aún no se registró ningún pago.`,
+          launchUrl: 'agendo://finance',
+          data: { url: '/finance', academyId, studentId, studentPlanId },
+        });
+      }
+    } catch (e) {
+      console.error('Error enviando OneSignal payment-pending (admins)', e);
     }
 
     const studentSubs = allowedStudent ? subs.filter((s) => s.user_id === studentUserId) : [];

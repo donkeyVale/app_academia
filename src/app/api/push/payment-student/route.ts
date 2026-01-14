@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import webPush from 'web-push';
 import { supabaseAdmin } from '@/lib/supabase-service';
 import { createInAppNotifications } from '@/lib/in-app-notifications';
+import { sendOneSignalNotification } from '@/lib/onesignal-server';
 
 function formatGs(amount: number) {
   try {
@@ -193,6 +194,19 @@ export async function POST(req: NextRequest) {
       inAppInserted = res.inserted;
     } catch (e) {
       console.error('Error creando notificación in-app (payment-student)', e);
+    }
+
+    // OneSignal (Android/iOS) - best effort
+    try {
+      await sendOneSignalNotification({
+        externalUserIds: [studentUserId],
+        title,
+        body: bodyText,
+        launchUrl: 'agendo://finance',
+        data: { url: '/finance', academyId, studentId, studentPlanId, amount: amountNum, currency, paymentDate },
+      });
+    } catch (e) {
+      console.error('Error enviando OneSignal payment-student', e);
     }
 
     const { data: subs, error: subsErr } = await supabaseAdmin
