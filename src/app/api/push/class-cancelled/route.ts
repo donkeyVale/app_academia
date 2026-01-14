@@ -190,7 +190,7 @@ export async function POST(req: NextRequest) {
 
     const subs = (subsAll ?? []) as any[];
     if (subs.length === 0) {
-      return NextResponse.json({ error: 'No hay suscripciones registradas para los usuarios objetivo.' }, { status: 404 });
+      return NextResponse.json({ ok: 0, total: 0, skipped: 'no_push_subscriptions' });
     }
 
     // Nombre del actor que canceló (nominal)

@@ -230,7 +230,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!subs || subs.length === 0) {
-      return NextResponse.json({ error: 'No hay suscripciones registradas para los admins objetivo.' }, { status: 404 });
+      return NextResponse.json({ ok: 0, total: 0, skipped: 'no_push_subscriptions' });
     }
 
     const results = await Promise.allSettled(

@@ -32,10 +32,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: subsError.message }, { status: 500 });
     }
 
-    if (!subs || subs.length === 0) {
-      return NextResponse.json({ error: 'No hay suscripciones registradas para este usuario.' }, { status: 404 });
-    }
-
     const payload = JSON.stringify({
       title: 'Notificación de prueba',
       body: 'Si ves esto, las notificaciones push están funcionando.',
@@ -53,6 +49,10 @@ export async function POST(req: NextRequest) {
       });
     } catch (e) {
       console.error('Error enviando OneSignal send-test', e);
+    }
+
+    if (!subs || subs.length === 0) {
+      return NextResponse.json({ ok: 0, total: 0, skipped: 'no_push_subscriptions' });
     }
 
     const results = await Promise.allSettled(
