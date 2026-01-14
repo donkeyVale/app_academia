@@ -160,7 +160,9 @@ export default function SchedulePage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [studentId, setStudentId] = useState<string | null>(null);
   const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
+  const [selectedAcademyReady, setSelectedAcademyReady] = useState(false);
   const [academyLocationIds, setAcademyLocationIds] = useState<Set<string>>(new Set());
+  const [academyLocationsReady, setAcademyLocationsReady] = useState(false);
   const [currentStudentFullName, setCurrentStudentFullName] = useState<string | null>(null);
 
   // Form state
@@ -258,12 +260,15 @@ export default function SchedulePage() {
     if (typeof window === 'undefined') return;
     const stored = window.localStorage.getItem('selectedAcademyId');
     setSelectedAcademyId(stored && stored.trim() ? stored : null);
+    setSelectedAcademyReady(true);
   }, []);
 
   // Cargar locations vinculadas a la academia seleccionada
   useEffect(() => {
+    setAcademyLocationsReady(false);
     if (!selectedAcademyId) {
       setAcademyLocationIds(new Set());
+      setAcademyLocationsReady(true);
       return;
     }
     (async () => {
@@ -275,6 +280,7 @@ export default function SchedulePage() {
         if (error) {
           console.error('Error cargando academy_locations en Agenda', error);
           setAcademyLocationIds(new Set());
+          setAcademyLocationsReady(true);
           return;
         }
         const ids = new Set(
@@ -283,15 +289,20 @@ export default function SchedulePage() {
             .filter((id): id is string => !!id)
         );
         setAcademyLocationIds(ids);
+        setAcademyLocationsReady(true);
       } catch (e) {
         console.error('Error cargando academy_locations en Agenda', e);
         setAcademyLocationIds(new Set());
+        setAcademyLocationsReady(true);
       }
     })();
   }, [selectedAcademyId, supabase]);
 
   useEffect(() => {
     (async () => {
+      if (typeof window !== 'undefined' && !selectedAcademyReady) return;
+      if (selectedAcademyId && !academyLocationsReady) return;
+
       setLoading(true);
       setError(null);
       // Load locations
@@ -418,6 +429,16 @@ export default function SchedulePage() {
 
       setCoaches(finalCoaches);
       setStudents(finalStudents);
+
+      if (selectedAcademyId && academyLocationsReady && academyLocationIds.size === 0) {
+        setClasses([]);
+        setBookingsCount({});
+        setStudentsByClass({});
+        setAttendanceMarkedByClass({});
+        setCoachNameByCoachId({});
+        setLoading(false);
+        return;
+      }
 
       // Load classes in a safe window (from last 24h to next 90 days) para poder ver varias clases recurrentes futuras
       const now = new Date();
@@ -558,7 +579,7 @@ export default function SchedulePage() {
       }
       setLoading(false);
     })();
-  }, [supabase, selectedAcademyId, academyLocationIds]);
+  }, [supabase, selectedAcademyId, academyLocationIds, selectedAcademyReady, academyLocationsReady]);
 
   useEffect(() => {
     (async () => {
