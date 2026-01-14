@@ -423,19 +423,31 @@ export default function SchedulePage() {
       const now = new Date();
       const from = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       const to = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
-      const { data: clsData, error: e3 } = await supabase
+      let clsQuery = supabase
         .from('class_sessions')
-        .select('*')
+        .select('*, courts!inner(location_id)')
         .gte('date', from.toISOString())
         .lte('date', to.toISOString())
         .order('date', { ascending: true });
+
+      if (selectedAcademyId && academyLocationIds.size > 0) {
+        clsQuery = clsQuery.in('courts.location_id', Array.from(academyLocationIds));
+      }
+
+      const { data: clsData, error: e3 } = await clsQuery;
       if (e3) throw e3;
 
-      const { data: pendingData, error: pendingErr } = await supabase
+      let pendingQuery = supabase
         .from('class_sessions')
-        .select('*')
+        .select('*, courts!inner(location_id)')
         .eq('attendance_pending', true)
         .order('date', { ascending: true });
+
+      if (selectedAcademyId && academyLocationIds.size > 0) {
+        pendingQuery = pendingQuery.in('courts.location_id', Array.from(academyLocationIds));
+      }
+
+      const { data: pendingData, error: pendingErr } = await pendingQuery;
       if (pendingErr) throw pendingErr;
 
       const mergedById = new Map<string, any>();
