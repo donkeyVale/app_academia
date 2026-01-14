@@ -24,7 +24,7 @@ export async function sendOneSignalNotification(params: OneSignalNotificationPar
 
   const baseUrlRaw = process.env.NEXT_PUBLIC_BASE_URL ?? process.env.APP_BASE_URL ?? 'https://agendo.nativatech.com.py';
   const baseUrl = typeof baseUrlRaw === 'string' ? baseUrlRaw.replace(/\/+$/, '') : 'https://agendo.nativatech.com.py';
-  payload.large_icon = `${baseUrl}/icons/icon-192.png`;
+  payload.large_icon = `${baseUrl}/icons/logoHome.png`;
 
   if (params.launchUrl) payload.url = params.launchUrl;
   if (params.data && typeof params.data === 'object') payload.data = params.data;
