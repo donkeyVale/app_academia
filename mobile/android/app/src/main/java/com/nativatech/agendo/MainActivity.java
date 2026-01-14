@@ -27,7 +27,7 @@ public class MainActivity extends BridgeActivity {
       }
     } else {
       try {
-        OneSignal.getNotifications().requestPermission(true);
+        oneSignalOptInBestEffort();
       } catch (Throwable t) {
       }
     }
@@ -157,9 +157,23 @@ public class MainActivity extends BridgeActivity {
 
     if (requestCode == REQ_NOTIFICATIONS) {
       try {
-        OneSignal.getNotifications().requestPermission(true);
+        oneSignalOptInBestEffort();
       } catch (Throwable t) {
       }
+    }
+  }
+
+  private void oneSignalOptInBestEffort() {
+    // OneSignal v5 expone APIs Kotlin/Java que varían entre versiones.
+    // Usamos reflection para evitar errores de compilación.
+    try {
+      Object user = OneSignal.class.getMethod("getUser").invoke(null);
+      if (user == null) return;
+      Object pushSub = user.getClass().getMethod("getPushSubscription").invoke(user);
+      if (pushSub == null) return;
+      pushSub.getClass().getMethod("optIn").invoke(pushSub);
+    } catch (Throwable t) {
+      // ignore
     }
   }
 }
