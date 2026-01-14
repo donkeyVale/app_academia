@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 import { createClientBrowser } from '@/lib/supabase';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { oneSignalLogout } from '@/lib/capacitor-onesignal';
 import {
   Smartphone,
   Layers,
@@ -158,6 +159,10 @@ export default function Page() {
   const [studentRemainingClasses, setStudentRemainingClasses] = useState<number | null>(null);
 
   const handleLogout = async () => {
+    try {
+      await oneSignalLogout();
+    } catch {
+    }
     await supabase.auth.signOut();
     window.location.href = '/login';
   };

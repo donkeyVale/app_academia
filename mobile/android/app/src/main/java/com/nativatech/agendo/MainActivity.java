@@ -16,6 +16,7 @@ public class MainActivity extends BridgeActivity {
 
   @Override
   protected void onCreate(android.os.Bundle savedInstanceState) {
+    registerPlugin(OneSignalBridgePlugin.class);
     super.onCreate(savedInstanceState);
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

@@ -11,6 +11,7 @@ import { FooterNav } from '@/components/footer-nav';
 import { PwaInstallPrompt } from '@/components/pwa-install-prompt';
 import { PushPermissionPrompt } from '@/components/push-permission-prompt';
 import { NotificationsMenuItem } from '@/components/notifications-menu-item';
+import { oneSignalLogout } from '@/lib/capacitor-onesignal';
 
 const iconColor = '#3cadaf';
 
@@ -471,6 +472,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [avatarMenuOpen]);
 
   const handleLogout = async () => {
+    try {
+      await oneSignalLogout();
+    } catch {
+    }
     await supabase.auth.signOut();
     window.location.href = '/login';
   };

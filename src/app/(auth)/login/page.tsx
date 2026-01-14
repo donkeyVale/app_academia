@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
 import { PasswordInput } from '@/components/ui/password-input';
 import { toast } from 'sonner';
+import { oneSignalLoginExternalUserId } from '@/lib/capacitor-onesignal';
 
 export default function LoginPage() {
   const supabase = createClientBrowser();
@@ -33,6 +34,13 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) setError(error.message);
     else {
+      try {
+        const { data } = await supabase.auth.getUser();
+        const userId = (data?.user?.id as string | undefined) ?? '';
+        if (userId) await oneSignalLoginExternalUserId(userId);
+      } catch {
+      }
+
       const params = new URLSearchParams(window.location.search);
       const next = params.get('next');
       if (next && next.startsWith('/')) window.location.href = next;
