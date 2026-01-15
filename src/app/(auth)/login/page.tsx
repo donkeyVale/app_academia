@@ -272,7 +272,7 @@ export default function LoginPage() {
             {loading ? 'Ingresando...' : 'Ingresar'}
           </button>
 
-          {biometricEnabled && biometricAvailable && hasBiometricSession && (
+          {biometricEnabled && biometricAvailable && (
             <button
               type="button"
               className="w-full border border-gray-200 bg-white hover:bg-gray-50 text-[#31435d] h-10 rounded-md text-base md:text-sm font-medium disabled:opacity-50 transition-colors"
