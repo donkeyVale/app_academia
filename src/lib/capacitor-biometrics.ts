@@ -12,7 +12,7 @@ const SECURE_STORAGE_PREFIX = 'agendo_';
 function isInvalidSecureStorageFormat(e: any): boolean {
   const code = String(e?.code ?? '').toLowerCase();
   const msg = String(e?.message ?? '').toLowerCase();
-  return code.includes('invalid') || msg.includes('invalid format');
+  return code.includes('invalid') || code.includes('invaliddata') || msg.includes('invalid format');
 }
 
 function isMissingKey(e: any): boolean {
@@ -22,17 +22,46 @@ function isMissingKey(e: any): boolean {
 }
 
 async function clearSecureStoragePrefix(plugin: any): Promise<void> {
-  if (typeof plugin?.clearItemsWithPrefix !== 'function') return;
-  const attempts = [
-    { prefix: SECURE_STORAGE_PREFIX },
-    { keyPrefix: SECURE_STORAGE_PREFIX },
-    { prefixedKey: SECURE_STORAGE_PREFIX },
-  ];
-  for (const a of attempts) {
-    try {
-      await plugin.clearItemsWithPrefix(a);
-      return;
-    } catch {
+  if (!plugin) return;
+
+  if (typeof plugin.clearItemsWithPrefix === 'function') {
+    const attempts = [
+      { prefix: SECURE_STORAGE_PREFIX },
+      { keyPrefix: SECURE_STORAGE_PREFIX },
+      { prefixedKey: SECURE_STORAGE_PREFIX },
+    ];
+    for (const a of attempts) {
+      try {
+        await plugin.clearItemsWithPrefix(a);
+        return;
+      } catch {
+      }
+    }
+  }
+
+  // Fallback: enumerate keys and remove one by one
+  if (typeof plugin.getPrefixedKeys === 'function' && typeof plugin.internalRemoveItem === 'function') {
+    const keyAttempts = [
+      { prefix: SECURE_STORAGE_PREFIX },
+      { keyPrefix: SECURE_STORAGE_PREFIX },
+      { prefixedKey: SECURE_STORAGE_PREFIX },
+    ];
+    for (const opts of keyAttempts) {
+      try {
+        const res = await plugin.getPrefixedKeys(opts);
+        const keys: any[] = (res?.keys ?? res) as any[];
+        if (!Array.isArray(keys)) continue;
+        for (const raw of keys) {
+          const k = String(raw ?? '');
+          if (!k) continue;
+          try {
+            await plugin.internalRemoveItem({ prefixedKey: k });
+          } catch {
+          }
+        }
+        return;
+      } catch {
+      }
     }
   }
 }
