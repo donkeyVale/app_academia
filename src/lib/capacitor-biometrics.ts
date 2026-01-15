@@ -1,4 +1,5 @@
 import { isCapacitorNativePlatform } from '@/lib/capacitor-onesignal';
+import { registerPlugin } from '@capacitor/core';
 
 type BiometricSession = {
   access_token: string;
@@ -88,11 +89,6 @@ function getPlugins(): any | null {
   return cap?.Plugins ?? null;
 }
 
-function getCapacitor(): any | null {
-  if (typeof window === 'undefined') return null;
-  return (window as any).Capacitor ?? null;
-}
-
 function getBiometricAuthPlugin(plugins: any | null): any | null {
   if (!plugins) return null;
   const direct =
@@ -105,10 +101,9 @@ function getBiometricAuthPlugin(plugins: any | null): any | null {
 
   if (direct) {
     if (typeof (direct as any).authenticate === 'function') return direct;
-    const cap = getCapacitor();
-    if (cap?.registerPlugin && (direct === plugins.BiometricAuthNative || direct === plugins.BiometricAuth)) {
+    if (direct === plugins.BiometricAuthNative || direct === plugins.BiometricAuth) {
       try {
-        const registered = cap.registerPlugin('BiometricAuthNative');
+        const registered = registerPlugin<any>('BiometricAuthNative');
         if (registered) return registered;
       } catch {
       }
