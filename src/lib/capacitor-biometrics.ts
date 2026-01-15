@@ -7,6 +7,7 @@ type BiometricSession = {
 
 const BIOMETRIC_ENABLED_KEY = 'biometricLoginEnabled';
 const BIOMETRIC_SESSION_KEY = 'biometricSupabaseSession';
+const SECURE_STORAGE_PREFIX = 'agendo_';
 
 function getPlugins(): any | null {
   if (typeof window === 'undefined') return null;
@@ -29,6 +30,65 @@ function getBiometricAuthPlugin(plugins: any | null): any | null {
     return key ? (plugins as any)[key] : null;
   } catch {
     return null;
+  }
+}
+
+async function secureStorageSet(plugin: any, key: string, value: any): Promise<void> {
+  if (!plugin) throw new Error('No se encontró el plugin SecureStorage.');
+  const k = `${SECURE_STORAGE_PREFIX}${key}`;
+  const v = typeof value === 'string' ? value : JSON.stringify(value);
+
+  if (typeof plugin.set === 'function') {
+    await plugin.setKeyPrefix?.(SECURE_STORAGE_PREFIX);
+    await plugin.set(key, value);
+    return;
+  }
+  if (typeof plugin.setItem === 'function') {
+    await plugin.setItem({ key: k, value: v });
+    return;
+  }
+  if (typeof plugin.internalSetItem === 'function') {
+    await plugin.internalSetItem({ key: k, value: v });
+    return;
+  }
+  throw new Error('No se encontró el plugin SecureStorage.');
+}
+
+async function secureStorageGet(plugin: any, key: string): Promise<any | null> {
+  if (!plugin) return null;
+  const k = `${SECURE_STORAGE_PREFIX}${key}`;
+
+  if (typeof plugin.get === 'function') {
+    await plugin.setKeyPrefix?.(SECURE_STORAGE_PREFIX);
+    return await plugin.get(key);
+  }
+  if (typeof plugin.getItem === 'function') {
+    const res = await plugin.getItem({ key: k });
+    return res?.value ?? res;
+  }
+  if (typeof plugin.internalGetItem === 'function') {
+    const res = await plugin.internalGetItem({ key: k });
+    return res?.value ?? res;
+  }
+  return null;
+}
+
+async function secureStorageRemove(plugin: any, key: string): Promise<void> {
+  if (!plugin) return;
+  const k = `${SECURE_STORAGE_PREFIX}${key}`;
+
+  if (typeof plugin.remove === 'function') {
+    await plugin.setKeyPrefix?.(SECURE_STORAGE_PREFIX);
+    await plugin.remove(key);
+    return;
+  }
+  if (typeof plugin.removeItem === 'function') {
+    await plugin.removeItem({ key: k });
+    return;
+  }
+  if (typeof plugin.internalRemoveItem === 'function') {
+    await plugin.internalRemoveItem({ key: k });
+    return;
   }
 }
 
@@ -131,21 +191,19 @@ export async function storeBiometricSession(session: BiometricSession): Promise<
   if (!isCapacitorNativePlatform()) return;
   const plugins = getPlugins();
   const SecureStorage = getSecureStoragePlugin(plugins);
-  if (!SecureStorage?.set) throw new Error('No se encontró el plugin SecureStorage.');
-  await SecureStorage.setKeyPrefix('agendo_');
-  await SecureStorage.set(BIOMETRIC_SESSION_KEY, session);
+  await secureStorageSet(SecureStorage, BIOMETRIC_SESSION_KEY, session);
 }
 
 export async function loadBiometricSession(): Promise<BiometricSession | null> {
   if (!isCapacitorNativePlatform()) return null;
   const plugins = getPlugins();
   const SecureStorage = getSecureStoragePlugin(plugins);
-  if (!SecureStorage?.get) return null;
   try {
-    await SecureStorage.setKeyPrefix('agendo_');
-    const data = await SecureStorage.get(BIOMETRIC_SESSION_KEY);
-    if (!data || typeof data !== 'object') return null;
-    const s: any = data;
+    const data = await secureStorageGet(SecureStorage, BIOMETRIC_SESSION_KEY);
+    if (!data) return null;
+    const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+    if (!parsed || typeof parsed !== 'object') return null;
+    const s: any = parsed;
     if (!s.access_token || !s.refresh_token) return null;
     return { access_token: String(s.access_token), refresh_token: String(s.refresh_token) };
   } catch {
@@ -157,10 +215,12 @@ export async function clearBiometricSession(): Promise<void> {
   if (!isCapacitorNativePlatform()) return;
   const plugins = getPlugins();
   const SecureStorage = getSecureStoragePlugin(plugins);
-  if (!SecureStorage?.remove) return;
   try {
-    await SecureStorage.setKeyPrefix('agendo_');
-    await SecureStorage.remove(BIOMETRIC_SESSION_KEY);
+    if (typeof SecureStorage?.clearItemsWithPrefix === 'function') {
+      await SecureStorage.clearItemsWithPrefix({ prefix: SECURE_STORAGE_PREFIX });
+      return;
+    }
+    await secureStorageRemove(SecureStorage, BIOMETRIC_SESSION_KEY);
   } catch {
   }
 }
