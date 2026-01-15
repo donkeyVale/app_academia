@@ -415,7 +415,6 @@ export default function ReportsPage() {
     const lower = msg.toLowerCase();
     if (!msg) return 'Error desconocido.';
     if (lower.includes('not implemented')) return 'Función no disponible en este dispositivo.';
-    if (lower.includes('filesystem')) return 'No se pudo acceder al sistema de archivos del dispositivo.';
     if (lower.includes('share')) return 'No se pudo abrir el panel para compartir.';
     return msg;
   };
@@ -489,6 +488,19 @@ export default function ReportsPage() {
       data: base64Data,
       directory: 'DOCUMENTS',
       recursive: true,
+    }).catch(async (err: any) => {
+      // Algunos dispositivos pueden fallar en DOCUMENTS; hacemos fallback a CACHE.
+      try {
+        return await Filesystem.writeFile({
+          path: fileName,
+          data: base64Data,
+          directory: 'CACHE',
+          recursive: true,
+        });
+      } catch (err2: any) {
+        const detail = (err2?.message ?? err?.message ?? String(err2 ?? err)).trim();
+        throw new Error(`No se pudo acceder al sistema de archivos del dispositivo: ${detail}`);
+      }
     });
 
     await Share.share({
