@@ -625,7 +625,8 @@ export default function ReportsPage() {
       toast.success("Exportación a Excel lista");
     } catch (e) {
       console.error(e);
-      toast.error("No se pudo exportar a Excel");
+      const msg = (e as any)?.message ?? String(e);
+      toast.error(`No se pudo exportar a Excel: ${msg}`);
     }
   };
 
@@ -731,7 +732,8 @@ export default function ReportsPage() {
       toast.success("Exportación a PDF lista");
     } catch (e) {
       console.error(e);
-      toast.error("No se pudo exportar a PDF");
+      const msg = (e as any)?.message ?? String(e);
+      toast.error(`No se pudo exportar a PDF: ${msg}`);
     }
   };
 
