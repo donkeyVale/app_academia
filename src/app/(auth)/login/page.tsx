@@ -6,12 +6,24 @@ import { createClientBrowser } from '@/lib/supabase';
 import { PasswordInput } from '@/components/ui/password-input';
 import { toast } from 'sonner';
 import { oneSignalLoginExternalUserId } from '@/lib/capacitor-onesignal';
+import {
+  biometricAuthenticate,
+  checkBiometryAvailable,
+  clearBiometricSession,
+  isBiometricEnabled,
+  loadBiometricSession,
+  storeBiometricSession,
+} from '@/lib/capacitor-biometrics';
 
 export default function LoginPage() {
   const supabase = createClientBrowser();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [biometricLoading, setBiometricLoading] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricEnabled, setBiometricEnabledState] = useState(false);
+  const [hasBiometricSession, setHasBiometricSession] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inactiveMsg = 'Tu usuario está inactivo en todas tus academias. Comunicate con el administrador.';
   const getInactiveInfoFromUrl = () => {
@@ -26,6 +38,52 @@ export default function LoginPage() {
     if (msg) toast.error(msg);
   }, []);
 
+  useEffect(() => {
+    (async () => {
+      const enabled = isBiometricEnabled();
+      setBiometricEnabledState(enabled);
+      if (!enabled) {
+        setBiometricAvailable(false);
+        setHasBiometricSession(false);
+        return;
+      }
+
+      const avail = await checkBiometryAvailable();
+      setBiometricAvailable(!!avail.isAvailable);
+      if (!avail.isAvailable) {
+        setHasBiometricSession(false);
+        return;
+      }
+      const stored = await loadBiometricSession();
+      setHasBiometricSession(!!stored);
+    })();
+  }, []);
+
+  const finishLoginRedirect = async () => {
+    try {
+      const { data } = await supabase.auth.getUser();
+      const userId = (data?.user?.id as string | undefined) ?? '';
+      if (userId) await oneSignalLoginExternalUserId(userId);
+    } catch {
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get('next');
+    if (next && next.startsWith('/')) window.location.href = next;
+    else {
+      try {
+        const pending = window.localStorage.getItem('pendingDeepLink');
+        if (pending && pending.startsWith('/')) {
+          window.localStorage.removeItem('pendingDeepLink');
+          window.location.href = pending;
+          return;
+        }
+      } catch {
+      }
+      window.location.href = '/';
+    }
+  };
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -34,31 +92,63 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) setError(error.message);
     else {
-      try {
-        const { data } = await supabase.auth.getUser();
-        const userId = (data?.user?.id as string | undefined) ?? '';
-        if (userId) await oneSignalLoginExternalUserId(userId);
-      } catch {
-      }
-
-      const params = new URLSearchParams(window.location.search);
-      const next = params.get('next');
-      if (next && next.startsWith('/')) window.location.href = next;
-      else {
+      if (isBiometricEnabled()) {
         try {
-          const pending = window.localStorage.getItem('pendingDeepLink');
-          if (pending && pending.startsWith('/')) {
-            window.localStorage.removeItem('pendingDeepLink');
-            window.location.href = pending;
-            setLoading(false);
-            return;
+          const { data } = await supabase.auth.getSession();
+          const s = data?.session;
+          if (s?.access_token && s?.refresh_token) {
+            await storeBiometricSession({ access_token: s.access_token, refresh_token: s.refresh_token });
           }
         } catch {
         }
-        window.location.href = '/';
       }
+
+      await finishLoginRedirect();
     }
     setLoading(false);
+  };
+
+  const onBiometricLogin = async () => {
+    if (biometricLoading) return;
+    setBiometricLoading(true);
+    setError(null);
+    setInfo(null);
+
+    try {
+      const verified = await biometricAuthenticate();
+      if (!verified) {
+        setBiometricLoading(false);
+        return;
+      }
+
+      const session = await loadBiometricSession();
+      if (!session) {
+        toast.error('No se encontró una sesión guardada para biometría.');
+        setHasBiometricSession(false);
+        setBiometricLoading(false);
+        return;
+      }
+
+      const { error: setErr } = await supabase.auth.setSession({
+        access_token: session.access_token,
+        refresh_token: session.refresh_token,
+      });
+
+      if (setErr) {
+        toast.error('No se pudo restaurar la sesión. Iniciá sesión con tu contraseña.');
+        try {
+          await clearBiometricSession();
+        } catch {
+        }
+        setHasBiometricSession(false);
+        setBiometricLoading(false);
+        return;
+      }
+
+      await finishLoginRedirect();
+    } finally {
+      setBiometricLoading(false);
+    }
   };
 
   const onForgotPassword = async () => {
@@ -154,6 +244,17 @@ export default function LoginPage() {
           >
             {loading ? 'Ingresando...' : 'Ingresar'}
           </button>
+
+          {biometricEnabled && biometricAvailable && hasBiometricSession && (
+            <button
+              type="button"
+              className="w-full border border-gray-200 bg-white hover:bg-gray-50 text-[#31435d] h-10 rounded-md text-base md:text-sm font-medium disabled:opacity-50 transition-colors"
+              disabled={loading || biometricLoading}
+              onClick={onBiometricLogin}
+            >
+              {biometricLoading ? 'Verificando...' : 'Ingresar con biometría'}
+            </button>
+          )}
 
           <p className="text-[11px] text-gray-400 text-center mt-2">
             Si no tenés acceso, solicitá un usuario a tu administrador.

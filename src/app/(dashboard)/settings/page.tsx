@@ -12,6 +12,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Calendar as CalendarIcon, ChevronDown, ChevronRight } from "lucide-react";
 import { toast } from "sonner";
+import {
+  checkBiometryAvailable,
+  clearBiometricSession,
+  isBiometricEnabled,
+  setBiometricEnabled,
+  storeBiometricSession,
+} from "@/lib/capacitor-biometrics";
 
 type AppRole = "super_admin" | "admin" | "coach" | "student" | null;
 type RentMode = "per_student" | "per_hour" | "both";
@@ -89,6 +96,9 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notifyClasses, setNotifyClasses] = useState<boolean>(true);
+  const [biometricEnabled, setBiometricEnabledState] = useState(false);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricSaving, setBiometricSaving] = useState(false);
   const [role, setRole] = useState<AppRole>(null);
   const [academyOptions, setAcademyOptions] = useState<{ id: string; name: string }[]>([]);
   const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
@@ -104,6 +114,19 @@ export default function SettingsPage() {
     const t = window.setTimeout(() => academySelectSearchRef.current?.focus(), 0);
     return () => window.clearTimeout(t);
   }, [academySelectOpen]);
+
+  useEffect(() => {
+    (async () => {
+      const enabled = isBiometricEnabled();
+      setBiometricEnabledState(enabled);
+      if (!enabled) {
+        setBiometricAvailable(false);
+        return;
+      }
+      const avail = await checkBiometryAvailable();
+      setBiometricAvailable(!!avail.isAvailable);
+    })();
+  }, []);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [rentLoading, setRentLoading] = useState(false);
@@ -554,6 +577,49 @@ const onSaveRentFees = async () => {
     }
   };
 
+  const onToggleBiometric = async () => {
+    if (biometricSaving) return;
+    setBiometricSaving(true);
+    try {
+      const nextValue = !biometricEnabled;
+      if (!nextValue) {
+        setBiometricEnabled(false);
+        setBiometricEnabledState(false);
+        setBiometricAvailable(false);
+        try {
+          await clearBiometricSession();
+        } catch {
+        }
+        toast.success("Ingreso con biometría desactivado");
+        return;
+      }
+
+      const avail = await checkBiometryAvailable();
+      if (!avail.isAvailable) {
+        toast.error("Tu dispositivo no tiene biometría disponible.");
+        return;
+      }
+
+      const { data } = await supabase.auth.getSession();
+      const s = data?.session;
+      if (!s?.access_token || !s?.refresh_token) {
+        toast.error("No se pudo obtener tu sesión actual.");
+        return;
+      }
+
+      await storeBiometricSession({ access_token: s.access_token, refresh_token: s.refresh_token });
+      setBiometricEnabled(true);
+      setBiometricEnabledState(true);
+      setBiometricAvailable(true);
+      toast.success("Ingreso con biometría activado");
+    } catch (err: any) {
+      const msg = err?.message ?? "No se pudo actualizar biometría.";
+      toast.error(msg);
+    } finally {
+      setBiometricSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4">
@@ -645,6 +711,39 @@ const onSaveRentFees = async () => {
             </button>
           </div>
           {saving && <p className="text-xs text-gray-500">Guardando cambios...</p>}
+        </div>
+      </div>
+
+      <div className="border rounded-lg bg-white shadow-sm border-t-4 border-slate-400">
+        <div className="px-4 py-3 border-b bg-gray-50 rounded-t-lg">
+          <p className="text-sm font-semibold text-[#31435d]">Seguridad</p>
+        </div>
+        <div className="px-4 py-4 space-y-3 text-sm">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="font-medium text-[#31435d]">Ingreso con biometría</p>
+              <p className="text-xs text-gray-600 mt-0.5">
+                Usá huella o rostro para ingresar más rápido en este dispositivo.
+              </p>
+              {biometricEnabled && !biometricAvailable && (
+                <p className="text-xs text-amber-700 mt-1">Biometría no disponible en este dispositivo.</p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={onToggleBiometric}
+              disabled={loading || biometricSaving}
+              className={
+                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors " +
+                (biometricEnabled
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+                  : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100")
+              }
+            >
+              {biometricEnabled ? "Activado" : "Desactivado"}
+            </button>
+          </div>
+          {biometricSaving && <p className="text-xs text-gray-500">Guardando cambios...</p>}
         </div>
       </div>
 

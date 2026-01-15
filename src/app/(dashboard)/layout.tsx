@@ -1,6 +1,8 @@
 "use client";
 
 import Link from 'next/link';
+import { toast } from "sonner";
+import { clearBiometricSession } from "@/lib/capacitor-biometrics";
 import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -472,6 +474,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [avatarMenuOpen]);
 
   const handleLogout = async () => {
+    try {
+      await clearBiometricSession();
+    } catch {
+    }
     await supabase.auth.signOut();
     window.location.href = '/login';
   };

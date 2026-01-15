@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import { FooterAvatarButton } from '@/components/footer-avatar-button';
 import { FooterNav } from '@/components/footer-nav';
 import { PwaInstallPrompt } from '@/components/pwa-install-prompt';
@@ -11,9 +12,9 @@ import { NotificationsMenuItem } from '@/components/notifications-menu-item';
 import { AgendoLogo } from '@/components/agendo-logo';
 import AdminHomeIncomeExpensesCard from '@/app/(dashboard)/AdminHomeIncomeExpensesCard';
 import { useRouter } from 'next/navigation';
-import { createClientBrowser } from '@/lib/supabase';
-import { motion } from 'framer-motion';
-import { toast } from 'sonner';
+import { createClientBrowser } from "@/lib/supabase";
+import { toast } from "sonner";
+import { clearBiometricSession } from "@/lib/capacitor-biometrics";
 import { oneSignalLogout } from '@/lib/capacitor-onesignal';
 import {
   Smartphone,
@@ -159,6 +160,10 @@ export default function Page() {
   const [studentRemainingClasses, setStudentRemainingClasses] = useState<number | null>(null);
 
   const handleLogout = async () => {
+    try {
+      await clearBiometricSession();
+    } catch {
+    }
     await supabase.auth.signOut();
     window.location.href = '/login';
   };
