@@ -259,7 +259,21 @@ export async function storeBiometricSession(session: BiometricSession): Promise<
   if (!isCapacitorNativePlatform()) return;
   const plugins = getPlugins();
   const SecureStorage = getSecureStoragePlugin(plugins);
-  await secureStorageSet(SecureStorage, BIOMETRIC_SESSION_KEY, session);
+
+  try {
+    await secureStorageSet(SecureStorage, BIOMETRIC_SESSION_KEY, session);
+  } catch (e: any) {
+    if (isInvalidSecureStorageFormat(e)) {
+      try {
+        await clearSecureStoragePrefix(SecureStorage);
+        await secureStorageSet(SecureStorage, BIOMETRIC_SESSION_KEY, session);
+        return;
+      } catch {
+      }
+      throw new Error('No se pudo preparar el almacenamiento seguro para el ingreso rápido. Intentá nuevamente.');
+    }
+    throw e;
+  }
 }
 
 export async function loadBiometricSession(): Promise<BiometricSession | null> {
@@ -284,10 +298,7 @@ export async function clearBiometricSession(): Promise<void> {
   const plugins = getPlugins();
   const SecureStorage = getSecureStoragePlugin(plugins);
   try {
-    if (typeof SecureStorage?.clearItemsWithPrefix === 'function') {
-      await SecureStorage.clearItemsWithPrefix({ prefix: SECURE_STORAGE_PREFIX });
-      return;
-    }
+    await clearSecureStoragePrefix(SecureStorage);
     await secureStorageRemove(SecureStorage, BIOMETRIC_SESSION_KEY);
   } catch {
   }
