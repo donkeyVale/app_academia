@@ -82,9 +82,17 @@ export async function checkBiometryAvailable(): Promise<{ isAvailable: boolean; 
   try {
     const info = await checkFn();
     if (typeof info === 'boolean') return { isAvailable: info, reason: '' };
-    const isAvailable =
-      !!(info?.isAvailable ?? info?.available ?? info?.biometryAvailable ?? info?.hasBiometry);
-    const reason = String(info?.reason ?? info?.status ?? info?.message ?? '');
+    const biometryType = (info?.biometryType ?? info?.biometry ?? info?.type ?? '') as any;
+    const typeStr = String(biometryType ?? '');
+    const isAvailable = !!(
+      info?.isAvailable ??
+      info?.available ??
+      info?.biometryAvailable ??
+      info?.hasBiometry ??
+      info?.isEnrolled ??
+      (typeStr && typeStr.toLowerCase() !== 'none' && typeStr !== '0')
+    );
+    const reason = String(info?.reason ?? info?.status ?? info?.message ?? typeStr ?? '');
     return { isAvailable, reason };
   } catch (e: any) {
     return { isAvailable: false, reason: e?.message ?? String(e) };
