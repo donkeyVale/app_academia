@@ -14,6 +14,42 @@ function getPlugins(): any | null {
   return cap?.Plugins ?? null;
 }
 
+function getBiometricAuthPlugin(plugins: any | null): any | null {
+  if (!plugins) return null;
+  const direct =
+    plugins.BiometricAuth ??
+    plugins.BiometricAuthentication ??
+    plugins.Biometric ??
+    plugins.Biometrics ??
+    plugins.BiometricAuthPlugin;
+  if (direct) return direct;
+
+  try {
+    const key = Object.keys(plugins).find((k) => k.toLowerCase().includes('biometric'));
+    return key ? (plugins as any)[key] : null;
+  } catch {
+    return null;
+  }
+}
+
+function getSecureStoragePlugin(plugins: any | null): any | null {
+  if (!plugins) return null;
+  const direct =
+    plugins.SecureStorage ??
+    plugins.SecureStoragePlugin ??
+    plugins.SecureStorageNative ??
+    plugins.SecureStorageAndroid ??
+    plugins.SecureStorageIOS;
+  if (direct) return direct;
+
+  try {
+    const key = Object.keys(plugins).find((k) => k.toLowerCase().includes('secure') && k.toLowerCase().includes('storage'));
+    return key ? (plugins as any)[key] : null;
+  } catch {
+    return null;
+  }
+}
+
 export function isBiometricEnabled(): boolean {
   if (typeof window === 'undefined') return false;
   try {
@@ -34,7 +70,7 @@ export function setBiometricEnabled(enabled: boolean): void {
 export async function checkBiometryAvailable(): Promise<{ isAvailable: boolean; reason?: string }>{
   if (!isCapacitorNativePlatform()) return { isAvailable: false, reason: 'web' };
   const plugins = getPlugins();
-  const BiometricAuth = plugins?.BiometricAuth;
+  const BiometricAuth = getBiometricAuthPlugin(plugins);
 
   if (!BiometricAuth) return { isAvailable: false, reason: 'no_plugin' };
   const checkFn =
@@ -58,7 +94,7 @@ export async function checkBiometryAvailable(): Promise<{ isAvailable: boolean; 
 export async function biometricAuthenticate(): Promise<boolean> {
   if (!isCapacitorNativePlatform()) return false;
   const plugins = getPlugins();
-  const BiometricAuth = plugins?.BiometricAuth;
+  const BiometricAuth = getBiometricAuthPlugin(plugins);
   if (!BiometricAuth?.authenticate) return false;
   try {
     await BiometricAuth.authenticate({
@@ -80,7 +116,7 @@ export async function biometricAuthenticate(): Promise<boolean> {
 export async function storeBiometricSession(session: BiometricSession): Promise<void> {
   if (!isCapacitorNativePlatform()) return;
   const plugins = getPlugins();
-  const SecureStorage = plugins?.SecureStorage;
+  const SecureStorage = getSecureStoragePlugin(plugins);
   if (!SecureStorage?.set) throw new Error('No se encontró el plugin SecureStorage.');
   await SecureStorage.setKeyPrefix('agendo_');
   await SecureStorage.set(BIOMETRIC_SESSION_KEY, session);
@@ -89,7 +125,7 @@ export async function storeBiometricSession(session: BiometricSession): Promise<
 export async function loadBiometricSession(): Promise<BiometricSession | null> {
   if (!isCapacitorNativePlatform()) return null;
   const plugins = getPlugins();
-  const SecureStorage = plugins?.SecureStorage;
+  const SecureStorage = getSecureStoragePlugin(plugins);
   if (!SecureStorage?.get) return null;
   try {
     await SecureStorage.setKeyPrefix('agendo_');
@@ -106,7 +142,7 @@ export async function loadBiometricSession(): Promise<BiometricSession | null> {
 export async function clearBiometricSession(): Promise<void> {
   if (!isCapacitorNativePlatform()) return;
   const plugins = getPlugins();
-  const SecureStorage = plugins?.SecureStorage;
+  const SecureStorage = getSecureStoragePlugin(plugins);
   if (!SecureStorage?.remove) return;
   try {
     await SecureStorage.setKeyPrefix('agendo_');
