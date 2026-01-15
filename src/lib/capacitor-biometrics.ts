@@ -135,7 +135,7 @@ async function secureStorageSet(plugin: any, key: string, value: any): Promise<v
   }
   if (typeof plugin.internalSetItem === 'function') {
     const tryWrite = async () => {
-      await plugin.internalSetItem({ prefixedKey: k, value: v });
+      await plugin.internalSetItem({ prefixedKey: k, data: v });
     };
     await handleInvalidFormat(plugin, k, tryWrite);
     return;
