@@ -279,9 +279,13 @@ export async function biometricAuthenticate(): Promise<boolean> {
   if (!isCapacitorNativePlatform()) return false;
   const plugins = getPlugins();
   const BiometricAuth = getBiometricAuthPlugin(plugins);
-  if (!BiometricAuth?.authenticate) return false;
+  const authenticateFn =
+    (typeof BiometricAuth?.authenticate === 'function' && BiometricAuth.authenticate.bind(BiometricAuth)) ||
+    (typeof BiometricAuth?.internalAuthenticate === 'function' && BiometricAuth.internalAuthenticate.bind(BiometricAuth));
+
+  if (!authenticateFn) return false;
   try {
-    await BiometricAuth.authenticate({
+    await authenticateFn({
       reason: 'Confirmá tu identidad para ingresar.',
       cancelTitle: 'Cancelar',
       allowDeviceCredential: true,
