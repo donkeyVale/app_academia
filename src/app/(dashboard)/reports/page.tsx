@@ -410,6 +410,16 @@ export default function ReportsPage() {
       .trim();
   };
 
+  const translateExportError = (raw: string) => {
+    const msg = String(raw || '').trim();
+    const lower = msg.toLowerCase();
+    if (!msg) return 'Error desconocido.';
+    if (lower.includes('not implemented')) return 'Función no disponible en este dispositivo.';
+    if (lower.includes('filesystem')) return 'No se pudo acceder al sistema de archivos del dispositivo.';
+    if (lower.includes('share')) return 'No se pudo abrir el panel para compartir.';
+    return msg;
+  };
+
   const buildReportFileName = (
     reportTitle: string,
     from: string | null | undefined,
@@ -446,7 +456,13 @@ export default function ReportsPage() {
   };
 
   const downloadBlob = async (blob: Blob, fileName: string) => {
-    const isNative = typeof window !== 'undefined' && !!(window as any).Capacitor;
+    let isNative = false;
+    try {
+      const core = await import('@capacitor/core');
+      isNative = typeof core?.Capacitor?.isNativePlatform === 'function' ? core.Capacitor.isNativePlatform() : false;
+    } catch {
+      isNative = false;
+    }
     if (!isNative) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -625,7 +641,7 @@ export default function ReportsPage() {
       toast.success("Exportación a Excel lista");
     } catch (e) {
       console.error(e);
-      const msg = (e as any)?.message ?? String(e);
+      const msg = translateExportError((e as any)?.message ?? String(e));
       toast.error(`No se pudo exportar a Excel: ${msg}`);
     }
   };
@@ -732,7 +748,7 @@ export default function ReportsPage() {
       toast.success("Exportación a PDF lista");
     } catch (e) {
       console.error(e);
-      const msg = (e as any)?.message ?? String(e);
+      const msg = translateExportError((e as any)?.message ?? String(e));
       toast.error(`No se pudo exportar a PDF: ${msg}`);
     }
   };
