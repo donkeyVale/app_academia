@@ -183,12 +183,12 @@ export default function LoginPage() {
       });
 
       if (setErr) {
-        toast.error('No se pudo restaurar la sesión. Iniciá sesión con tu contraseña.');
-        try {
-          await clearBiometricSession();
-        } catch {
-        }
-        setHasBiometricSession(false);
+        const detail = String((setErr as any)?.message ?? '').trim();
+        toast.error(
+          detail
+            ? `No se pudo restaurar la sesión. Iniciá sesión con tu contraseña. (${detail})`
+            : 'No se pudo restaurar la sesión. Iniciá sesión con tu contraseña.'
+        );
         setBiometricLoading(false);
         return;
       }
