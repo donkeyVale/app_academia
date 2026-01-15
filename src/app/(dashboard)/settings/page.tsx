@@ -596,7 +596,11 @@ const onSaveRentFees = async () => {
 
       const avail = await checkBiometryAvailable();
       if (!avail.isAvailable) {
-        toast.error("Tu dispositivo no tiene biometría disponible.");
+        if (avail.reason === 'no_plugin') {
+          toast.error('La app no tiene biometría habilitada en esta instalación. Reinstalá el APK.');
+        } else {
+          toast.error("Tu dispositivo no tiene biometría disponible.");
+        }
         return;
       }
 
