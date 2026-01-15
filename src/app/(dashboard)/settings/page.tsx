@@ -598,10 +598,17 @@ const onSaveRentFees = async () => {
       if (!avail.isAvailable) {
         if (avail.reason === 'no_plugin') {
           toast.error('La app no tiene biometría habilitada en esta instalación. Reinstalá el APK.');
+        } else if ((avail.reason || '').toLowerCase().includes('no biometric hardware')) {
+          toast.error('Este dispositivo no tiene hardware de biometría (huella/rostro).');
         } else {
-          toast.error("Tu dispositivo no tiene biometría disponible.");
+          const detail = (avail.reason || '').trim();
+          toast.error(detail ? `Tu dispositivo no tiene biometría disponible: ${detail}` : 'Tu dispositivo no tiene biometría disponible.');
         }
         return;
+      }
+
+      if (avail.reason === 'device_credential') {
+        toast.message('Tu dispositivo no tiene biometría compatible. Se usará el PIN/patrón del dispositivo para el ingreso rápido.');
       }
 
       const { data } = await supabase.auth.getSession();

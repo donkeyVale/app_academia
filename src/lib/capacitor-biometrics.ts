@@ -84,6 +84,7 @@ export async function checkBiometryAvailable(): Promise<{ isAvailable: boolean; 
     if (typeof info === 'boolean') return { isAvailable: info, reason: '' };
     const biometryType = (info?.biometryType ?? info?.biometry ?? info?.type ?? '') as any;
     const typeStr = String(biometryType ?? '');
+    const deviceIsSecure = !!info?.deviceIsSecure;
     const isAvailable = !!(
       info?.isAvailable ??
       info?.available ??
@@ -93,7 +94,12 @@ export async function checkBiometryAvailable(): Promise<{ isAvailable: boolean; 
       (typeStr && typeStr.toLowerCase() !== 'none' && typeStr !== '0')
     );
     const reason = String(info?.reason ?? info?.status ?? info?.message ?? typeStr ?? '');
-    return { isAvailable, reason };
+
+    if (isAvailable) return { isAvailable: true, reason };
+    if (deviceIsSecure) {
+      return { isAvailable: true, reason: 'device_credential' };
+    }
+    return { isAvailable: false, reason };
   } catch (e: any) {
     return { isAvailable: false, reason: e?.message ?? String(e) };
   }

@@ -24,6 +24,7 @@ export default function LoginPage() {
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricEnabled, setBiometricEnabledState] = useState(false);
   const [hasBiometricSession, setHasBiometricSession] = useState(false);
+  const [biometricMode, setBiometricMode] = useState<'biometric' | 'device_credential'>('biometric');
   const [error, setError] = useState<string | null>(null);
   const inactiveMsg = 'Tu usuario está inactivo en todas tus academias. Comunicate con el administrador.';
   const getInactiveInfoFromUrl = () => {
@@ -50,6 +51,7 @@ export default function LoginPage() {
 
       const avail = await checkBiometryAvailable();
       setBiometricAvailable(!!avail.isAvailable);
+      setBiometricMode(avail.reason === 'device_credential' ? 'device_credential' : 'biometric');
       if (!avail.isAvailable) {
         setHasBiometricSession(false);
         return;
@@ -252,7 +254,11 @@ export default function LoginPage() {
               disabled={loading || biometricLoading}
               onClick={onBiometricLogin}
             >
-              {biometricLoading ? 'Verificando...' : 'Ingresar con biometría'}
+              {biometricLoading
+                ? 'Verificando...'
+                : biometricMode === 'device_credential'
+                  ? 'Ingresar con bloqueo de pantalla'
+                  : 'Ingresar con biometría'}
             </button>
           )}
 
