@@ -474,10 +474,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [avatarMenuOpen]);
 
   const handleLogout = async () => {
-    try {
-      await clearBiometricSession();
-    } catch {
-    }
     await supabase.auth.signOut();
     window.location.href = '/login';
   };
