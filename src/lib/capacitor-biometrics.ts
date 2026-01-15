@@ -38,18 +38,45 @@ async function secureStorageSet(plugin: any, key: string, value: any): Promise<v
   const k = `${SECURE_STORAGE_PREFIX}${key}`;
   const v = typeof value === 'string' ? value : JSON.stringify(value);
 
+  const isMissingKey = (e: any) => {
+    const code = String(e?.code ?? '').toLowerCase();
+    const msg = String(e?.message ?? '').toLowerCase();
+    return code.includes('missingkey') || msg.includes('missing key') || msg.includes('empty key');
+  };
+
+  const isInvalidFormat = (e: any) => {
+    const code = String(e?.code ?? '').toLowerCase();
+    const msg = String(e?.message ?? '').toLowerCase();
+    return code.includes('invalid') || msg.includes('invalid format');
+  };
+
   if (typeof plugin.set === 'function') {
     await plugin.setKeyPrefix?.(SECURE_STORAGE_PREFIX);
     await plugin.set(key, value);
     return;
   }
   if (typeof plugin.setItem === 'function') {
-    await plugin.setItem({ key: k, value: v });
+    await plugin.setItem({ key: k, value: v, data: v, prefixedKey: k, fullKey: k, options: { key: k, value: v }, item: { key: k, value: v } });
     return;
   }
   if (typeof plugin.internalSetItem === 'function') {
-    await plugin.internalSetItem({ key: k, value: v });
-    return;
+    const tryWrite = async () => {
+      await plugin.internalSetItem({ prefixedKey: k, value: v });
+    };
+    try {
+      await tryWrite();
+      return;
+    } catch (e: any) {
+      if (isMissingKey(e)) {
+        throw e;
+      }
+      if (isInvalidFormat(e) && typeof plugin.clearItemsWithPrefix === 'function') {
+        await plugin.clearItemsWithPrefix({ prefix: SECURE_STORAGE_PREFIX });
+        await tryWrite();
+        return;
+      }
+      throw e;
+    }
   }
   throw new Error('No se encontró el plugin SecureStorage.');
 }
@@ -58,17 +85,23 @@ async function secureStorageGet(plugin: any, key: string): Promise<any | null> {
   if (!plugin) return null;
   const k = `${SECURE_STORAGE_PREFIX}${key}`;
 
+  const isMissingKey = (e: any) => {
+    const code = String(e?.code ?? '').toLowerCase();
+    const msg = String(e?.message ?? '').toLowerCase();
+    return code.includes('missingkey') || msg.includes('missing key') || msg.includes('empty key');
+  };
+
   if (typeof plugin.get === 'function') {
     await plugin.setKeyPrefix?.(SECURE_STORAGE_PREFIX);
     return await plugin.get(key);
   }
   if (typeof plugin.getItem === 'function') {
-    const res = await plugin.getItem({ key: k });
+    const res = await plugin.getItem({ key: k, prefixedKey: k, fullKey: k, options: { key: k }, item: { key: k } });
     return res?.value ?? res;
   }
   if (typeof plugin.internalGetItem === 'function') {
-    const res = await plugin.internalGetItem({ key: k });
-    return res?.value ?? res;
+    const res = await plugin.internalGetItem({ prefixedKey: k });
+    return res?.value ?? res?.data ?? res;
   }
   return null;
 }
@@ -77,17 +110,23 @@ async function secureStorageRemove(plugin: any, key: string): Promise<void> {
   if (!plugin) return;
   const k = `${SECURE_STORAGE_PREFIX}${key}`;
 
+  const isMissingKey = (e: any) => {
+    const code = String(e?.code ?? '').toLowerCase();
+    const msg = String(e?.message ?? '').toLowerCase();
+    return code.includes('missingkey') || msg.includes('missing key') || msg.includes('empty key');
+  };
+
   if (typeof plugin.remove === 'function') {
     await plugin.setKeyPrefix?.(SECURE_STORAGE_PREFIX);
     await plugin.remove(key);
     return;
   }
   if (typeof plugin.removeItem === 'function') {
-    await plugin.removeItem({ key: k });
+    await plugin.removeItem({ key: k, prefixedKey: k, fullKey: k, options: { key: k }, item: { key: k } });
     return;
   }
   if (typeof plugin.internalRemoveItem === 'function') {
-    await plugin.internalRemoveItem({ key: k });
+    await plugin.internalRemoveItem({ prefixedKey: k });
     return;
   }
 }
