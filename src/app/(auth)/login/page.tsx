@@ -7,7 +7,7 @@ import { PasswordInput } from '@/components/ui/password-input';
 import { toast } from 'sonner';
 import { oneSignalLoginExternalUserId } from '@/lib/capacitor-onesignal';
 import {
-  biometricAuthenticate,
+  biometricAuthenticateDetailed,
   checkBiometryAvailable,
   clearBiometricSession,
   isBiometricEnabled,
@@ -142,8 +142,29 @@ export default function LoginPage() {
     setInfo(null);
 
     try {
-      const verified = await biometricAuthenticate();
-      if (!verified) {
+      const verified = await biometricAuthenticateDetailed();
+      if (!verified.ok) {
+        if (verified.reason === 'cancelled') {
+          setBiometricLoading(false);
+          return;
+        }
+        if (verified.reason === 'no_plugin') {
+          toast.error('No se encontró el plugin de biometría en el dispositivo.');
+          setBiometricLoading(false);
+          return;
+        }
+        if (verified.reason === 'no_method') {
+          toast.error('El plugin de biometría no expone el método de autenticación.');
+          setBiometricLoading(false);
+          return;
+        }
+        if (verified.reason === 'web') {
+          toast.error('La biometría solo está disponible en la app instalada.');
+          setBiometricLoading(false);
+          return;
+        }
+        const detail = (verified.message || verified.code || '').trim();
+        toast.error(detail ? `No se pudo validar la biometría: ${detail}` : 'No se pudo validar la biometría.');
         setBiometricLoading(false);
         return;
       }

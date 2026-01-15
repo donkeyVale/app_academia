@@ -6,6 +6,10 @@ type BiometricSession = {
   refresh_token: string;
 };
 
+type BiometricAuthResult =
+  | { ok: true }
+  | { ok: false; reason: 'web' | 'no_plugin' | 'no_method' | 'cancelled' | 'error'; code?: string; message?: string };
+
 const BIOMETRIC_ENABLED_KEY = 'biometricLoginEnabled';
 const BIOMETRIC_SESSION_KEY = 'biometricSupabaseSession';
 const SECURE_STORAGE_PREFIX = 'agendo_';
@@ -275,15 +279,18 @@ export async function checkBiometryAvailable(): Promise<{ isAvailable: boolean; 
   }
 }
 
-export async function biometricAuthenticate(): Promise<boolean> {
-  if (!isCapacitorNativePlatform()) return false;
+export async function biometricAuthenticateDetailed(): Promise<BiometricAuthResult> {
+  if (!isCapacitorNativePlatform()) return { ok: false, reason: 'web' };
   const plugins = getPlugins();
   const BiometricAuth = getBiometricAuthPlugin(plugins);
+  if (!BiometricAuth) return { ok: false, reason: 'no_plugin' };
+
   const authenticateFn =
     (typeof BiometricAuth?.authenticate === 'function' && BiometricAuth.authenticate.bind(BiometricAuth)) ||
     (typeof BiometricAuth?.internalAuthenticate === 'function' && BiometricAuth.internalAuthenticate.bind(BiometricAuth));
 
-  if (!authenticateFn) return false;
+  if (!authenticateFn) return { ok: false, reason: 'no_method' };
+
   try {
     await authenticateFn({
       reason: 'Confirmá tu identidad para ingresar.',
@@ -295,10 +302,25 @@ export async function biometricAuthenticate(): Promise<boolean> {
       androidConfirmationRequired: false,
       androidBiometryStrength: 0,
     });
-    return true;
-  } catch {
-    return false;
+    return { ok: true };
+  } catch (e: any) {
+    const code = String(e?.code ?? '');
+    const message = String(e?.message ?? '').trim();
+    const haystack = `${code} ${message}`.toLowerCase();
+    const cancelled =
+      haystack.includes('cancel') ||
+      haystack.includes('usercancel') ||
+      haystack.includes('user_cancel') ||
+      haystack.includes('canceled') ||
+      haystack.includes('cancelled');
+    if (cancelled) return { ok: false, reason: 'cancelled', code, message };
+    return { ok: false, reason: 'error', code, message };
   }
+}
+
+export async function biometricAuthenticate(): Promise<boolean> {
+  const res = await biometricAuthenticateDetailed();
+  return res.ok;
 }
 
 export async function storeBiometricSession(session: BiometricSession): Promise<void> {
