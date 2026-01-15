@@ -40,8 +40,11 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+
+    const refreshBiometrics = async () => {
       const enabled = isBiometricEnabled();
+      if (cancelled) return;
       setBiometricEnabledState(enabled);
       if (!enabled) {
         setBiometricAvailable(false);
@@ -50,6 +53,7 @@ export default function LoginPage() {
       }
 
       const avail = await checkBiometryAvailable();
+      if (cancelled) return;
       setBiometricAvailable(!!avail.isAvailable);
       setBiometricMode(avail.reason === 'device_credential' ? 'device_credential' : 'biometric');
       if (!avail.isAvailable) {
@@ -57,8 +61,29 @@ export default function LoginPage() {
         return;
       }
       const stored = await loadBiometricSession();
+      if (cancelled) return;
       setHasBiometricSession(!!stored);
-    })();
+    };
+
+    const onFocus = () => {
+      void refreshBiometrics();
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshBiometrics();
+      }
+    };
+
+    void refreshBiometrics();
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, []);
 
   const finishLoginRedirect = async () => {
