@@ -456,13 +456,7 @@ export default function ReportsPage() {
   };
 
   const downloadBlob = async (blob: Blob, fileName: string) => {
-    let isNative = false;
-    try {
-      const core = await import('@capacitor/core');
-      isNative = typeof core?.Capacitor?.isNativePlatform === 'function' ? core.Capacitor.isNativePlatform() : false;
-    } catch {
-      isNative = false;
-    }
+    const isNative = typeof window !== 'undefined' && (window as any)?.Capacitor?.isNativePlatform?.() === true;
     if (!isNative) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -473,10 +467,11 @@ export default function ReportsPage() {
       return;
     }
 
-    const [{ Filesystem, Directory }, { Share }] = await Promise.all([
-      import('@capacitor/filesystem'),
-      import('@capacitor/share'),
-    ]);
+    const plugins = (window as any)?.Capacitor?.Plugins;
+    const Filesystem = plugins?.Filesystem;
+    const Share = plugins?.Share;
+    if (!Filesystem) throw new Error('No se encontró el plugin Filesystem.');
+    if (!Share) throw new Error('No se encontró el plugin Share.');
 
     const base64Data: string = await new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -492,7 +487,7 @@ export default function ReportsPage() {
     const writeRes = await Filesystem.writeFile({
       path: fileName,
       data: base64Data,
-      directory: Directory.Documents,
+      directory: 'DOCUMENTS',
       recursive: true,
     });
 
