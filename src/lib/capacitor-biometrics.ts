@@ -88,6 +88,11 @@ function getPlugins(): any | null {
   return cap?.Plugins ?? null;
 }
 
+function getCapacitor(): any | null {
+  if (typeof window === 'undefined') return null;
+  return (window as any).Capacitor ?? null;
+}
+
 function getBiometricAuthPlugin(plugins: any | null): any | null {
   if (!plugins) return null;
   const direct =
@@ -97,7 +102,19 @@ function getBiometricAuthPlugin(plugins: any | null): any | null {
     plugins.Biometric ??
     plugins.Biometrics ??
     plugins.BiometricAuthPlugin;
-  if (direct) return direct;
+
+  if (direct) {
+    if (typeof (direct as any).authenticate === 'function') return direct;
+    const cap = getCapacitor();
+    if (cap?.registerPlugin && (direct === plugins.BiometricAuthNative || direct === plugins.BiometricAuth)) {
+      try {
+        const registered = cap.registerPlugin('BiometricAuthNative');
+        if (registered) return registered;
+      } catch {
+      }
+    }
+    return direct;
+  }
 
   try {
     const key = Object.keys(plugins).find((k) => k.toLowerCase().includes('biometric'));
