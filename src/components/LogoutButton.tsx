@@ -1,6 +1,7 @@
 "use client";
 
 import { createClientBrowser } from '@/lib/supabase';
+import { isBiometricEnabled } from '@/lib/capacitor-biometrics';
 
 export default function LogoutButton() {
   const supabase = createClientBrowser();
@@ -9,7 +10,7 @@ export default function LogoutButton() {
       type="button"
       className="text-sm"
       onClick={async () => {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut(isBiometricEnabled() ? ({ scope: 'local' } as any) : undefined);
         window.location.href = '/(auth)/login';
       }}
     >

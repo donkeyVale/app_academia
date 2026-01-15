@@ -14,6 +14,7 @@ import AdminHomeIncomeExpensesCard from '@/app/(dashboard)/AdminHomeIncomeExpens
 import { useRouter } from 'next/navigation';
 import { createClientBrowser } from "@/lib/supabase";
 import { toast } from "sonner";
+import { isBiometricEnabled } from "@/lib/capacitor-biometrics";
 import { oneSignalLogout } from '@/lib/capacitor-onesignal';
 import {
   Smartphone,
@@ -159,7 +160,7 @@ export default function Page() {
   const [studentRemainingClasses, setStudentRemainingClasses] = useState<number | null>(null);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut(isBiometricEnabled() ? ({ scope: 'local' } as any) : undefined);
     window.location.href = '/login';
   };
 

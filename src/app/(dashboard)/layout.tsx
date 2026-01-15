@@ -1,13 +1,13 @@
 "use client";
 
-import Link from 'next/link';
-import { toast } from "sonner";
-import { clearBiometricSession } from "@/lib/capacitor-biometrics";
+import { createClientBrowser } from '@/lib/supabase';
+import { toast } from 'sonner';
+import { oneSignalLoginExternalUserId } from '@/lib/capacitor-onesignal';
+import { isBiometricEnabled } from '@/lib/capacitor-biometrics';
 import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CalendarDays, Users, CreditCard, UserCog, BarChart3, LogOut, UserCircle2, Smartphone } from 'lucide-react';
-import { createClientBrowser } from '@/lib/supabase';
 import { FooterAvatarButton } from '@/components/footer-avatar-button';
 import { FooterNav } from '@/components/footer-nav';
 import { PwaInstallPrompt } from '@/components/pwa-install-prompt';
@@ -474,7 +474,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [avatarMenuOpen]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut(isBiometricEnabled() ? ({ scope: 'local' } as any) : undefined);
     window.location.href = '/login';
   };
 
