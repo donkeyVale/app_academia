@@ -92,6 +92,7 @@ function getBiometricAuthPlugin(plugins: any | null): any | null {
   if (!plugins) return null;
   const direct =
     plugins.BiometricAuth ??
+    plugins.BiometricAuthNative ??
     plugins.BiometricAuthentication ??
     plugins.Biometric ??
     plugins.Biometrics ??
