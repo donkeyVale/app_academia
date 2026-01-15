@@ -35,10 +35,21 @@ export async function checkBiometryAvailable(): Promise<{ isAvailable: boolean; 
   if (!isCapacitorNativePlatform()) return { isAvailable: false, reason: 'web' };
   const plugins = getPlugins();
   const BiometricAuth = plugins?.BiometricAuth;
-  if (!BiometricAuth?.checkBiometry) return { isAvailable: false, reason: 'no_plugin' };
+
+  if (!BiometricAuth) return { isAvailable: false, reason: 'no_plugin' };
+  const checkFn =
+    BiometricAuth.checkBiometry ??
+    BiometricAuth.checkBiometryAvailable ??
+    BiometricAuth.checkBiometryAvailability ??
+    BiometricAuth.isAvailable;
+  if (typeof checkFn !== 'function') return { isAvailable: false, reason: 'no_plugin' };
   try {
-    const info = await BiometricAuth.checkBiometry();
-    return { isAvailable: !!info?.isAvailable, reason: String(info?.reason ?? '') };
+    const info = await checkFn();
+    if (typeof info === 'boolean') return { isAvailable: info, reason: '' };
+    const isAvailable =
+      !!(info?.isAvailable ?? info?.available ?? info?.biometryAvailable ?? info?.hasBiometry);
+    const reason = String(info?.reason ?? info?.status ?? info?.message ?? '');
+    return { isAvailable, reason };
   } catch (e: any) {
     return { isAvailable: false, reason: e?.message ?? String(e) };
   }
