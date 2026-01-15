@@ -1,11 +1,12 @@
 {
-  "appId": "com.nativatech.agendo",
-  "appName": "Agendo",
-  "webDir": "www",
-  "bundledWebRuntime": false,
-  "server": {
-    "url": "https://agendo.nativatech.com.py",
-    "cleartext": false,
-    "allowNavigation": ["agendo.nativatech.com.py"]
-  }
+	"appId": "com.nativatech.agendo",
+	"appName": "Agendo",
+	"webDir": "www",
+	"server": {
+		"url": "https://agendo.nativatech.com.py",
+		"cleartext": false,
+		"allowNavigation": [
+			"agendo.nativatech.com.py"
+		]
+	}
 }

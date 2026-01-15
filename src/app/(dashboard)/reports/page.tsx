@@ -445,13 +445,47 @@ export default function ReportsPage() {
     }
   };
 
-  const downloadBlob = (blob: Blob, fileName: string) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    a.click();
-    URL.revokeObjectURL(url);
+  const downloadBlob = async (blob: Blob, fileName: string) => {
+    const isNative = typeof window !== 'undefined' && !!(window as any).Capacitor;
+    if (!isNative) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+
+    const [{ Filesystem, Directory }, { Share }] = await Promise.all([
+      import('@capacitor/filesystem'),
+      import('@capacitor/share'),
+    ]);
+
+    const base64Data: string = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = String(reader.result ?? '');
+        const comma = result.indexOf(',');
+        resolve(comma >= 0 ? result.slice(comma + 1) : result);
+      };
+      reader.onerror = () => reject(new Error('Error leyendo archivo'));
+      reader.readAsDataURL(blob);
+    });
+
+    const writeRes = await Filesystem.writeFile({
+      path: fileName,
+      data: base64Data,
+      directory: Directory.Documents,
+      recursive: true,
+    });
+
+    await Share.share({
+      title: fileName,
+      text: fileName,
+      url: writeRes.uri,
+      dialogTitle: 'Compartir archivo',
+    });
   };
 
   const safeRangeLabel = (from: string | null | undefined, to: string | null | undefined) => {
@@ -587,7 +621,7 @@ export default function ReportsPage() {
       const blob = new Blob([buffer], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       });
-      downloadBlob(blob, fileName);
+      await downloadBlob(blob, fileName);
       toast.success("Exportación a Excel lista");
     } catch (e) {
       console.error(e);
@@ -692,7 +726,8 @@ export default function ReportsPage() {
         drawFooter(p, totalPages);
       }
 
-      doc.save(fileName);
+      const pdfBlob = doc.output('blob');
+      await downloadBlob(pdfBlob, fileName);
       toast.success("Exportación a PDF lista");
     } catch (e) {
       console.error(e);
