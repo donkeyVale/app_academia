@@ -104,14 +104,6 @@ function getBiometricAuthPlugin(plugins: any | null): any | null {
     plugins.BiometricAuthPlugin;
 
   if (direct) {
-    if (typeof (direct as any).authenticate === 'function') return direct;
-    if (direct === plugins.BiometricAuthNative || direct === plugins.BiometricAuth) {
-      try {
-        const registered = registerPlugin<any>('BiometricAuthNative');
-        if (registered) return registered;
-      } catch {
-      }
-    }
     return direct;
   }
 
@@ -285,14 +277,12 @@ export async function biometricAuthenticateDetailed(): Promise<BiometricAuthResu
   const BiometricAuth = getBiometricAuthPlugin(plugins);
   if (!BiometricAuth) return { ok: false, reason: 'no_plugin' };
 
-  const authenticateFn =
-    (typeof BiometricAuth?.authenticate === 'function' && BiometricAuth.authenticate.bind(BiometricAuth)) ||
-    (typeof BiometricAuth?.internalAuthenticate === 'function' && BiometricAuth.internalAuthenticate.bind(BiometricAuth));
+  const authenticate = typeof BiometricAuth?.authenticate === 'function' ? BiometricAuth.authenticate.bind(BiometricAuth) : null;
+  const internalAuthenticate =
+    typeof BiometricAuth?.internalAuthenticate === 'function' ? BiometricAuth.internalAuthenticate.bind(BiometricAuth) : null;
 
-  if (!authenticateFn) return { ok: false, reason: 'no_method' };
-
-  try {
-    await authenticateFn({
+  const run = async (fn: any) => {
+    await fn({
       reason: 'Confirmá tu identidad para ingresar.',
       cancelTitle: 'Cancelar',
       allowDeviceCredential: true,
@@ -302,11 +292,34 @@ export async function biometricAuthenticateDetailed(): Promise<BiometricAuthResu
       androidConfirmationRequired: false,
       androidBiometryStrength: 0,
     });
-    return { ok: true };
+  };
+
+  if (!authenticate && !internalAuthenticate) return { ok: false, reason: 'no_method' };
+
+  try {
+    if (authenticate) {
+      await run(authenticate);
+      return { ok: true };
+    }
+    if (internalAuthenticate) {
+      await run(internalAuthenticate);
+      return { ok: true };
+    }
+    return { ok: false, reason: 'no_method' };
   } catch (e: any) {
     const code = String(e?.code ?? '');
     const message = String(e?.message ?? '').trim();
     const haystack = `${code} ${message}`.toLowerCase();
+
+    const notImplemented = haystack.includes('not implemented') || haystack.includes('is not implemented');
+    if (notImplemented && internalAuthenticate && authenticate) {
+      try {
+        await run(internalAuthenticate);
+        return { ok: true };
+      } catch {
+      }
+    }
+
     const cancelled =
       haystack.includes('cancel') ||
       haystack.includes('usercancel') ||
