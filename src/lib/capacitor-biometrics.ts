@@ -9,6 +9,50 @@ const BIOMETRIC_ENABLED_KEY = 'biometricLoginEnabled';
 const BIOMETRIC_SESSION_KEY = 'biometricSupabaseSession';
 const SECURE_STORAGE_PREFIX = 'agendo_';
 
+function isInvalidSecureStorageFormat(e: any): boolean {
+  const code = String(e?.code ?? '').toLowerCase();
+  const msg = String(e?.message ?? '').toLowerCase();
+  return code.includes('invalid') || msg.includes('invalid format');
+}
+
+function isMissingKey(e: any): boolean {
+  const code = String(e?.code ?? '').toLowerCase();
+  const msg = String(e?.message ?? '').toLowerCase();
+  return code.includes('missingkey') || msg.includes('missing key') || msg.includes('empty key');
+}
+
+async function clearSecureStoragePrefix(plugin: any): Promise<void> {
+  if (typeof plugin?.clearItemsWithPrefix !== 'function') return;
+  const attempts = [
+    { prefix: SECURE_STORAGE_PREFIX },
+    { keyPrefix: SECURE_STORAGE_PREFIX },
+    { prefixedKey: SECURE_STORAGE_PREFIX },
+  ];
+  for (const a of attempts) {
+    try {
+      await plugin.clearItemsWithPrefix(a);
+      return;
+    } catch {
+    }
+  }
+}
+
+async function handleInvalidFormat(plugin: any, key: string, tryWrite: () => Promise<void>): Promise<void> {
+  try {
+    await tryWrite();
+  } catch (e: any) {
+    if (isMissingKey(e)) {
+      throw e;
+    }
+    if (isInvalidSecureStorageFormat(e) && typeof plugin.clearItemsWithPrefix === 'function') {
+      await clearSecureStoragePrefix(plugin);
+      await tryWrite();
+    } else {
+      throw e;
+    }
+  }
+}
+
 function getPlugins(): any | null {
   if (typeof window === 'undefined') return null;
   const cap: any = (window as any).Capacitor;
@@ -38,18 +82,6 @@ async function secureStorageSet(plugin: any, key: string, value: any): Promise<v
   const k = `${SECURE_STORAGE_PREFIX}${key}`;
   const v = typeof value === 'string' ? value : JSON.stringify(value);
 
-  const isMissingKey = (e: any) => {
-    const code = String(e?.code ?? '').toLowerCase();
-    const msg = String(e?.message ?? '').toLowerCase();
-    return code.includes('missingkey') || msg.includes('missing key') || msg.includes('empty key');
-  };
-
-  const isInvalidFormat = (e: any) => {
-    const code = String(e?.code ?? '').toLowerCase();
-    const msg = String(e?.message ?? '').toLowerCase();
-    return code.includes('invalid') || msg.includes('invalid format');
-  };
-
   if (typeof plugin.set === 'function') {
     await plugin.setKeyPrefix?.(SECURE_STORAGE_PREFIX);
     await plugin.set(key, value);
@@ -63,20 +95,8 @@ async function secureStorageSet(plugin: any, key: string, value: any): Promise<v
     const tryWrite = async () => {
       await plugin.internalSetItem({ prefixedKey: k, value: v });
     };
-    try {
-      await tryWrite();
-      return;
-    } catch (e: any) {
-      if (isMissingKey(e)) {
-        throw e;
-      }
-      if (isInvalidFormat(e) && typeof plugin.clearItemsWithPrefix === 'function') {
-        await plugin.clearItemsWithPrefix({ prefix: SECURE_STORAGE_PREFIX });
-        await tryWrite();
-        return;
-      }
-      throw e;
-    }
+    await handleInvalidFormat(plugin, k, tryWrite);
+    return;
   }
   throw new Error('No se encontró el plugin SecureStorage.');
 }
@@ -100,8 +120,17 @@ async function secureStorageGet(plugin: any, key: string): Promise<any | null> {
     return res?.value ?? res;
   }
   if (typeof plugin.internalGetItem === 'function') {
-    const res = await plugin.internalGetItem({ prefixedKey: k });
-    return res?.value ?? res?.data ?? res;
+    try {
+      const res = await plugin.internalGetItem({ prefixedKey: k });
+      return res?.value ?? res?.data ?? res;
+    } catch (e: any) {
+      if (isMissingKey(e)) return null;
+      if (isInvalidSecureStorageFormat(e)) {
+        await clearSecureStoragePrefix(plugin);
+        return null;
+      }
+      throw e;
+    }
   }
   return null;
 }
