@@ -178,6 +178,22 @@ export default function LoginPage() {
       }
 
       try {
+        const res = await fetch('/api/auth/biometric', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh_token: session.refresh_token }),
+        });
+        if (res.ok) {
+          const json = (await res.json().catch(() => ({}))) as any;
+          if (json?.ok) {
+            await finishLoginRedirect();
+            return;
+          }
+        }
+      } catch {
+      }
+
+      try {
         const refreshFn = (supabase as any)?.auth?.refreshSession;
         if (typeof refreshFn === 'function') {
           const refreshed = await refreshFn({ refresh_token: session.refresh_token } as any);
