@@ -29,11 +29,9 @@ export async function POST(req: Request) {
       );
     }
 
-    const cookieStore = cookies() as any;
-
     let supabase: any;
     try {
-      supabase = createRouteHandlerClient({ cookies: () => cookieStore } as any);
+      supabase = createRouteHandlerClient({ cookies } as any);
     } catch (e: any) {
       return NextResponse.json(
         { ok: false, error: 'create_server_client_failed', detail: e?.message ?? String(e) },
