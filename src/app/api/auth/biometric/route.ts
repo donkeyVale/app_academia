@@ -7,9 +7,13 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: Request) {
   try {
     const body = (await req.json().catch(() => ({}))) as any;
+    const access_token = String(body?.access_token ?? '').trim();
     const refresh_token = String(body?.refresh_token ?? '').trim();
-    if (!refresh_token) {
-      return NextResponse.json({ ok: false, error: 'missing_refresh_token' }, { status: 400 });
+    if (!access_token || !refresh_token) {
+      return NextResponse.json(
+        { ok: false, error: 'missing_tokens', detail: 'access_token y refresh_token son requeridos' },
+        { status: 400 }
+      );
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -59,13 +63,13 @@ export async function POST(req: Request) {
     }
 
     try {
-      const { error } = await supabase.auth.refreshSession({ refresh_token } as any);
+      const { error } = await supabase.auth.setSession({ access_token, refresh_token } as any);
       if (error) {
-        return NextResponse.json({ ok: false, error: 'refresh_failed', detail: error.message }, { status: 401 });
+        return NextResponse.json({ ok: false, error: 'set_session_failed', detail: error.message }, { status: 401 });
       }
     } catch (e: any) {
       return NextResponse.json(
-        { ok: false, error: 'refresh_threw', detail: e?.message ?? String(e) },
+        { ok: false, error: 'set_session_threw', detail: e?.message ?? String(e) },
         { status: 500 }
       );
     }

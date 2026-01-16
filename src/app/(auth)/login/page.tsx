@@ -181,7 +181,7 @@ export default function LoginPage() {
         const res = await fetch('/api/auth/biometric', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refresh_token: session.refresh_token }),
+          body: JSON.stringify({ access_token: session.access_token, refresh_token: session.refresh_token }),
         });
         if (res.ok) {
           const json = (await res.json().catch(() => ({}))) as any;
