@@ -2,7 +2,7 @@
 
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
-import { createClientBrowser } from '@/lib/supabase';
+import { createClientBrowser, createClientBrowserJs } from '@/lib/supabase';
 import { PasswordInput } from '@/components/ui/password-input';
 import { toast } from 'sonner';
 import { oneSignalLoginExternalUserId } from '@/lib/capacitor-onesignal';
@@ -184,6 +184,23 @@ export default function LoginPage() {
 
       if (setErr) {
         const detail = String((setErr as any)?.message ?? '').trim();
+        const haystack = detail.toLowerCase();
+
+        if (haystack.includes('auth session missing')) {
+          try {
+            const supabaseJs = createClientBrowserJs();
+            const { error: jsErr } = await supabaseJs.auth.setSession({
+              access_token: session.access_token,
+              refresh_token: session.refresh_token,
+            });
+            if (!jsErr) {
+              await finishLoginRedirect();
+              return;
+            }
+          } catch {
+          }
+        }
+
         toast.error(
           detail
             ? `No se pudo restaurar la sesión. Iniciá sesión con tu contraseña. (${detail})`
