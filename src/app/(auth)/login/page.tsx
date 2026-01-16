@@ -177,16 +177,35 @@ export default function LoginPage() {
         return;
       }
 
-      const { error: setErr } = await supabase.auth.setSession({
-        access_token: session.access_token,
-        refresh_token: session.refresh_token,
-      });
+      let setErr: any = null;
+      try {
+        const res = await supabase.auth.setSession({
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+        });
+        setErr = res?.error ?? null;
+      } catch (e: any) {
+        setErr = e;
+      }
 
       if (setErr) {
-        const detail = String((setErr as any)?.message ?? '').trim();
-        const haystack = detail.toLowerCase();
+        const detail = String(setErr?.message ?? '').trim();
+        const code = String(setErr?.code ?? setErr?.name ?? '').trim();
+        const haystack = `${code} ${detail}`.toLowerCase();
 
         if (haystack.includes('auth session missing')) {
+          try {
+            const refreshFn = (supabase as any)?.auth?.refreshSession;
+            if (typeof refreshFn === 'function') {
+              const refreshed = await refreshFn({ refresh_token: session.refresh_token } as any);
+              if (!refreshed?.error) {
+                await finishLoginRedirect();
+                return;
+              }
+            }
+          } catch {
+          }
+
           try {
             const supabaseJs = createClientBrowserJs();
             const { error: jsErr } = await supabaseJs.auth.setSession({
@@ -201,9 +220,10 @@ export default function LoginPage() {
           }
         }
 
+        const detailFull = `${code ? `${code}: ` : ''}${detail}`.trim();
         toast.error(
-          detail
-            ? `No se pudo restaurar la sesión. Iniciá sesión con tu contraseña. (${detail})`
+          detailFull
+            ? `No se pudo restaurar la sesión. Iniciá sesión con tu contraseña. (${detailFull})`
             : 'No se pudo restaurar la sesión. Iniciá sesión con tu contraseña.'
         );
         setBiometricLoading(false);

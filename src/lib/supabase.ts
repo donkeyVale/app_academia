@@ -2,7 +2,13 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { createClient } from '@supabase/supabase-js';
 
 // Client-side (use inside Client Components)
-export const createClientBrowser = () => createClientComponentClient();
+export const createClientBrowser = () => {
+  const isNative =
+    typeof window !== 'undefined' &&
+    (window as any)?.Capacitor?.isNativePlatform?.() === true;
+  if (isNative) return createClientBrowserJs();
+  return createClientComponentClient();
+};
 
 export const createClientBrowserJs = () => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
