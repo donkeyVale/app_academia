@@ -3,10 +3,6 @@ import { createClient } from '@supabase/supabase-js';
 
 // Client-side (use inside Client Components)
 export const createClientBrowser = () => {
-  const isNative =
-    typeof window !== 'undefined' &&
-    (window as any)?.Capacitor?.isNativePlatform?.() === true;
-  if (isNative) return createClientBrowserJs();
   return createClientComponentClient();
 };
 
