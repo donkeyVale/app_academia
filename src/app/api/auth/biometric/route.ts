@@ -1,6 +1,6 @@
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,28 +33,7 @@ export async function POST(req: Request) {
 
     let supabase: any;
     try {
-      supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-        cookies: {
-          get(name: string) {
-            const cookie = cookieStore.get(name);
-            return cookie?.value;
-          },
-          set(name: string, value: string, options: CookieOptions) {
-            try {
-              // @ts-ignore
-              cookieStore.set(name, value, options as any);
-            } catch {
-            }
-          },
-          remove(name: string, options: CookieOptions) {
-            try {
-              // @ts-ignore
-              cookieStore.set(name, '', { ...(options as any), maxAge: 0 });
-            } catch {
-            }
-          },
-        },
-      });
+      supabase = createRouteHandlerClient({ cookies: () => cookieStore } as any);
     } catch (e: any) {
       return NextResponse.json(
         { ok: false, error: 'create_server_client_failed', detail: e?.message ?? String(e) },
