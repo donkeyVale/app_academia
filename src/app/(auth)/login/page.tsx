@@ -177,6 +177,18 @@ export default function LoginPage() {
         return;
       }
 
+      try {
+        const refreshFn = (supabase as any)?.auth?.refreshSession;
+        if (typeof refreshFn === 'function') {
+          const refreshed = await refreshFn({ refresh_token: session.refresh_token } as any);
+          if (!refreshed?.error) {
+            await finishLoginRedirect();
+            return;
+          }
+        }
+      } catch {
+      }
+
       let setErr: any = null;
       try {
         const res = await supabase.auth.setSession({
@@ -194,18 +206,6 @@ export default function LoginPage() {
         const haystack = `${code} ${detail}`.toLowerCase();
 
         if (haystack.includes('auth session missing')) {
-          try {
-            const refreshFn = (supabase as any)?.auth?.refreshSession;
-            if (typeof refreshFn === 'function') {
-              const refreshed = await refreshFn({ refresh_token: session.refresh_token } as any);
-              if (!refreshed?.error) {
-                await finishLoginRedirect();
-                return;
-              }
-            }
-          } catch {
-          }
-
           try {
             const supabaseJs = createClientBrowserJs();
             const { error: jsErr } = await supabaseJs.auth.setSession({
