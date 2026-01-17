@@ -90,6 +90,10 @@ export default function StudentsPage() {
       studentPlanId: string | null;
       planName: string | null;
       planPurchasedAt: string | null;
+      usageStatus: 'pending' | 'confirmed';
+      attendancePresent: boolean | null;
+      attendanceMarkedAt: string | null;
+      attendanceMarkedByName: string | null;
     }[]
   >([]);
   const [showOnlyMyStudents, setShowOnlyMyStudents] = useState(false);
@@ -298,7 +302,8 @@ export default function StudentsPage() {
           const { data: usagesData, error: usagesErr } = await supabase
             .from('plan_usages')
             .select('student_plan_id')
-            .in('student_plan_id', studentPlanIds);
+            .in('student_plan_id', studentPlanIds)
+            .in('status', ['pending', 'confirmed']);
 
           if (usagesErr) throw usagesErr;
 
@@ -556,11 +561,12 @@ export default function StudentsPage() {
     setEditingNote(null);
     setNotesError(null);
     try {
-      // Buscar clases efectivamente usadas (presentes) a través de plan_usages
+      // Cargar clases confirmadas + pendientes (Opción A)
       const { data: usagesData, error: usagesErr } = await supabase
         .from('plan_usages')
-        .select('class_id, student_plan_id, class_sessions!inner(id,date,court_id,coach_id)')
+        .select('class_id, student_plan_id, status, class_sessions!inner(id,date,court_id,coach_id)')
         .eq('student_id', studentId)
+        .in('status', ['confirmed', 'pending'])
         .limit(50);
 
       if (usagesErr) throw usagesErr;
@@ -571,6 +577,7 @@ export default function StudentsPage() {
         {
           classId: string;
           studentPlanId: string | null;
+          usageStatus: 'pending' | 'confirmed';
           classSession: { id: string; date: string; court_id: string | null; coach_id: string | null };
         }
       > = {};
@@ -583,6 +590,7 @@ export default function StudentsPage() {
         byClassId[classId] = {
           classId,
           studentPlanId: (u.student_plan_id as string | null) ?? null,
+          usageStatus: ((u.status as string | null) === 'pending' ? 'pending' : 'confirmed'),
           classSession: {
             id: cls.id as string,
             date: cls.date as string,
@@ -710,15 +718,79 @@ export default function StudentsPage() {
           studentPlanId: cls.studentPlanId,
           planName: planInfo?.name ?? null,
           planPurchasedAt: planInfo?.purchased_at ?? null,
+          usageStatus: cls.usageStatus,
+          attendancePresent: null,
+          attendanceMarkedAt: null,
+          attendanceMarkedByName: null,
         };
       });
 
       // Ordenar por fecha descendente por si acaso
       items.sort((a, b) => b.date.localeCompare(a.date));
-      setHistoryItems(items);
+
+      // Cargar asistencia para estas clases (para mostrar Presente/Ausente/Sin marcar)
+      const classIdsForAttendance = items.map((i) => i.id);
+      const attendanceMap = new Map<
+        string,
+        { present: boolean | null; marked_at: string | null; marked_by_user_id: string | null }
+      >();
+      if (classIdsForAttendance.length) {
+        const { data: attRows, error: attErr } = await supabase
+          .from('attendance')
+          .select('class_id,present,marked_at,marked_by_user_id')
+          .eq('student_id', studentId)
+          .in('class_id', classIdsForAttendance);
+        if (attErr) throw attErr;
+        (attRows ?? []).forEach((r: any) => {
+          const cid = r.class_id as string | null;
+          if (!cid) return;
+          attendanceMap.set(cid, {
+            present: (r.present as boolean | null) ?? null,
+            marked_at: (r.marked_at as string | null) ?? null,
+            marked_by_user_id: (r.marked_by_user_id as string | null) ?? null,
+          });
+        });
+      }
+
+      let markedByNameByUserId: Record<string, string | null> = {};
+      const showMarkedBy = role === 'admin' || role === 'super_admin' || role === 'coach';
+      if (showMarkedBy) {
+        const markerUserIds = Array.from(
+          new Set(
+            Array.from(attendanceMap.values())
+              .map((a) => a.marked_by_user_id)
+              .filter((id): id is string => !!id)
+          )
+        );
+        if (markerUserIds.length) {
+          const { data: profRows, error: profErr } = await supabase
+            .from('profiles')
+            .select('id, full_name')
+            .in('id', markerUserIds);
+          if (profErr) throw profErr;
+          markedByNameByUserId = (profRows ?? []).reduce<Record<string, string | null>>((acc, p: any) => {
+            acc[p.id] = (p.full_name as string | null) ?? null;
+            return acc;
+          }, {});
+        }
+      }
+
+      const merged = items.map((it) => {
+        const att = attendanceMap.get(it.id);
+        const markedByName =
+          showMarkedBy && att?.marked_by_user_id ? markedByNameByUserId[att.marked_by_user_id] ?? null : null;
+        return {
+          ...it,
+          attendancePresent: att ? (att.present ?? null) : null,
+          attendanceMarkedAt: att ? (att.marked_at ?? null) : null,
+          attendanceMarkedByName: markedByName,
+        };
+      });
+
+      setHistoryItems(merged);
 
       // Cargar notas de clase para este alumno y estas clases
-      const classIds = items.map((i) => i.id);
+      const classIds = merged.map((i) => i.id);
       if (classIds.length) {
         let notesQuery = supabase
           .from('class_notes')
@@ -1378,75 +1450,124 @@ export default function StudentsPage() {
                 <p className="text-sm text-gray-600">Este alumno aún no tiene clases registradas.</p>
               )}
               {!historyLoading && !historyError && historyItems.length > 0 && (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[320px] border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b bg-gray-50 text-xs text-gray-600">
-                        <th className="py-1.5 px-2 text-left font-medium">Fecha</th>
-                        <th className="py-1.5 px-2 text-left font-medium">Hora</th>
-                        <th className="py-1.5 px-2 text-left font-medium">Cancha</th>
-                        <th className="py-1.5 px-2 text-left font-medium">Profesor</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(() => {
-                        const groups: Record<string, typeof historyItems> = {};
-                        historyItems.forEach((it) => {
-                          const key = it.studentPlanId ?? 'unknown';
-                          if (!groups[key]) groups[key] = [];
-                          groups[key].push(it);
-                        });
+                <div className="space-y-4">
+                  {(() => {
+                    const showMarkedBy = role === 'admin' || role === 'super_admin' || role === 'coach';
+                    const confirmed = historyItems.filter((x) => x.usageStatus === 'confirmed');
+                    const pending = historyItems.filter((x) => x.usageStatus === 'pending');
 
-                        const groupKeys = Object.keys(groups).sort((a, b) => {
-                          const aItem = groups[a]?.[0] ?? null;
-                          const bItem = groups[b]?.[0] ?? null;
-                          const aMs = aItem?.planPurchasedAt ? new Date(aItem.planPurchasedAt).getTime() : 0;
-                          const bMs = bItem?.planPurchasedAt ? new Date(bItem.planPurchasedAt).getTime() : 0;
-                          if (aMs !== bMs) return bMs - aMs;
-                          return a.localeCompare(b);
-                        });
+                    const renderSection = (title: string, itemsInSection: typeof historyItems) => {
+                      if (!itemsInSection.length) return null;
 
-                        return groupKeys.flatMap((key) => {
-                          const items = groups[key] ?? [];
-                          const headerName = items[0]?.planName ?? (key === 'unknown' ? 'Plan sin identificar' : 'Plan');
+                      const groups: Record<string, typeof historyItems> = {};
+                      itemsInSection.forEach((it) => {
+                        const key = it.studentPlanId ?? 'unknown';
+                        if (!groups[key]) groups[key] = [];
+                        groups[key].push(it);
+                      });
 
-                          const headerRow = (
-                            <tr key={`${key}-header`} className="border-b bg-slate-50">
-                              <td colSpan={4} className="py-2 px-2 text-xs font-semibold text-slate-700">
-                                {headerName}
-                              </td>
-                            </tr>
-                          );
+                      const groupKeys = Object.keys(groups).sort((a, b) => {
+                        const aItem = groups[a]?.[0] ?? null;
+                        const bItem = groups[b]?.[0] ?? null;
+                        const aMs = aItem?.planPurchasedAt ? new Date(aItem.planPurchasedAt).getTime() : 0;
+                        const bMs = bItem?.planPurchasedAt ? new Date(bItem.planPurchasedAt).getTime() : 0;
+                        if (aMs !== bMs) return bMs - aMs;
+                        return a.localeCompare(b);
+                      });
 
-                          const rows = items.flatMap((item) => {
-                            const d = new Date(item.date);
-                            const yyyy = d.getFullYear();
-                            const mm = String(d.getMonth() + 1).padStart(2, '0');
-                            const dd = String(d.getDate()).padStart(2, '0');
-                            const hh = String(d.getHours()).padStart(2, '0');
-                            const min = String(d.getMinutes()).padStart(2, '0');
-
-                            const notesArr = classNotesByClass[item.id] ?? [];
-                            const firstNote = notesArr[0] ?? null;
-                            const isCoach = role === 'coach';
-                            const isAdmin = role === 'admin' || role === 'super_admin';
-                            const isStudent = role === 'student';
-                            const coachCanEditThisNote =
-                              !isCoach || !firstNote || (!!coachIdForNotes && firstNote.coach_id === coachIdForNotes);
-
-                            return [
-                              (
-                                <tr key={`${item.id}-row`} className="border-b last:border-b-0">
-                                  <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
-                                  <td className="py-1.5 px-2">{`${hh}:${min}`}</td>
-                                  <td className="py-1.5 px-2">{item.courtName ?? '-'}</td>
-                                  <td className="py-1.5 px-2">{item.coachName ?? '-'}</td>
+                      return (
+                        <div className="space-y-2">
+                          <h3 className="text-xs font-semibold text-slate-700">{title}</h3>
+                          <div className="overflow-x-auto">
+                            <table className="w-full min-w-[560px] border-collapse text-sm">
+                              <thead>
+                                <tr className="border-b bg-gray-50 text-xs text-gray-600">
+                                  <th className="py-1.5 px-2 text-left font-medium">Fecha</th>
+                                  <th className="py-1.5 px-2 text-left font-medium">Hora</th>
+                                  <th className="py-1.5 px-2 text-left font-medium">Cancha</th>
+                                  <th className="py-1.5 px-2 text-left font-medium">Profesor</th>
+                                  <th className="py-1.5 px-2 text-left font-medium">Asistencia</th>
+                                  <th className="py-1.5 px-2 text-left font-medium">Marcado</th>
                                 </tr>
-                              ),
-                              (
-                                <tr key={`${item.id}-note`} className="border-b last:border-b-0">
-                                  <td colSpan={4} className="py-1.5 px-2 bg-gray-50/40">
-                                    {isCoach ? (
+                              </thead>
+                              <tbody>
+                                {groupKeys.flatMap((key) => {
+                                  const items = groups[key] ?? [];
+                                  const headerName = items[0]?.planName ?? (key === 'unknown' ? 'Plan sin identificar' : 'Plan');
+
+                                  const headerRow = (
+                                    <tr key={`${title}-${key}-header`} className="border-b bg-slate-50">
+                                      <td colSpan={6} className="py-2 px-2 text-xs font-semibold text-slate-700">
+                                        {headerName}
+                                      </td>
+                                    </tr>
+                                  );
+
+                                  const rows = items.flatMap((item) => {
+                                    const d = new Date(item.date);
+                                    const yyyy = d.getFullYear();
+                                    const mm = String(d.getMonth() + 1).padStart(2, '0');
+                                    const dd = String(d.getDate()).padStart(2, '0');
+                                    const hh = String(d.getHours()).padStart(2, '0');
+                                    const min = String(d.getMinutes()).padStart(2, '0');
+
+                                    const attLabel =
+                                      item.attendancePresent == null
+                                        ? 'Sin marcar'
+                                        : item.attendancePresent
+                                          ? 'Presente'
+                                          : 'Ausente';
+
+                                    const attClass =
+                                      item.attendancePresent == null
+                                        ? 'bg-slate-50 text-slate-700 border border-slate-200'
+                                        : item.attendancePresent
+                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                          : 'bg-red-50 text-red-700 border border-red-100';
+
+                                    let markedText = '-';
+                                    if (item.attendanceMarkedAt) {
+                                      const md = new Date(item.attendanceMarkedAt);
+                                      const mY = md.getFullYear();
+                                      const mM = String(md.getMonth() + 1).padStart(2, '0');
+                                      const mD = String(md.getDate()).padStart(2, '0');
+                                      const mH = String(md.getHours()).padStart(2, '0');
+                                      const mMin = String(md.getMinutes()).padStart(2, '0');
+                                      const when = `${mD}/${mM}/${mY} ${mH}:${mMin}`;
+                                      if (showMarkedBy) {
+                                        const who = item.attendanceMarkedByName || 'Usuario';
+                                        markedText = `${who} • ${when}`;
+                                      } else {
+                                        markedText = when;
+                                      }
+                                    }
+
+                                    const notesArr = classNotesByClass[item.id] ?? [];
+                                    const firstNote = notesArr[0] ?? null;
+                                    const isCoach = role === 'coach';
+                                    const isAdmin = role === 'admin' || role === 'super_admin';
+                                    const coachCanEditThisNote =
+                                      !isCoach || !firstNote || (!!coachIdForNotes && firstNote.coach_id === coachIdForNotes);
+
+                                    return [
+                                      (
+                                        <tr key={`${title}-${item.id}-row`} className="border-b last:border-b-0">
+                                          <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
+                                          <td className="py-1.5 px-2">{`${hh}:${min}`}</td>
+                                          <td className="py-1.5 px-2">{item.courtName ?? '-'}</td>
+                                          <td className="py-1.5 px-2">{item.coachName ?? '-'}</td>
+                                          <td className="py-1.5 px-2">
+                                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${attClass}`}>
+                                              {attLabel}
+                                            </span>
+                                          </td>
+                                          <td className="py-1.5 px-2 text-xs text-slate-600">{markedText}</td>
+                                        </tr>
+                                      ),
+                                      (
+                                        <tr key={`${title}-${item.id}-note`} className="border-b last:border-b-0">
+                                          <td colSpan={6} className="py-1.5 px-2 bg-gray-50/40">
+                                            {isCoach ? (
                                       <div className="space-y-1">
                                         {editingNote && editingNote.classId === item.id ? (
                                           <div className="space-y-1">
@@ -1623,7 +1744,7 @@ export default function StudentsPage() {
                                           </div>
                                         )}
                                       </div>
-                                    ) : isStudent && firstNote ? (
+                                    ) : role === 'student' && firstNote ? (
                                       <p className="text-[13px] text-gray-700">
                                         <span className="font-semibold">Nota del profesor:</span>{' '}
                                         <span className="font-semibold">{firstNote.note}</span>
@@ -1636,10 +1757,21 @@ export default function StudentsPage() {
                           });
 
                           return [headerRow, ...rows];
-                        });
-                      })()}
-                    </tbody>
-                  </table>
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            };
+
+            return (
+              <>
+                {renderSection('Histórico confirmado', confirmed)}
+                {renderSection('Reservas pendientes de confirmar', pending)}
+              </>
+            );
+          })()}
                 </div>
               )}
             </div>

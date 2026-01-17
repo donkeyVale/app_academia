@@ -2131,7 +2131,8 @@ export default function ReportsPage() {
             const { data: usageRows, error: usageErr } = await supabase
               .from('plan_usages')
               .select('class_id')
-              .in('class_id', classIdsForCount);
+              .in('class_id', classIdsForCount)
+              .eq('status', 'confirmed');
             if (usageErr) throw usageErr;
             for (const r of (usageRows ?? []) as any[]) {
               const cid = r?.class_id as string | undefined;

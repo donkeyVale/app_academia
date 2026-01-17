@@ -1013,7 +1013,8 @@ export default function Page() {
                 .from('plan_usages')
                 .select('id')
                 .eq('student_plan_id', planRow.id)
-                .eq('student_id', studentId);
+                .eq('student_id', studentId)
+                .in('status', ['pending', 'confirmed']);
               if (usagesErr) throw usagesErr;
               const used = (usagesData ?? []).length;
 

@@ -10,15 +10,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Faltan classId o studentId.' }, { status: 400 });
     }
 
-    // Borrar uso de plan para este alumno y clase (si existe)
-    const { error: delUsageErr } = await supabaseAdmin
+    // Marcar uso de plan como devuelto (refund) para este alumno y clase (si existe)
+    const { error: refundUsageErr } = await supabaseAdmin
       .from('plan_usages')
-      .delete()
+      .update({ status: 'refunded', refunded_at: new Date().toISOString() })
       .eq('class_id', classId)
-      .eq('student_id', studentId);
-    if (delUsageErr) {
-      console.error('Error borrando plan_usages en cancel-single-student', delUsageErr.message);
-      return NextResponse.json({ error: delUsageErr.message }, { status: 500 });
+      .eq('student_id', studentId)
+      .in('status', ['pending', 'confirmed']);
+    if (refundUsageErr) {
+      console.error('Error marcando plan_usages como refunded en cancel-single-student', refundUsageErr.message);
+      return NextResponse.json({ error: refundUsageErr.message }, { status: 500 });
     }
 
     // Borrar booking del alumno para esta clase (si existe)

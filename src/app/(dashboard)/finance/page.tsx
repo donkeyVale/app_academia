@@ -156,7 +156,8 @@ export default function FinancePage() {
             .from('plan_usages')
             .select('id')
             .eq('student_plan_id', row.id)
-            .eq('student_id', studentId);
+            .eq('student_id', studentId)
+            .in('status', ['pending', 'confirmed']);
 
           if (usagesErr) throw usagesErr;
 
@@ -434,6 +435,7 @@ export default function FinancePage() {
                           .from('plan_usages')
                           .select('class_id, student_plan_id, class_sessions!inner(id,date,court_id,coach_id)')
                           .eq('student_id', studentId)
+                          .eq('status', 'confirmed')
                           .limit(50);
 
                         if (usagesErr) throw usagesErr;

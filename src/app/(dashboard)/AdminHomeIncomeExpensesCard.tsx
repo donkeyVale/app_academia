@@ -392,7 +392,8 @@ export default function AdminHomeIncomeExpensesCard() {
                     const { data: usageRows, error: usageErr } = await supabase
                       .from('plan_usages')
                       .select('class_id')
-                      .in('class_id', classIds);
+                      .in('class_id', classIds)
+                      .eq('status', 'confirmed');
                     if (!usageErr) {
                       for (const r of (usageRows ?? []) as any[]) {
                         const cid = r?.class_id as string | undefined;

@@ -852,7 +852,8 @@ export default function SchedulePage() {
             .from('plan_usages')
             .select('id', { count: 'exact', head: true })
             .eq('student_plan_id', p.id)
-            .eq('student_id', sid);
+            .eq('student_id', sid)
+            .in('status', ['pending', 'confirmed']);
           if (usageCountErr) {
             const msg = 'No se pudo verificar el uso de clases del plan.';
             toast.error(msg);
@@ -1081,6 +1082,7 @@ export default function SchedulePage() {
               student_plan_id: planId,
               class_id: createdClassId,
               student_id: sid,
+              status: 'pending',
             },
             { onConflict: 'student_id,class_id' }
           );
@@ -1389,6 +1391,9 @@ export default function SchedulePage() {
   const [attendanceClass, setAttendanceClass] = useState<ClassSession | null>(null);
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [attendanceSaving, setAttendanceSaving] = useState(false);
+  const [attendanceLastMark, setAttendanceLastMark] = useState<{ markedAt: string | null; markedByName: string | null }>(
+    { markedAt: null, markedByName: null }
+  );
   const [attendanceList, setAttendanceList] = useState<{
     student_id: string;
     present: boolean;
@@ -1492,6 +1497,7 @@ export default function SchedulePage() {
     setAttendanceClass(cls);
     setAttendanceLoading(true);
     setError(null);
+    setAttendanceLastMark({ markedAt: null, markedByName: null });
     try {
       // Cargar reservas para esta clase (para fallback si aún no tenemos studentsByClass actualizado)
       const { data: bookingsData, error: bErr } = await supabase
@@ -1502,9 +1508,38 @@ export default function SchedulePage() {
 
       const { data: attData, error: aErr } = await supabase
         .from('attendance')
-        .select('student_id, present')
+        .select('student_id, present, marked_at, marked_by_user_id')
         .eq('class_id', cls.id);
       if (aErr) throw aErr;
+
+      // Calcular última marcación (más reciente) para mostrar en header (solo admin/profe)
+      const isStaff = role === 'admin' || role === 'super_admin' || role === 'coach';
+      if (isStaff && (attData ?? []).length > 0) {
+        let lastAt: string | null = null;
+        let lastByUserId: string | null = null;
+        for (const r of (attData ?? []) as any[]) {
+          const at = (r.marked_at as string | null | undefined) ?? null;
+          if (!at) continue;
+          if (!lastAt || at > lastAt) {
+            lastAt = at;
+            lastByUserId = ((r.marked_by_user_id as string | null | undefined) ?? null);
+          }
+        }
+
+        let lastByName: string | null = null;
+        if (lastByUserId) {
+          const { data: profRow, error: profErr } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', lastByUserId)
+            .maybeSingle();
+          if (!profErr) {
+            lastByName = ((profRow as any)?.full_name as string | null | undefined) ?? null;
+          }
+        }
+
+        setAttendanceLastMark({ markedAt: lastAt, markedByName: lastByName });
+      }
 
       const attMap = new Map((attData ?? []).map((a: any) => [a.student_id as string, !!a.present]));
 
@@ -1533,6 +1568,7 @@ export default function SchedulePage() {
     } catch (e: any) {
       setError(e.message || 'Error cargando asistencia');
       setAttendanceList([]);
+      setAttendanceLastMark({ markedAt: null, markedByName: null });
     } finally {
       setAttendanceLoading(false);
     }
@@ -1543,21 +1579,57 @@ export default function SchedulePage() {
     setAttendanceSaving(true);
     setError(null);
     try {
-      // Simple approach: remove previous attendance for this class and insert fresh snapshot
-      const { error: delErr } = await supabase
-        .from('attendance')
-        .delete()
-        .eq('class_id', attendanceClass.id);
-      if (delErr) throw delErr;
+      if (!currentUserId) {
+        throw new Error('No se pudo identificar el usuario actual. Inicia sesión nuevamente.');
+      }
+
+      const nowIso = new Date().toISOString();
+
+      const studentIds = attendanceList.map((r) => r.student_id).filter(Boolean);
+
+      // Limpiar filas antiguas de asistencia para alumnos que ya no están en la clase
+      if (studentIds.length > 0) {
+        const { error: delOldErr } = await supabase
+          .from('attendance')
+          .delete()
+          .eq('class_id', attendanceClass.id)
+          .not('student_id', 'in', `(${studentIds.join(',')})`);
+        if (delOldErr) throw delOldErr;
+      } else {
+        // Si no hay alumnos, borramos toda la asistencia de la clase
+        const { error: delAllErr } = await supabase
+          .from('attendance')
+          .delete()
+          .eq('class_id', attendanceClass.id);
+        if (delAllErr) throw delAllErr;
+      }
 
       if (attendanceList.length) {
         const rows = attendanceList.map((row) => ({
           class_id: attendanceClass.id,
           student_id: row.student_id,
           present: row.present,
+          marked_at: nowIso,
+          marked_by_user_id: currentUserId,
         }));
-        const { error: insErr } = await supabase.from('attendance').insert(rows);
-        if (insErr) throw insErr;
+
+        const { error: upsertErr } = await supabase
+          .from('attendance')
+          .upsert(rows, { onConflict: 'class_id,student_id' });
+        if (upsertErr) throw upsertErr;
+
+        // Confirmar consumo del plan (presente o ausente) al marcar asistencia
+        if (studentIds.length) {
+          const { error: confirmErr } = await supabase
+            .from('plan_usages')
+            .update({ status: 'confirmed', confirmed_at: nowIso })
+            .eq('class_id', attendanceClass.id)
+            .in('student_id', studentIds)
+            .eq('status', 'pending');
+          if (confirmErr) {
+            console.error('Error confirmando plan_usages por asistencia', confirmErr.message);
+          }
+        }
 
         const { error: updPendingErr } = await supabase
           .from('class_sessions')
@@ -1725,7 +1797,8 @@ export default function SchedulePage() {
               .from('plan_usages')
               .select('id', { count: 'exact', head: true })
               .eq('student_plan_id', p.id)
-              .eq('student_id', sid);
+              .eq('student_id', sid)
+              .in('status', ['pending', 'confirmed']);
             if (usageCountErr) {
               toast.error('No se pudo verificar el uso de clases del plan.');
               setSaving(false);
@@ -1850,6 +1923,7 @@ export default function SchedulePage() {
               student_plan_id: planId,
               class_id: editing.id,
               student_id: sid,
+              status: 'pending',
             },
             { onConflict: 'student_id,class_id' }
           );
@@ -1866,13 +1940,14 @@ export default function SchedulePage() {
           .in('student_id', toRemove);
         if (delErr) throw delErr;
 
-        // devolver clases al plan eliminando usos para los alumnos quitados
-        const { error: delUsageErr } = await supabase
+        // devolver clases al plan marcando usos como refund (histórico)
+        const { error: refundUsageErr } = await supabase
           .from('plan_usages')
-          .delete()
+          .update({ status: 'refunded', refunded_at: new Date().toISOString() })
           .eq('class_id', editing.id)
-          .in('student_id', toRemove);
-        if (delUsageErr) throw delUsageErr;
+          .in('student_id', toRemove)
+          .in('status', ['pending', 'confirmed']);
+        if (refundUsageErr) throw refundUsageErr;
       }
 
       await logAudit('update', 'class_session', editing.id, { ...updates, add_students: toAdd, remove_students: toRemove });
@@ -3053,8 +3128,9 @@ export default function SchedulePage() {
 
                               const { error: delUsageErr } = await supabase
                                 .from('plan_usages')
-                                .delete()
-                                .eq('class_id', cls.id);
+                                .update({ status: 'refunded', refunded_at: new Date().toISOString() })
+                                .eq('class_id', cls.id)
+                                .in('status', ['pending', 'confirmed']);
                               if (delUsageErr) {
                                 toast.error('Error al cancelar: ' + delUsageErr.message);
                                 return;
@@ -3482,6 +3558,18 @@ export default function SchedulePage() {
                     Clase del {new Date(attendanceClass.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}
                     {" "}a las{" "}
                     {new Date(attendanceClass.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                )}
+                {(role === 'admin' || role === 'super_admin' || role === 'coach') && attendanceLastMark.markedAt && (
+                  <p className="text-[11px] text-gray-500">
+                    Última marcación: {attendanceLastMark.markedByName ?? 'Usuario'} •{' '}
+                    {new Date(attendanceLastMark.markedAt).toLocaleString('es-ES', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
                   </p>
                 )}
               </div>

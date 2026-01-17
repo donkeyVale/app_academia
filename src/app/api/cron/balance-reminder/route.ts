@@ -91,7 +91,8 @@ export async function POST(req: NextRequest) {
         .from('plan_usages')
         .select('id', { count: 'exact', head: true })
         .eq('student_plan_id', planId)
-        .eq('student_id', studentId);
+        .eq('student_id', studentId)
+        .in('status', ['pending', 'confirmed']);
 
       if (usageErr) {
         return NextResponse.json({ error: usageErr.message }, { status: 500 });
