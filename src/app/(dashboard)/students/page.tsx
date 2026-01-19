@@ -1707,6 +1707,11 @@ export default function StudentsPage() {
                           const studentId = historyStudent?.id;
                           const isLogForStudent = (log: AuditLogRow) => {
                             if (!studentId) return false;
+                            if (log.action === 'update' || log.action === 'cancel') return true;
+                            if (log.action === 'cancel_booking') {
+                              const p = log.payload ?? {};
+                              return p?.student_id && String(p.student_id) === String(studentId);
+                            }
                             const p = log.payload ?? {};
                             if (p?.student_id && String(p.student_id) === String(studentId)) return true;
                             const arrayKeys = ['students', 'add_students', 'remove_students'];
