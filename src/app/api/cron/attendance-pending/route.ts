@@ -67,7 +67,13 @@ async function handle(req: NextRequest) {
 
     const allTodayRows = (clsRows ?? []) as any[];
     if (allTodayRows.length === 0) {
-      return NextResponse.json({ ok: true, checked: 0, academies: 0, notifiedRequests: 0, debug: debug ? { dayRange: { startIso, endIso } } : undefined });
+      return NextResponse.json({
+        ok: true,
+        checked: 0,
+        academies: 0,
+        notifiedRequests: 0,
+        debug: debug ? { dayRange: { startIso, endIso }, today: 0 } : undefined,
+      });
     }
 
     // 2) Solo clases ya finalizadas (asumimos duración 1 hora) y sin asistencia marcada
@@ -86,11 +92,18 @@ async function handle(req: NextRequest) {
         checked: 0,
         academies: 0,
         notifiedRequests: 0,
-        debug: debug ? { dayRange: { startIso, endIso }, reason: 'no_finished_classes_yet' } : undefined,
+        debug: debug
+          ? {
+              dayRange: { startIso, endIso },
+              today: allTodayRows.length,
+              finished: 0,
+              reason: 'no_finished_classes_yet',
+            }
+          : undefined,
       });
     }
 
-    const classIds = finishedTodayRows.map((r) => r?.id as string | undefined).filter(Boolean) as string[];
+    const classIds = allTodayRows.map((r) => r?.id as string | undefined).filter(Boolean) as string[];
     const { data: attRows, error: attErr } = await supabaseAdmin
       .from('attendance')
       .select('class_id')
@@ -114,9 +127,19 @@ async function handle(req: NextRequest) {
         checked: 0,
         academies: 0,
         notifiedRequests: 0,
-        debug: debug ? { dayRange: { startIso, endIso }, finished: finishedTodayRows.length, reason: 'all_marked' } : undefined,
+        debug: debug
+          ? {
+              dayRange: { startIso, endIso },
+              today: allTodayRows.length,
+              finished: finishedTodayRows.length,
+              attendanceRows: (attRows ?? []).length,
+              reason: 'all_marked',
+            }
+          : undefined,
       });
     }
+
+    const pendingSample = rows.slice(0, 10).map((r) => ({ id: r?.id, date: r?.date, coach_id: r?.coach_id }));
 
     // 3) Mapear location -> academy (multiacademia)
     const locationIds = Array.from(
@@ -243,7 +266,17 @@ async function handle(req: NextRequest) {
       checked: rows.length,
       academies: academies.length,
       notifiedRequests: okNotified,
-      debug: debug ? { dayRange: { startIso, endIso }, academies, pushResponses } : undefined,
+      debug: debug
+        ? {
+            dayRange: { startIso, endIso },
+            today: allTodayRows.length,
+            finished: finishedTodayRows.length,
+            attendanceRows: (attRows ?? []).length,
+            pendingSample,
+            academies,
+            pushResponses,
+          }
+        : undefined,
     });
   } catch (e: any) {
     console.error('Error en /api/cron/attendance-pending', e);
