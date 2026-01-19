@@ -30,6 +30,16 @@ type StudentPayment = {
   status: string;
 };
 
+type AuditLogRow = {
+  id: string;
+  created_at: string;
+  user_id: string | null;
+  action: string;
+  entity: string;
+  entity_id: string | null;
+  payload: any;
+};
+
 export default function FinancePage() {
   const supabase = useMemo(() => createClientBrowser(), []);
   const [role, setRole] = useState<Role>(null);
@@ -47,6 +57,9 @@ export default function FinancePage() {
   const [historySelectedPlanId, setHistorySelectedPlanId] = useState<string>('');
   const [historyPlanOpen, setHistoryPlanOpen] = useState(false);
   const [historyPlanSearch, setHistoryPlanSearch] = useState('');
+  const [historyAuditLoading, setHistoryAuditLoading] = useState(false);
+  const [historyAuditError, setHistoryAuditError] = useState<string | null>(null);
+  const [historyAuditLogs, setHistoryAuditLogs] = useState<AuditLogRow[]>([]);
   const [historyItems, setHistoryItems] = useState<
     {
       id: string;
@@ -442,6 +455,9 @@ export default function FinancePage() {
                         setHistorySelectedPlanId('');
                         setHistoryPlanOpen(false);
                         setHistoryPlanSearch('');
+                        setHistoryAuditLoading(false);
+                        setHistoryAuditError(null);
+                        setHistoryAuditLogs([]);
 
                         const { data: usagesData, error: usagesErr } = await supabase
                           .from('plan_usages')
@@ -630,7 +646,7 @@ export default function FinancePage() {
                           });
                         }
 
-                        const itemsWithAttendance = baseItems.map((it) => {
+                        const merged = baseItems.map((it) => {
                           const att = attendanceMap.get(it.id);
                           return {
                             ...it,
@@ -639,40 +655,36 @@ export default function FinancePage() {
                           };
                         });
 
-                        // Cargar notas de clase para este alumno y estas clases (solo lectura)
-                        const classIds = baseItems.map((i) => i.id);
-                        let notesByClass: Record<string, string | null> = {};
-                        if (classIds.length) {
-                          const { data: notesData, error: notesErr } = await supabase
-                            .from('class_notes')
-                            .select('class_id,note,visible_to_student')
-                            .eq('student_id', studentId)
-                            .eq('visible_to_student', true)
-                            .in('class_id', classIds);
+                        merged.sort((a, b) => b.date.localeCompare(a.date));
+                        setHistoryItems(merged);
 
-                          if (!notesErr) {
-                            notesByClass = (notesData ?? []).reduce<Record<string, string | null>>(
-                              (acc, n: any) => {
-                                const cid = n.class_id as string;
-                                // Nos quedamos con la primera nota si hay varias
-                                if (!acc[cid]) acc[cid] = (n.note as string) ?? null;
-                                return acc;
-                              },
-                              {},
-                            );
+                        try {
+                          setHistoryAuditLoading(true);
+                          setHistoryAuditError(null);
+                          const classIdsForAudit = Array.from(new Set(merged.map((x) => x.id).filter(Boolean)));
+                          if (classIdsForAudit.length) {
+                            const { data: auditRows, error: auditErr } = await supabase
+                              .from('audit_logs')
+                              .select('id,created_at,user_id,action,entity,entity_id,payload')
+                              .eq('entity', 'class_session')
+                              .in('entity_id', classIdsForAudit)
+                              .in('action', ['update', 'cancel', 'cancel_booking', 'attendance_update'])
+                              .order('created_at', { ascending: false })
+                              .limit(200);
+                            if (auditErr) throw auditErr;
+                            setHistoryAuditLogs((auditRows ?? []) as any);
+                          } else {
+                            setHistoryAuditLogs([]);
                           }
+                        } catch (e: any) {
+                          setHistoryAuditError(e?.message ?? 'Error cargando cambios y cancelaciones');
+                          setHistoryAuditLogs([]);
+                        } finally {
+                          setHistoryAuditLoading(false);
                         }
 
-                        const items = itemsWithAttendance.map((it) => ({
-                          ...it,
-                          note: notesByClass[it.id] ?? null,
-                        }));
-
-                        items.sort((a, b) => b.date.localeCompare(a.date));
-                        setHistoryItems(items);
-
                         const planOptionsMap = new Map<string, { id: string; label: string; purchasedAtMs: number }>();
-                        for (const it of items) {
+                        for (const it of merged) {
                           const key = it.studentPlanId ?? 'unknown';
                           if (planOptionsMap.has(key)) continue;
                           const ms = it.planPurchasedAt ? new Date(it.planPurchasedAt).getTime() : 0;
@@ -724,6 +736,9 @@ export default function FinancePage() {
                     setHistoryError(null);
                     setHistoryPlanOpen(false);
                     setHistoryPlanSearch('');
+                    setHistoryAuditLoading(false);
+                    setHistoryAuditError(null);
+                    setHistoryAuditLogs([]);
                   }}
                 >
                   Cerrar
@@ -920,6 +935,126 @@ export default function FinancePage() {
                               </div>
                             </div>
                           )}
+
+                          {(() => {
+                            const selectedKey = historySelectedPlanId || (historyItems[0]?.studentPlanId ?? 'unknown');
+                            const classIdsForPlan = new Set(
+                              historyItems
+                                .filter((it) => (it.studentPlanId ?? 'unknown') === selectedKey)
+                                .map((it) => it.id)
+                            );
+
+                            const studentIdForFilter = studentId;
+                            const isLogForStudent = (log: AuditLogRow) => {
+                              if (!studentIdForFilter) return false;
+                              const p = log.payload ?? {};
+                              if (p?.student_id && String(p.student_id) === String(studentIdForFilter)) return true;
+                              const arrayKeys = ['students', 'add_students', 'remove_students'];
+                              for (const k of arrayKeys) {
+                                const arr = p?.[k];
+                                if (Array.isArray(arr) && arr.some((x) => String(x) === String(studentIdForFilter))) return true;
+                              }
+                              if (log.action === 'attendance_update') {
+                                const rows = p?.attendance;
+                                if (Array.isArray(rows) && rows.some((r: any) => String(r?.student_id) === String(studentIdForFilter))) return true;
+                              }
+                              return false;
+                            };
+
+                            const logs = historyAuditLogs
+                              .filter((l) => !!l.entity_id && classIdsForPlan.has(String(l.entity_id)))
+                              .filter(isLogForStudent);
+
+                            if (!historyAuditLoading && !historyAuditError && logs.length === 0) return null;
+
+                            return (
+                              <div className="space-y-2">
+                                <h3 className="text-xs font-semibold text-slate-700">Cambios y cancelaciones</h3>
+                                {historyAuditLoading && (
+                                  <p className="text-sm text-gray-600">Cargando cambios y cancelaciones...</p>
+                                )}
+                                {historyAuditError && <p className="text-sm text-red-600">{historyAuditError}</p>}
+                                {!historyAuditLoading && !historyAuditError && logs.length > 0 && (
+                                  <div className="space-y-2">
+                                    {logs.map((log) => {
+                                      const at = new Date(log.created_at);
+                                      const atLabel = at.toLocaleString('es-ES', {
+                                        day: '2-digit',
+                                        month: '2-digit',
+                                        year: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      });
+
+                                      let title = log.action;
+                                      let detail: string | null = null;
+
+                                      if (log.action === 'cancel') {
+                                        title = 'Clase cancelada';
+                                      }
+                                      if (log.action === 'cancel_booking') {
+                                        title = 'Reserva cancelada';
+                                        const cancelledClass = !!log.payload?.cancelledClass;
+                                        detail = cancelledClass ? 'Era el último alumno, la clase quedó cancelada' : null;
+                                      }
+                                      if (log.action === 'update') {
+                                        const isRescheduled = !!log.payload?.isRescheduled;
+                                        if (isRescheduled) {
+                                          title = 'Clase re-agendada';
+                                          const oldDateIso = (log.payload?.oldDateIso as string | undefined) ?? null;
+                                          const newDateIso = (log.payload?.newDateIso as string | undefined) ?? null;
+                                          if (oldDateIso && newDateIso) {
+                                            const oldD = new Date(oldDateIso);
+                                            const newD = new Date(newDateIso);
+                                            const oldLabel = oldD.toLocaleString('es-ES', {
+                                              day: '2-digit',
+                                              month: '2-digit',
+                                              year: 'numeric',
+                                              hour: '2-digit',
+                                              minute: '2-digit',
+                                            });
+                                            const newLabel = newD.toLocaleString('es-ES', {
+                                              day: '2-digit',
+                                              month: '2-digit',
+                                              year: 'numeric',
+                                              hour: '2-digit',
+                                              minute: '2-digit',
+                                            });
+                                            detail = `${oldLabel} → ${newLabel}`;
+                                          }
+                                        } else {
+                                          title = 'Clase editada';
+                                        }
+                                      }
+                                      if (log.action === 'attendance_update') {
+                                        title = 'Asistencia marcada';
+                                        const rows = (log.payload?.attendance as any[]) ?? [];
+                                        const row = studentIdForFilter
+                                          ? rows.find((r) => String(r?.student_id) === String(studentIdForFilter))
+                                          : null;
+                                        if (row) {
+                                          detail = row.present === true ? 'Presente' : row.present === false ? 'Ausente' : null;
+                                        }
+                                      }
+
+                                      return (
+                                        <div key={log.id} className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                                          <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                              <div className="text-xs font-semibold text-slate-800">{title}</div>
+                                              {detail && <div className="text-xs text-slate-600 mt-0.5">{detail}</div>}
+                                            </div>
+                                            <div className="text-[11px] text-slate-500 whitespace-nowrap">{atLabel}</div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+
                           {renderSection('Histórico confirmado', confirmed)}
                           {renderSection('Reservas pendientes de confirmar', pending)}
                         </>
