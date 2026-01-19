@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import PlansClient from './PlansClient';
 import { CreditCard, History } from 'lucide-react';
 import { createClientBrowser } from '@/lib/supabase';
@@ -28,7 +28,7 @@ type StudentPayment = {
 };
 
 export default function FinancePage() {
-  const supabase = createClientBrowser();
+  const supabase = useMemo(() => createClientBrowser(), []);
   const [role, setRole] = useState<Role>(null);
   const [checkingRole, setCheckingRole] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -51,6 +51,9 @@ export default function FinancePage() {
       studentPlanId: string | null;
       planName: string | null;
       planPurchasedAt: string | null;
+      usageStatus: 'pending' | 'confirmed';
+      attendancePresent: boolean | null;
+      attendanceMarkedAt: string | null;
     }[]
   >([]);
 
@@ -433,9 +436,9 @@ export default function FinancePage() {
 
                         const { data: usagesData, error: usagesErr } = await supabase
                           .from('plan_usages')
-                          .select('class_id, student_plan_id, class_sessions!inner(id,date,court_id,coach_id)')
+                          .select('class_id, student_plan_id, status, class_sessions!inner(id,date,court_id,coach_id)')
                           .eq('student_id', studentId)
-                          .eq('status', 'confirmed')
+                          .in('status', ['confirmed', 'pending'])
                           .limit(50);
 
                         if (usagesErr) throw usagesErr;
@@ -445,6 +448,7 @@ export default function FinancePage() {
                           {
                             classId: string;
                             studentPlanId: string | null;
+                            usageStatus: 'pending' | 'confirmed';
                             classSession: { id: string; date: string; court_id: string | null; coach_id: string | null };
                           }
                         > = {};
@@ -457,6 +461,7 @@ export default function FinancePage() {
                           byClassId[classId] = {
                             classId,
                             studentPlanId: (u.student_plan_id as string | null) ?? null,
+                            usageStatus: ((u.status as string | null) === 'pending' ? 'pending' : 'confirmed'),
                             classSession: {
                               id: cls.id as string,
                               date: cls.date as string,
@@ -590,6 +595,38 @@ export default function FinancePage() {
                             studentPlanId: cls.studentPlanId,
                             planName: planInfo?.name ?? null,
                             planPurchasedAt: planInfo?.purchased_at ?? null,
+                            usageStatus: cls.usageStatus,
+                            attendancePresent: null as boolean | null,
+                            attendanceMarkedAt: null as string | null,
+                          };
+                        });
+
+                        // Cargar asistencia para estas clases (Presente/Ausente/Sin marcar + marcado_at)
+                        const classIdsForAttendance = baseItems.map((i) => i.id);
+                        const attendanceMap = new Map<string, { present: boolean | null; marked_at: string | null }>();
+                        if (classIdsForAttendance.length) {
+                          const { data: attRows, error: attErr } = await supabase
+                            .from('attendance')
+                            .select('class_id,present,marked_at')
+                            .eq('student_id', studentId)
+                            .in('class_id', classIdsForAttendance);
+                          if (attErr) throw attErr;
+                          (attRows ?? []).forEach((r: any) => {
+                            const cid = r.class_id as string | null;
+                            if (!cid) return;
+                            attendanceMap.set(cid, {
+                              present: (r.present as boolean | null) ?? null,
+                              marked_at: (r.marked_at as string | null) ?? null,
+                            });
+                          });
+                        }
+
+                        const itemsWithAttendance = baseItems.map((it) => {
+                          const att = attendanceMap.get(it.id);
+                          return {
+                            ...it,
+                            attendancePresent: att ? (att.present ?? null) : null,
+                            attendanceMarkedAt: att ? (att.marked_at ?? null) : null,
                           };
                         });
 
@@ -617,7 +654,7 @@ export default function FinancePage() {
                           }
                         }
 
-                        const items = baseItems.map((it) => ({
+                        const items = itemsWithAttendance.map((it) => ({
                           ...it,
                           note: notesByClass[it.id] ?? null,
                         }));
@@ -670,88 +707,142 @@ export default function FinancePage() {
                   <p className="text-sm text-gray-600">Todavía no tenés clases registradas.</p>
                 )}
                 {!historyLoading && !historyError && historyItems.length > 0 && (
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[320px] border-collapse text-sm">
-                      <thead>
-                        <tr className="border-b bg-gray-50 text-xs text-gray-600">
-                          <th className="py-1.5 px-2 text-left font-medium">Fecha</th>
-                          <th className="py-1.5 px-2 text-left font-medium">Hora</th>
-                          <th className="py-1.5 px-2 text-left font-medium">Cancha</th>
-                          <th className="py-1.5 px-2 text-left font-medium">Profesor</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(() => {
-                          const groups: Record<string, typeof historyItems> = {};
-                          historyItems.forEach((it) => {
-                            const key = it.studentPlanId ?? 'unknown';
-                            if (!groups[key]) groups[key] = [];
-                            groups[key].push(it);
-                          });
+                  <div className="space-y-4">
+                    {(() => {
+                      const confirmed = historyItems.filter((x) => x.usageStatus === 'confirmed');
+                      const pending = historyItems.filter((x) => x.usageStatus === 'pending');
 
-                          const groupKeys = Object.keys(groups).sort((a, b) => {
-                            const aItem = groups[a]?.[0] ?? null;
-                            const bItem = groups[b]?.[0] ?? null;
-                            const aMs = aItem?.planPurchasedAt ? new Date(aItem.planPurchasedAt).getTime() : 0;
-                            const bMs = bItem?.planPurchasedAt ? new Date(bItem.planPurchasedAt).getTime() : 0;
-                            if (aMs !== bMs) return bMs - aMs;
-                            return a.localeCompare(b);
-                          });
+                      const renderSection = (title: string, itemsInSection: typeof historyItems) => {
+                        if (!itemsInSection.length) return null;
 
-                          return groupKeys.flatMap((key) => {
-                            const items = groups[key] ?? [];
-                            const headerName =
-                              items[0]?.planName ?? (key === 'unknown' ? 'Plan sin identificar' : 'Plan');
+                        const groups: Record<string, typeof historyItems> = {};
+                        itemsInSection.forEach((it) => {
+                          const key = it.studentPlanId ?? 'unknown';
+                          if (!groups[key]) groups[key] = [];
+                          groups[key].push(it);
+                        });
 
-                            const headerRow = (
-                              <tr key={`${key}-header`} className="border-b bg-slate-50">
-                                <td colSpan={4} className="py-2 px-2 text-xs font-semibold text-slate-700">
-                                  {headerName}
-                                </td>
-                              </tr>
-                            );
+                        const groupKeys = Object.keys(groups).sort((a, b) => {
+                          const aItem = groups[a]?.[0] ?? null;
+                          const bItem = groups[b]?.[0] ?? null;
+                          const aMs = aItem?.planPurchasedAt ? new Date(aItem.planPurchasedAt).getTime() : 0;
+                          const bMs = bItem?.planPurchasedAt ? new Date(bItem.planPurchasedAt).getTime() : 0;
+                          if (aMs !== bMs) return bMs - aMs;
+                          return a.localeCompare(b);
+                        });
 
-                            const rows = items.flatMap((item) => {
-                              const d = new Date(item.date);
-                              const yyyy = d.getFullYear();
-                              const mm = String(d.getMonth() + 1).padStart(2, '0');
-                              const dd = String(d.getDate()).padStart(2, '0');
-                              const hh = String(d.getHours()).padStart(2, '0');
-                              const min = String(d.getMinutes()).padStart(2, '0');
-
-                              return [
-                                (
-                                  <tr key={`${item.id}-row`} className="border-b last:border-b-0">
-                                    <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
-                                    <td className="py-1.5 px-2">{`${hh}:${min}`}</td>
-                                    <td className="py-1.5 px-2">{item.courtName ?? '-'}</td>
-                                    <td className="py-1.5 px-2">{item.coachName ?? '-'}</td>
+                        return (
+                          <div className="space-y-2">
+                            <h3 className="text-xs font-semibold text-slate-700">{title}</h3>
+                            <div className="overflow-x-auto">
+                              <table className="w-full min-w-[560px] border-collapse text-sm">
+                                <thead>
+                                  <tr className="border-b bg-gray-50 text-xs text-gray-600">
+                                    <th className="py-1.5 px-2 text-left font-medium">Fecha</th>
+                                    <th className="py-1.5 px-2 text-left font-medium">Hora</th>
+                                    <th className="py-1.5 px-2 text-left font-medium">Cancha</th>
+                                    <th className="py-1.5 px-2 text-left font-medium">Profesor</th>
+                                    <th className="py-1.5 px-2 text-left font-medium">Asistencia</th>
+                                    <th className="py-1.5 px-2 text-left font-medium">Marcado</th>
                                   </tr>
-                                ),
-                                (
-                                  <tr key={`${item.id}-note`} className="border-b last:border-b-0">
-                                    <td colSpan={4} className="py-1.5 px-2 bg-gray-50/40">
-                                      {item.note ? (
-                                        <p className="text-[12px] text-gray-700">
-                                          <span className="font-semibold">Nota:</span>{' '}
-                                          <span className="font-semibold">{item.note}</span>
-                                        </p>
-                                      ) : (
-                                        <p className="text-[12px] text-gray-500">
-                                          Esta clase no tiene notas cargadas.
-                                        </p>
-                                      )}
-                                    </td>
-                                  </tr>
-                                ),
-                              ];
-                            });
+                                </thead>
+                                <tbody>
+                                  {groupKeys.flatMap((key) => {
+                                    const items = groups[key] ?? [];
+                                    const headerName =
+                                      items[0]?.planName ?? (key === 'unknown' ? 'Plan sin identificar' : 'Plan');
 
-                            return [headerRow, ...rows];
-                          });
-                        })()}
-                      </tbody>
-                    </table>
+                                    const headerRow = (
+                                      <tr key={`${title}-${key}-header`} className="border-b bg-slate-50">
+                                        <td colSpan={6} className="py-2 px-2 text-xs font-semibold text-slate-700">
+                                          {headerName}
+                                        </td>
+                                      </tr>
+                                    );
+
+                                    const rows = items.flatMap((item) => {
+                                      const d = new Date(item.date);
+                                      const yyyy = d.getFullYear();
+                                      const mm = String(d.getMonth() + 1).padStart(2, '0');
+                                      const dd = String(d.getDate()).padStart(2, '0');
+                                      const hh = String(d.getHours()).padStart(2, '0');
+                                      const min = String(d.getMinutes()).padStart(2, '0');
+
+                                      const attLabel =
+                                        item.attendancePresent == null
+                                          ? 'Sin marcar'
+                                          : item.attendancePresent
+                                            ? 'Presente'
+                                            : 'Ausente';
+
+                                      const attClass =
+                                        item.attendancePresent == null
+                                          ? 'bg-slate-50 text-slate-700 border border-slate-200'
+                                          : item.attendancePresent
+                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                            : 'bg-red-50 text-red-700 border border-red-100';
+
+                                      let markedText = '-';
+                                      if (item.attendanceMarkedAt) {
+                                        const md = new Date(item.attendanceMarkedAt);
+                                        const mY = md.getFullYear();
+                                        const mM = String(md.getMonth() + 1).padStart(2, '0');
+                                        const mD = String(md.getDate()).padStart(2, '0');
+                                        const mH = String(md.getHours()).padStart(2, '0');
+                                        const mMin = String(md.getMinutes()).padStart(2, '0');
+                                        markedText = `${mD}/${mM}/${mY} ${mH}:${mMin}`;
+                                      }
+
+                                      return [
+                                        (
+                                          <tr key={`${title}-${item.id}-row`} className="border-b last:border-b-0">
+                                            <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
+                                            <td className="py-1.5 px-2">{`${hh}:${min}`}</td>
+                                            <td className="py-1.5 px-2">{item.courtName ?? '-'}</td>
+                                            <td className="py-1.5 px-2">{item.coachName ?? '-'}</td>
+                                            <td className="py-1.5 px-2">
+                                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${attClass}`}>
+                                                {attLabel}
+                                              </span>
+                                            </td>
+                                            <td className="py-1.5 px-2 text-xs text-slate-600">{markedText}</td>
+                                          </tr>
+                                        ),
+                                        (
+                                          <tr key={`${title}-${item.id}-note`} className="border-b last:border-b-0">
+                                            <td colSpan={6} className="py-1.5 px-2 bg-gray-50/40">
+                                              {item.note ? (
+                                                <p className="text-[12px] text-gray-700">
+                                                  <span className="font-semibold">Nota:</span>{' '}
+                                                  <span className="font-semibold">{item.note}</span>
+                                                </p>
+                                              ) : (
+                                                <p className="text-[12px] text-gray-500">
+                                                  Esta clase no tiene notas cargadas.
+                                                </p>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        ),
+                                      ];
+                                    });
+
+                                    return [headerRow, ...rows];
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        );
+                      };
+
+                      return (
+                        <>
+                          {renderSection('Histórico confirmado', confirmed)}
+                          {renderSection('Reservas pendientes de confirmar', pending)}
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
