@@ -52,25 +52,73 @@ async function handle(req: NextRequest) {
     const { y, m, d } = getLocalYmdUtcMinus3(now);
     const { startIso, endIso } = getUtcRangeForLocalDayUtcMinus3(y, m, d);
 
-    // 1) Buscar clases de hoy con asistencia pendiente
+    // 1) Buscar clases de hoy
+    // Nota: no dependemos de attendance_pending porque en DB default=false y solo se setea en algunos flujos.
     const { data: clsRows, error: clsErr } = await supabaseAdmin
       .from('class_sessions')
       .select('id, date, court_id, coach_id, courts!inner(location_id), attendance_pending, status')
       .gte('date', startIso)
       .lte('date', endIso)
-      .eq('attendance_pending', true)
       .neq('status', 'cancelled');
 
     if (clsErr) {
       return NextResponse.json({ error: clsErr.message }, { status: 500 });
     }
 
-    const rows = (clsRows ?? []) as any[];
-    if (rows.length === 0) {
+    const allTodayRows = (clsRows ?? []) as any[];
+    if (allTodayRows.length === 0) {
       return NextResponse.json({ ok: true, checked: 0, academies: 0, notifiedRequests: 0, debug: debug ? { dayRange: { startIso, endIso } } : undefined });
     }
 
-    // 2) Mapear location -> academy (multiacademia)
+    // 2) Solo clases ya finalizadas (asumimos duración 1 hora) y sin asistencia marcada
+    const nowTs = now.getTime();
+
+    const finishedTodayRows = allTodayRows.filter((c) => {
+      const startTs = new Date(c?.date as string).getTime();
+      if (!Number.isFinite(startTs)) return false;
+      const endTs = startTs + 60 * 60 * 1000;
+      return endTs <= nowTs;
+    });
+
+    if (finishedTodayRows.length === 0) {
+      return NextResponse.json({
+        ok: true,
+        checked: 0,
+        academies: 0,
+        notifiedRequests: 0,
+        debug: debug ? { dayRange: { startIso, endIso }, reason: 'no_finished_classes_yet' } : undefined,
+      });
+    }
+
+    const classIds = finishedTodayRows.map((r) => r?.id as string | undefined).filter(Boolean) as string[];
+    const { data: attRows, error: attErr } = await supabaseAdmin
+      .from('attendance')
+      .select('class_id')
+      .in('class_id', classIds);
+
+    if (attErr) {
+      return NextResponse.json({ error: attErr.message }, { status: 500 });
+    }
+
+    const hasAttendance = new Set<string>(((attRows ?? []) as any[]).map((r) => r?.class_id as string).filter(Boolean));
+    const rows = finishedTodayRows.filter((r) => {
+      const id = r?.id as string | undefined;
+      if (!id) return false;
+      // Si ya hay filas de attendance para la clase, consideramos que ya fue marcada.
+      return !hasAttendance.has(id);
+    });
+
+    if (rows.length === 0) {
+      return NextResponse.json({
+        ok: true,
+        checked: 0,
+        academies: 0,
+        notifiedRequests: 0,
+        debug: debug ? { dayRange: { startIso, endIso }, finished: finishedTodayRows.length, reason: 'all_marked' } : undefined,
+      });
+    }
+
+    // 3) Mapear location -> academy (multiacademia)
     const locationIds = Array.from(
       new Set(
         rows
@@ -114,7 +162,7 @@ async function handle(req: NextRequest) {
       return NextResponse.json({ ok: true, checked: rows.length, academies: 0, notifiedRequests: 0, debug: debug ? { reason: 'no_academies_after_mapping' } : undefined });
     }
 
-    // 3) Resolver coaches (coach_id -> user_id) y agrupar por academy
+    // 4) Resolver coaches (coach_id -> user_id) y agrupar por academy
     const coachIds = Array.from(
       new Set(
         rows
@@ -154,7 +202,7 @@ async function handle(req: NextRequest) {
       coachUserIdsByAcademy.get(academyId)!.add(coachUserId);
     }
 
-    // 4) Notificar por academia (no dedupeamos acá porque la frecuencia la controla el cron cada 6h)
+    // 5) Notificar por academia (no dedupeamos acá porque la frecuencia la controla el cron cada 6h)
     const origin = req.nextUrl.origin;
     const bodyText = 'Hay clases aun sin marcar asistencia, revisa la agenda';
 
