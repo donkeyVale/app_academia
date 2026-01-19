@@ -2,10 +2,12 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { History, Users, StickyNote } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { createClientBrowser } from '@/lib/supabase';
 import { formatPyg } from '@/lib/formatters';
@@ -64,9 +66,19 @@ type ProfileRow = {
   full_name: string | null;
 };
 
+type AuditLogRow = {
+  id: string;
+  created_at: string;
+  user_id: string | null;
+  action: string;
+  entity: string;
+  entity_id: string | null;
+  payload: any;
+};
+
 export default function StudentsPage() {
   const router = useRouter();
-  const supabase = createClientBrowser();
+  const supabase = useMemo(() => createClientBrowser(), []);
   const [checking, setChecking] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +93,12 @@ export default function StudentsPage() {
   const [historyStudent, setHistoryStudent] = useState<{ id: string; name: string } | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historySelectedPlanId, setHistorySelectedPlanId] = useState<string>('');
+  const [historyPlanOpen, setHistoryPlanOpen] = useState(false);
+  const [historyPlanSearch, setHistoryPlanSearch] = useState('');
+  const [historyAuditLoading, setHistoryAuditLoading] = useState(false);
+  const [historyAuditError, setHistoryAuditError] = useState<string | null>(null);
+  const [historyAuditLogs, setHistoryAuditLogs] = useState<AuditLogRow[]>([]);
   const [historyItems, setHistoryItems] = useState<
     {
       id: string;
@@ -90,6 +108,10 @@ export default function StudentsPage() {
       studentPlanId: string | null;
       planName: string | null;
       planPurchasedAt: string | null;
+      usageStatus: 'pending' | 'confirmed' | 'refunded';
+      attendancePresent: boolean | null;
+      attendanceMarkedAt: string | null;
+      attendanceMarkedByName: string | null;
     }[]
   >([]);
   const [showOnlyMyStudents, setShowOnlyMyStudents] = useState(false);
@@ -298,7 +320,8 @@ export default function StudentsPage() {
           const { data: usagesData, error: usagesErr } = await supabase
             .from('plan_usages')
             .select('student_plan_id')
-            .in('student_plan_id', studentPlanIds);
+            .in('student_plan_id', studentPlanIds)
+            .in('status', ['pending', 'confirmed']);
 
           if (usagesErr) throw usagesErr;
 
@@ -552,15 +575,20 @@ export default function StudentsPage() {
     setHistoryLoading(true);
     setHistoryError(null);
     setHistoryItems([]);
+    setHistorySelectedPlanId('');
     setClassNotesByClass({});
     setEditingNote(null);
     setNotesError(null);
+    setHistoryAuditLoading(false);
+    setHistoryAuditError(null);
+    setHistoryAuditLogs([]);
     try {
-      // Buscar clases efectivamente usadas (presentes) a través de plan_usages
+      // Cargar clases confirmadas + pendientes (Opción A)
       const { data: usagesData, error: usagesErr } = await supabase
         .from('plan_usages')
-        .select('class_id, student_plan_id, class_sessions!inner(id,date,court_id,coach_id)')
+        .select('class_id, student_plan_id, status, class_sessions!inner(id,date,court_id,coach_id)')
         .eq('student_id', studentId)
+        .in('status', ['confirmed', 'pending', 'refunded'])
         .limit(50);
 
       if (usagesErr) throw usagesErr;
@@ -571,6 +599,7 @@ export default function StudentsPage() {
         {
           classId: string;
           studentPlanId: string | null;
+          usageStatus: 'pending' | 'confirmed' | 'refunded';
           classSession: { id: string; date: string; court_id: string | null; coach_id: string | null };
         }
       > = {};
@@ -580,9 +609,13 @@ export default function StudentsPage() {
         const classId = (u.class_id as string | null) ?? (cls?.id as string | null);
         if (!classId || !cls?.id) return;
         if (byClassId[classId]) return;
+        const rawStatus = (u.status as string | null) ?? null;
+        const usageStatus: 'pending' | 'confirmed' | 'refunded' =
+          rawStatus === 'pending' ? 'pending' : rawStatus === 'refunded' ? 'refunded' : 'confirmed';
         byClassId[classId] = {
           classId,
           studentPlanId: (u.student_plan_id as string | null) ?? null,
+          usageStatus,
           classSession: {
             id: cls.id as string,
             date: cls.date as string,
@@ -710,15 +743,123 @@ export default function StudentsPage() {
           studentPlanId: cls.studentPlanId,
           planName: planInfo?.name ?? null,
           planPurchasedAt: planInfo?.purchased_at ?? null,
+          usageStatus: cls.usageStatus,
+          attendancePresent: null,
+          attendanceMarkedAt: null,
+          attendanceMarkedByName: null,
         };
       });
 
       // Ordenar por fecha descendente por si acaso
       items.sort((a, b) => b.date.localeCompare(a.date));
-      setHistoryItems(items);
+
+      // Cargar asistencia para estas clases (para mostrar Presente/Ausente/Sin marcar)
+      const classIdsForAttendance = items.map((i) => i.id);
+      const attendanceMap = new Map<
+        string,
+        { present: boolean | null; marked_at: string | null; marked_by_user_id: string | null }
+      >();
+      if (classIdsForAttendance.length) {
+        const { data: attRows, error: attErr } = await supabase
+          .from('attendance')
+          .select('class_id,present,marked_at,marked_by_user_id')
+          .eq('student_id', studentId)
+          .in('class_id', classIdsForAttendance);
+        if (attErr) throw attErr;
+        (attRows ?? []).forEach((r: any) => {
+          const cid = r.class_id as string | null;
+          if (!cid) return;
+          attendanceMap.set(cid, {
+            present: (r.present as boolean | null) ?? null,
+            marked_at: (r.marked_at as string | null) ?? null,
+            marked_by_user_id: (r.marked_by_user_id as string | null) ?? null,
+          });
+        });
+      }
+
+      let markedByNameByUserId: Record<string, string | null> = {};
+      const showMarkedBy = role === 'admin' || role === 'super_admin' || role === 'coach';
+      if (showMarkedBy) {
+        const markerUserIds = Array.from(
+          new Set(
+            Array.from(attendanceMap.values())
+              .map((a) => a.marked_by_user_id)
+              .filter((id): id is string => !!id)
+          )
+        );
+        if (markerUserIds.length) {
+          const { data: profRows, error: profErr } = await supabase
+            .from('profiles')
+            .select('id, full_name')
+            .in('id', markerUserIds);
+          if (profErr) throw profErr;
+          markedByNameByUserId = (profRows ?? []).reduce<Record<string, string | null>>((acc, p: any) => {
+            acc[p.id] = (p.full_name as string | null) ?? null;
+            return acc;
+          }, {});
+        }
+      }
+
+      const merged = items.map((it) => {
+        const att = attendanceMap.get(it.id);
+        const markedByName =
+          showMarkedBy && att?.marked_by_user_id ? markedByNameByUserId[att.marked_by_user_id] ?? null : null;
+        return {
+          ...it,
+          attendancePresent: att ? (att.present ?? null) : null,
+          attendanceMarkedAt: att ? (att.marked_at ?? null) : null,
+          attendanceMarkedByName: markedByName,
+        };
+      });
+
+      setHistoryItems(merged);
+
+      try {
+        setHistoryAuditLoading(true);
+        setHistoryAuditError(null);
+        const classIdsForAudit = Array.from(new Set(merged.map((x) => x.id).filter(Boolean)));
+        if (classIdsForAudit.length) {
+          const { data: auditRows, error: auditErr } = await supabase
+            .from('audit_logs')
+            .select('id,created_at,user_id,action,entity,entity_id,payload')
+            .eq('entity', 'class_session')
+            .in('entity_id', classIdsForAudit)
+            .in('action', ['update', 'cancel', 'cancel_booking'])
+            .order('created_at', { ascending: false })
+            .limit(200);
+          if (auditErr) throw auditErr;
+          setHistoryAuditLogs((auditRows ?? []) as any);
+        } else {
+          setHistoryAuditLogs([]);
+        }
+      } catch (e: any) {
+        setHistoryAuditError(e?.message ?? 'Error cargando cambios y cancelaciones');
+        setHistoryAuditLogs([]);
+      } finally {
+        setHistoryAuditLoading(false);
+      }
+
+      const planOptionsMap = new Map<string, { id: string; label: string; purchasedAtMs: number }>();
+      for (const it of merged) {
+        const key = it.studentPlanId ?? 'unknown';
+        if (planOptionsMap.has(key)) continue;
+        const ms = it.planPurchasedAt ? new Date(it.planPurchasedAt).getTime() : 0;
+        const d = it.planPurchasedAt ? new Date(it.planPurchasedAt) : null;
+        const dd = d ? String(d.getDate()).padStart(2, '0') : '--';
+        const mm = d ? String(d.getMonth() + 1).padStart(2, '0') : '--';
+        const yyyy = d ? String(d.getFullYear()) : '----';
+        const when = `${dd}/${mm}/${yyyy}`;
+        const planName = it.planName ?? (key === 'unknown' ? 'Plan sin identificar' : 'Plan');
+        planOptionsMap.set(key, { id: key, label: `${planName} — asignado el ${when}`, purchasedAtMs: ms });
+      }
+
+      const optionsSorted = Array.from(planOptionsMap.values()).sort((a, b) => b.purchasedAtMs - a.purchasedAtMs);
+      if (optionsSorted.length > 0) {
+        setHistorySelectedPlanId(optionsSorted[0].id);
+      }
 
       // Cargar notas de clase para este alumno y estas clases
-      const classIds = items.map((i) => i.id);
+      const classIds = merged.map((i) => i.id);
       if (classIds.length) {
         let notesQuery = supabase
           .from('class_notes')
@@ -1192,7 +1333,7 @@ export default function StudentsPage() {
               ) : (
                 <>
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="inline-flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-2 py-1 text-[11px] text-slate-700">
+                    <div className="inline-flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-700">
                       <span className="font-semibold">{students.length}</span>
                       <span>alumnos totales</span>
                     </div>
@@ -1299,7 +1440,7 @@ export default function StudentsPage() {
                                     (remaining !== null && remaining > 0
                                       ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
                                       : remaining === 0
-                                      ? "bg-amber-50 text-amber-700 border-amber-100 border"
+                                      ? "bg-amber-50 text-amber-700 border border-amber-100"
                                       : "bg-slate-50 text-slate-500 border border-slate-200")
                                   }
                                 >
@@ -1366,6 +1507,11 @@ export default function StudentsPage() {
                   setHistoryStudent(null);
                   setHistoryItems([]);
                   setHistoryError(null);
+                  setHistoryPlanOpen(false);
+                  setHistoryPlanSearch('');
+                  setHistoryAuditLoading(false);
+                  setHistoryAuditError(null);
+                  setHistoryAuditLogs([]);
                 }}
               >
                 Cerrar
@@ -1378,268 +1524,296 @@ export default function StudentsPage() {
                 <p className="text-sm text-gray-600">Este alumno aún no tiene clases registradas.</p>
               )}
               {!historyLoading && !historyError && historyItems.length > 0 && (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[320px] border-collapse text-sm">
-                    <thead>
-                      <tr className="border-b bg-gray-50 text-xs text-gray-600">
-                        <th className="py-1.5 px-2 text-left font-medium">Fecha</th>
-                        <th className="py-1.5 px-2 text-left font-medium">Hora</th>
-                        <th className="py-1.5 px-2 text-left font-medium">Cancha</th>
-                        <th className="py-1.5 px-2 text-left font-medium">Profesor</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(() => {
-                        const groups: Record<string, typeof historyItems> = {};
-                        historyItems.forEach((it) => {
-                          const key = it.studentPlanId ?? 'unknown';
-                          if (!groups[key]) groups[key] = [];
-                          groups[key].push(it);
-                        });
+                <div className="space-y-4">
+                  {(() => {
+                    const showMarkedBy = role === 'admin' || role === 'super_admin' || role === 'coach';
 
-                        const groupKeys = Object.keys(groups).sort((a, b) => {
-                          const aItem = groups[a]?.[0] ?? null;
-                          const bItem = groups[b]?.[0] ?? null;
-                          const aMs = aItem?.planPurchasedAt ? new Date(aItem.planPurchasedAt).getTime() : 0;
-                          const bMs = bItem?.planPurchasedAt ? new Date(bItem.planPurchasedAt).getTime() : 0;
-                          if (aMs !== bMs) return bMs - aMs;
-                          return a.localeCompare(b);
-                        });
+                    const planOptionsMap = new Map<string, { id: string; label: string; purchasedAtMs: number }>();
+                    for (const it of historyItems) {
+                      const key = it.studentPlanId ?? 'unknown';
+                      if (planOptionsMap.has(key)) continue;
+                      const ms = it.planPurchasedAt ? new Date(it.planPurchasedAt).getTime() : 0;
+                      const d = it.planPurchasedAt ? new Date(it.planPurchasedAt) : null;
+                      const dd = d ? String(d.getDate()).padStart(2, '0') : '--';
+                      const mm = d ? String(d.getMonth() + 1).padStart(2, '0') : '--';
+                      const yyyy = d ? String(d.getFullYear()) : '----';
+                      const when = `${dd}/${mm}/${yyyy}`;
+                      const planName = it.planName ?? (key === 'unknown' ? 'Plan sin identificar' : 'Plan');
+                      planOptionsMap.set(key, { id: key, label: `${planName} — asignado el ${when}`, purchasedAtMs: ms });
+                    }
+                    const planOptions = Array.from(planOptionsMap.values()).sort((a, b) => b.purchasedAtMs - a.purchasedAtMs);
 
-                        return groupKeys.flatMap((key) => {
-                          const items = groups[key] ?? [];
-                          const headerName = items[0]?.planName ?? (key === 'unknown' ? 'Plan sin identificar' : 'Plan');
+                    const confirmed = historyItems.filter((x) => x.usageStatus === 'confirmed');
+                    const pending = historyItems.filter((x) => x.usageStatus === 'pending');
 
-                          const headerRow = (
-                            <tr key={`${key}-header`} className="border-b bg-slate-50">
-                              <td colSpan={4} className="py-2 px-2 text-xs font-semibold text-slate-700">
-                                {headerName}
-                              </td>
-                            </tr>
+                    const selectedPlanLabel = (() => {
+                      if (!historySelectedPlanId) return null;
+                      return planOptions.find((o) => o.id === historySelectedPlanId)?.label ?? null;
+                    })();
+
+                    const filteredPlanOptions = (() => {
+                      const q = historyPlanSearch.trim().toLowerCase();
+                      if (!q) return planOptions;
+                      return planOptions.filter((o) => o.label.toLowerCase().includes(q));
+                    })();
+
+                    const renderSection = (title: string, itemsInSection: typeof historyItems) => {
+                      if (!itemsInSection.length) return null;
+
+                      const key = historySelectedPlanId || (itemsInSection[0]?.studentPlanId ?? 'unknown');
+                      const items = itemsInSection.filter((it) => (it.studentPlanId ?? 'unknown') === key);
+                      if (!items.length) return null;
+
+                      return (
+                        <div className="space-y-2">
+                          <h3 className="text-xs font-semibold text-slate-700">{title}</h3>
+                          <div className="overflow-x-auto">
+                            <table className="w-full min-w-[560px] border-collapse text-sm">
+                              <thead>
+                                <tr className="border-b bg-gray-50 text-xs text-gray-600">
+                                  <th className="py-1.5 px-2 text-left font-medium">Fecha</th>
+                                  <th className="py-1.5 px-2 text-left font-medium">Hora</th>
+                                  <th className="py-1.5 px-2 text-left font-medium">Cancha</th>
+                                  <th className="py-1.5 px-2 text-left font-medium">Profesor</th>
+                                  <th className="py-1.5 px-2 text-left font-medium">Asistencia</th>
+                                  <th className="py-1.5 px-2 text-left font-medium">Marcado</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {items.map((item) => {
+                                    const d = new Date(item.date);
+                                    const yyyy = d.getFullYear();
+                                    const mm = String(d.getMonth() + 1).padStart(2, '0');
+                                    const dd = String(d.getDate()).padStart(2, '0');
+                                    const hh = String(d.getHours()).padStart(2, '0');
+                                    const min = String(d.getMinutes()).padStart(2, '0');
+
+                                    const attLabel =
+                                      item.attendancePresent == null
+                                        ? 'Sin marcar'
+                                        : item.attendancePresent
+                                          ? 'Presente'
+                                          : 'Ausente';
+
+                                    const attClass =
+                                      item.attendancePresent == null
+                                        ? 'bg-slate-50 text-slate-700 border border-slate-200'
+                                        : item.attendancePresent
+                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                          : 'bg-red-50 text-red-700 border border-red-100';
+
+                                    let markedText = '-';
+                                    if (item.attendanceMarkedAt) {
+                                      const md = new Date(item.attendanceMarkedAt);
+                                      const mY = md.getFullYear();
+                                      const mM = String(md.getMonth() + 1).padStart(2, '0');
+                                      const mD = String(md.getDate()).padStart(2, '0');
+                                      const mH = String(md.getHours()).padStart(2, '0');
+                                      const mMin = String(md.getMinutes()).padStart(2, '0');
+                                      const when = `${mD}/${mM}/${mY} ${mH}:${mMin}`;
+                                      if (showMarkedBy) {
+                                        const who = item.attendanceMarkedByName || 'Usuario';
+                                        markedText = `${who} • ${when}`;
+                                      } else {
+                                        markedText = when;
+                                      }
+                                    }
+
+                                    return (
+                                      <tr key={`${title}-${item.id}-row`} className="border-b last:border-b-0">
+                                        <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
+                                        <td className="py-1.5 px-2">{`${hh}:${min}`}</td>
+                                        <td className="py-1.5 px-2">{item.courtName ?? '-'}</td>
+                                        <td className="py-1.5 px-2">{item.coachName ?? '-'}</td>
+                                        <td className="py-1.5 px-2">
+                                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${attClass}`}>
+                                            {attLabel}
+                                          </span>
+                                        </td>
+                                        <td className="py-1.5 px-2 text-xs text-slate-600">{markedText}</td>
+                                      </tr>
+                                    );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    };
+
+                    return (
+                      <>
+                        {planOptions.length > 1 && (
+                          <div className="flex items-center justify-between gap-3">
+                            <label className="text-xs text-slate-600">Plan</label>
+                            <div className="w-full max-w-[360px]">
+                              <Popover
+                                open={historyPlanOpen}
+                                onOpenChange={(open) => {
+                                  setHistoryPlanOpen(open);
+                                  if (!open) setHistoryPlanSearch('');
+                                }}
+                              >
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="w-full justify-between h-9 px-2 text-xs font-normal"
+                                  >
+                                    <span className="truncate mr-2">
+                                      {selectedPlanLabel ?? 'Seleccionar plan'}
+                                    </span>
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-80 max-w-[calc(100vw-2rem)] p-2" align="start">
+                                  <div className="space-y-2">
+                                    <Input
+                                      type="text"
+                                      placeholder="Buscar plan..."
+                                      value={historyPlanSearch}
+                                      onChange={(e) => setHistoryPlanSearch(e.target.value)}
+                                      className="h-10 text-base"
+                                    />
+                                    <div className="max-h-52 overflow-auto border rounded-md divide-y text-xs bg-white">
+                                      {filteredPlanOptions.map((opt) => (
+                                        <button
+                                          key={opt.id}
+                                          type="button"
+                                          onClick={() => {
+                                            setHistorySelectedPlanId(opt.id);
+                                            setHistoryPlanOpen(false);
+                                            setHistoryPlanSearch('');
+                                          }}
+                                          className={`w-full px-2 py-1.5 text-left hover:bg-slate-50 ${
+                                            opt.id === historySelectedPlanId ? 'bg-slate-50' : ''
+                                          }`}
+                                        >
+                                          {opt.label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                          </div>
+                        )}
+
+                        {(() => {
+                          const selectedKey = historySelectedPlanId || (historyItems[0]?.studentPlanId ?? 'unknown');
+                          const classIdsForPlan = new Set(
+                            historyItems
+                              .filter((it) => (it.studentPlanId ?? 'unknown') === selectedKey)
+                              .map((it) => it.id)
                           );
 
-                          const rows = items.flatMap((item) => {
-                            const d = new Date(item.date);
-                            const yyyy = d.getFullYear();
-                            const mm = String(d.getMonth() + 1).padStart(2, '0');
-                            const dd = String(d.getDate()).padStart(2, '0');
-                            const hh = String(d.getHours()).padStart(2, '0');
-                            const min = String(d.getMinutes()).padStart(2, '0');
+                          const studentId = historyStudent?.id;
+                          const isLogForStudent = (log: AuditLogRow) => {
+                            if (!studentId) return false;
+                            if (log.action === 'update' || log.action === 'cancel') return true;
+                            if (log.action === 'cancel_booking') {
+                              const p = log.payload ?? {};
+                              return p?.student_id && String(p.student_id) === String(studentId);
+                            }
+                            const p = log.payload ?? {};
+                            if (p?.student_id && String(p.student_id) === String(studentId)) return true;
+                            const arrayKeys = ['students', 'add_students', 'remove_students'];
+                            for (const k of arrayKeys) {
+                              const arr = p?.[k];
+                              if (Array.isArray(arr) && arr.some((x) => String(x) === String(studentId))) return true;
+                            }
+                            return false;
+                          };
 
-                            const notesArr = classNotesByClass[item.id] ?? [];
-                            const firstNote = notesArr[0] ?? null;
-                            const isCoach = role === 'coach';
-                            const isAdmin = role === 'admin' || role === 'super_admin';
-                            const isStudent = role === 'student';
-                            const coachCanEditThisNote =
-                              !isCoach || !firstNote || (!!coachIdForNotes && firstNote.coach_id === coachIdForNotes);
+                          const logs = historyAuditLogs
+                            .filter((l) => !!l.entity_id && classIdsForPlan.has(String(l.entity_id)))
+                            .filter(isLogForStudent);
 
-                            return [
-                              (
-                                <tr key={`${item.id}-row`} className="border-b last:border-b-0">
-                                  <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
-                                  <td className="py-1.5 px-2">{`${hh}:${min}`}</td>
-                                  <td className="py-1.5 px-2">{item.courtName ?? '-'}</td>
-                                  <td className="py-1.5 px-2">{item.coachName ?? '-'}</td>
-                                </tr>
-                              ),
-                              (
-                                <tr key={`${item.id}-note`} className="border-b last:border-b-0">
-                                  <td colSpan={4} className="py-1.5 px-2 bg-gray-50/40">
-                                    {isCoach ? (
-                                      <div className="space-y-1">
-                                        {editingNote && editingNote.classId === item.id ? (
-                                          <div className="space-y-1">
-                                            <label className="block text-xs text-gray-600">Nota para esta clase</label>
-                                            <textarea
-                                              className="w-full border rounded-md px-2 py-1 text-base resize-y min-h-[60px]"
-                                              style={{ fontSize: '16px' }}
-                                              value={editingNote.draft}
-                                              onChange={(e) =>
-                                                setEditingNote((prev) =>
-                                                  prev && prev.classId === item.id
-                                                    ? { ...prev, draft: e.target.value }
-                                                    : prev,
-                                                )
-                                              }
-                                              placeholder="Escribí una nota sobre el rendimiento del alumno en esta clase..."
-                                            />
-                                            <div className="flex items-center justify-between gap-2">
-                                              <label className="text-[11px] text-gray-600">Visible para el alumno</label>
-                                              <Switch
-                                                checked={editingNote.visibleToStudent}
-                                                onCheckedChange={(checked) =>
-                                                  setEditingNote((prev) =>
-                                                    prev && prev.classId === item.id
-                                                      ? { ...prev, visibleToStudent: checked }
-                                                      : prev,
-                                                  )
-                                                }
-                                              />
-                                            </div>
-                                            {notesError && (
-                                              <p className="text-[11px] text-red-600">{notesError}</p>
-                                            )}
-                                            <div className="flex items-center gap-2 mt-1">
-                                              <button
-                                                type="button"
-                                                onClick={handleSaveNote}
-                                                disabled={savingNote}
-                                                className="px-3 py-1 rounded-full bg-[#3cadaf] text-white text-[11px] font-semibold hover:bg-[#31435d] disabled:opacity-60"
-                                              >
-                                                {savingNote ? 'Guardando...' : 'Guardar nota'}
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={handleCancelEditNote}
-                                                disabled={savingNote}
-                                                className="px-3 py-1 rounded-full border border-slate-300 text-[11px] text-slate-700 bg-white hover:bg-slate-50"
-                                              >
-                                                Cancelar
-                                              </button>
-                                            </div>
+                          if (!historyAuditLoading && !historyAuditError && logs.length === 0) return null;
+
+                          return (
+                            <div className="space-y-2">
+                              <h3 className="text-xs font-semibold text-slate-700">Cambios y cancelaciones</h3>
+                              {historyAuditLoading && (
+                                <p className="text-sm text-gray-600">Cargando cambios y cancelaciones...</p>
+                              )}
+                              {historyAuditError && <p className="text-sm text-red-600">{historyAuditError}</p>}
+                              {!historyAuditLoading && !historyAuditError && logs.length > 0 && (
+                                <div className="space-y-2">
+                                  {logs.map((log) => {
+                                    const at = new Date(log.created_at);
+                                    const atLabel = at.toLocaleString('es-ES', {
+                                      day: '2-digit',
+                                      month: '2-digit',
+                                      year: 'numeric',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                    });
+
+                                    let title = log.action;
+                                    let detail: string | null = null;
+
+                                    if (log.action === 'cancel') {
+                                      title = 'Clase cancelada';
+                                    }
+                                    if (log.action === 'cancel_booking') {
+                                      title = 'Reserva cancelada';
+                                      const cancelledClass = !!log.payload?.cancelledClass;
+                                      detail = cancelledClass ? 'Era el último alumno, la clase quedó cancelada' : null;
+                                    }
+                                    if (log.action === 'update') {
+                                      const isRescheduled = !!log.payload?.isRescheduled;
+                                      if (isRescheduled) {
+                                        title = 'Clase re-agendada';
+                                        const oldDateIso = (log.payload?.oldDateIso as string | undefined) ?? null;
+                                        const newDateIso = (log.payload?.newDateIso as string | undefined) ?? null;
+                                        if (oldDateIso && newDateIso) {
+                                          const oldD = new Date(oldDateIso);
+                                          const newD = new Date(newDateIso);
+                                          const oldLabel = oldD.toLocaleString('es-ES', {
+                                            day: '2-digit',
+                                            month: '2-digit',
+                                            year: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                          });
+                                          const newLabel = newD.toLocaleString('es-ES', {
+                                            day: '2-digit',
+                                            month: '2-digit',
+                                            year: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                          });
+                                          detail = `${oldLabel} → ${newLabel}`;
+                                        }
+                                      } else {
+                                        title = 'Clase editada';
+                                      }
+                                    }
+
+                                    return (
+                                      <div key={log.id} className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                                        <div className="flex items-start justify-between gap-3">
+                                          <div>
+                                            <div className="text-xs font-semibold text-slate-800">{title}</div>
+                                            {detail && <div className="text-xs text-slate-600 mt-0.5">{detail}</div>}
                                           </div>
-                                        ) : (
-                                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                                            <p className="text-[12px] text-gray-700">
-                                              {firstNote ? (
-                                                <>
-                                                  <span className="font-semibold">
-                                                    {firstNote.coach_id ? 'Tu nota:' : 'Nota del admin:'}
-                                                  </span>{' '}
-                                                  <span className="font-semibold">{firstNote.note}</span>
-                                                </>
-                                              ) : (
-                                                'Aún no dejaste una nota para esta clase.'
-                                              )}
-                                            </p>
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                handleStartEditNote(item.id, firstNote ? firstNote.note : '')
-                                              }
-                                              disabled={!coachCanEditThisNote}
-                                              className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
-                                            >
-                                              <StickyNote className="w-3.5 h-3.5 text-[#3cadaf]" />
-                                              {firstNote ? 'Editar nota' : 'Agregar nota'}
-                                            </button>
-                                            {!coachCanEditThisNote && (
-                                              <p className="text-[11px] text-gray-500">
-                                                Esta nota fue creada por un admin. No podés editarla.
-                                              </p>
-                                            )}
-                                          </div>
-                                        )}
+                                          <div className="text-[11px] text-slate-500 whitespace-nowrap">{atLabel}</div>
+                                        </div>
                                       </div>
-                                    ) : isAdmin ? (
-                                      <div className="space-y-1">
-                                        {editingNote && editingNote.classId === item.id ? (
-                                          <div className="space-y-2">
-                                            <label className="block text-xs text-gray-600">Nota para el alumno (en esta clase)</label>
-                                            <textarea
-                                              className="w-full border rounded-md px-2 py-1 text-base resize-y min-h-[60px]"
-                                              style={{ fontSize: '16px' }}
-                                              value={editingNote.draft}
-                                              onChange={(e) =>
-                                                setEditingNote((prev) =>
-                                                  prev && prev.classId === item.id
-                                                    ? { ...prev, draft: e.target.value }
-                                                    : prev,
-                                                )
-                                              }
-                                              placeholder="Escribí una nota para el alumno..."
-                                            />
-                                            <div className="flex items-center justify-between gap-2">
-                                              <label className="text-[11px] text-gray-600">Visible para el profesor</label>
-                                              <Switch
-                                                checked={editingNote.visibleToCoach}
-                                                onCheckedChange={(checked) =>
-                                                  setEditingNote((prev) =>
-                                                    prev && prev.classId === item.id
-                                                      ? { ...prev, visibleToCoach: checked }
-                                                      : prev,
-                                                  )
-                                                }
-                                              />
-                                            </div>
-                                            <div className="flex items-center justify-between gap-2">
-                                              <label className="text-[11px] text-gray-600">Visible para el alumno</label>
-                                              <Switch
-                                                checked={editingNote.visibleToStudent}
-                                                onCheckedChange={(checked) =>
-                                                  setEditingNote((prev) =>
-                                                    prev && prev.classId === item.id
-                                                      ? { ...prev, visibleToStudent: checked }
-                                                      : prev,
-                                                  )
-                                                }
-                                              />
-                                            </div>
-                                            {notesError && (
-                                              <p className="text-[11px] text-red-600">{notesError}</p>
-                                            )}
-                                            <div className="flex items-center gap-2">
-                                              <button
-                                                type="button"
-                                                onClick={handleSaveNote}
-                                                disabled={savingNote}
-                                                className="px-3 py-1 rounded-full bg-[#3cadaf] text-white text-[11px] font-semibold hover:bg-[#31435d] disabled:opacity-60"
-                                              >
-                                                {savingNote ? 'Guardando...' : 'Guardar nota'}
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={handleCancelEditNote}
-                                                disabled={savingNote}
-                                                className="px-3 py-1 rounded-full border border-slate-300 text-[11px] text-slate-700 bg-white hover:bg-slate-50"
-                                              >
-                                                Cancelar
-                                              </button>
-                                            </div>
-                                          </div>
-                                        ) : (
-                                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                                            <p className="text-[12px] text-gray-700">
-                                              {firstNote ? (
-                                                <>
-                                                  <span className="font-semibold">Nota:</span>{' '}
-                                                  <span className="font-semibold">{firstNote.note}</span>
-                                                </>
-                                              ) : (
-                                                'Aún no hay nota para esta clase.'
-                                              )}
-                                            </p>
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                handleStartEditNote(item.id, firstNote ? firstNote.note : '')
-                                              }
-                                              className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
-                                            >
-                                              <StickyNote className="w-3.5 h-3.5 text-[#3cadaf]" />
-                                              {firstNote ? 'Editar nota' : 'Agregar nota'}
-                                            </button>
-                                          </div>
-                                        )}
-                                      </div>
-                                    ) : isStudent && firstNote ? (
-                                      <p className="text-[13px] text-gray-700">
-                                        <span className="font-semibold">Nota del profesor:</span>{' '}
-                                        <span className="font-semibold">{firstNote.note}</span>
-                                      </p>
-                                    ) : null}
-                                  </td>
-                                </tr>
-                              ),
-                            ];
-                          });
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
 
-                          return [headerRow, ...rows];
-                        });
-                      })()}
-                    </tbody>
-                  </table>
+                        {renderSection('Histórico confirmado', confirmed)}
+                        {renderSection('Reservas pendientes de confirmar', pending)}
+                      </>
+                    );
+                  })()}
                 </div>
               )}
             </div>

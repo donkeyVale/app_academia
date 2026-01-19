@@ -2,11 +2,14 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import PlansClient from './PlansClient';
 import { CreditCard, History } from 'lucide-react';
 import { createClientBrowser } from '@/lib/supabase';
 import { formatPyg } from '@/lib/formatters';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 type Role = 'super_admin' | 'admin' | 'coach' | 'student' | null;
 
@@ -27,8 +30,18 @@ type StudentPayment = {
   status: string;
 };
 
+type AuditLogRow = {
+  id: string;
+  created_at: string;
+  user_id: string | null;
+  action: string;
+  entity: string;
+  entity_id: string | null;
+  payload: any;
+};
+
 export default function FinancePage() {
-  const supabase = createClientBrowser();
+  const supabase = useMemo(() => createClientBrowser(), []);
   const [role, setRole] = useState<Role>(null);
   const [checkingRole, setCheckingRole] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -41,6 +54,12 @@ export default function FinancePage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historySelectedPlanId, setHistorySelectedPlanId] = useState<string>('');
+  const [historyPlanOpen, setHistoryPlanOpen] = useState(false);
+  const [historyPlanSearch, setHistoryPlanSearch] = useState('');
+  const [historyAuditLoading, setHistoryAuditLoading] = useState(false);
+  const [historyAuditError, setHistoryAuditError] = useState<string | null>(null);
+  const [historyAuditLogs, setHistoryAuditLogs] = useState<AuditLogRow[]>([]);
   const [historyItems, setHistoryItems] = useState<
     {
       id: string;
@@ -51,6 +70,9 @@ export default function FinancePage() {
       studentPlanId: string | null;
       planName: string | null;
       planPurchasedAt: string | null;
+      usageStatus: 'pending' | 'confirmed' | 'refunded';
+      attendancePresent: boolean | null;
+      attendanceMarkedAt: string | null;
     }[]
   >([]);
 
@@ -156,7 +178,8 @@ export default function FinancePage() {
             .from('plan_usages')
             .select('id')
             .eq('student_plan_id', row.id)
-            .eq('student_id', studentId);
+            .eq('student_id', studentId)
+            .in('status', ['pending', 'confirmed']);
 
           if (usagesErr) throw usagesErr;
 
@@ -429,11 +452,18 @@ export default function FinancePage() {
                         setHistoryLoading(true);
                         setHistoryError(null);
                         setHistoryItems([]);
+                        setHistorySelectedPlanId('');
+                        setHistoryPlanOpen(false);
+                        setHistoryPlanSearch('');
+                        setHistoryAuditLoading(false);
+                        setHistoryAuditError(null);
+                        setHistoryAuditLogs([]);
 
                         const { data: usagesData, error: usagesErr } = await supabase
                           .from('plan_usages')
-                          .select('class_id, student_plan_id, class_sessions!inner(id,date,court_id,coach_id)')
+                          .select('class_id, student_plan_id, status, class_sessions!inner(id,date,court_id,coach_id)')
                           .eq('student_id', studentId)
+                          .in('status', ['confirmed', 'pending', 'refunded'])
                           .limit(50);
 
                         if (usagesErr) throw usagesErr;
@@ -443,6 +473,7 @@ export default function FinancePage() {
                           {
                             classId: string;
                             studentPlanId: string | null;
+                            usageStatus: 'pending' | 'confirmed' | 'refunded';
                             classSession: { id: string; date: string; court_id: string | null; coach_id: string | null };
                           }
                         > = {};
@@ -452,9 +483,13 @@ export default function FinancePage() {
                           const classId = (u.class_id as string | null) ?? (cls?.id as string | null);
                           if (!classId || !cls?.id) return;
                           if (byClassId[classId]) return;
+                          const rawStatus = (u.status as string | null) ?? null;
+                          const usageStatus: 'pending' | 'confirmed' | 'refunded' =
+                            rawStatus === 'pending' ? 'pending' : rawStatus === 'refunded' ? 'refunded' : 'confirmed';
                           byClassId[classId] = {
                             classId,
                             studentPlanId: (u.student_plan_id as string | null) ?? null,
+                            usageStatus,
                             classSession: {
                               id: cls.id as string,
                               date: cls.date as string,
@@ -588,40 +623,86 @@ export default function FinancePage() {
                             studentPlanId: cls.studentPlanId,
                             planName: planInfo?.name ?? null,
                             planPurchasedAt: planInfo?.purchased_at ?? null,
+                            usageStatus: cls.usageStatus,
+                            attendancePresent: null as boolean | null,
+                            attendanceMarkedAt: null as string | null,
                           };
                         });
 
-                        // Cargar notas de clase para este alumno y estas clases (solo lectura)
-                        const classIds = baseItems.map((i) => i.id);
-                        let notesByClass: Record<string, string | null> = {};
-                        if (classIds.length) {
-                          const { data: notesData, error: notesErr } = await supabase
-                            .from('class_notes')
-                            .select('class_id,note,visible_to_student')
+                        // Cargar asistencia para estas clases (Presente/Ausente/Sin marcar + marcado_at)
+                        const classIdsForAttendance = baseItems.map((i) => i.id);
+                        const attendanceMap = new Map<string, { present: boolean | null; marked_at: string | null }>();
+                        if (classIdsForAttendance.length) {
+                          const { data: attRows, error: attErr } = await supabase
+                            .from('attendance')
+                            .select('class_id,present,marked_at')
                             .eq('student_id', studentId)
-                            .eq('visible_to_student', true)
-                            .in('class_id', classIds);
-
-                          if (!notesErr) {
-                            notesByClass = (notesData ?? []).reduce<Record<string, string | null>>(
-                              (acc, n: any) => {
-                                const cid = n.class_id as string;
-                                // Nos quedamos con la primera nota si hay varias
-                                if (!acc[cid]) acc[cid] = (n.note as string) ?? null;
-                                return acc;
-                              },
-                              {},
-                            );
-                          }
+                            .in('class_id', classIdsForAttendance);
+                          if (attErr) throw attErr;
+                          (attRows ?? []).forEach((r: any) => {
+                            const cid = r.class_id as string | null;
+                            if (!cid) return;
+                            attendanceMap.set(cid, {
+                              present: (r.present as boolean | null) ?? null,
+                              marked_at: (r.marked_at as string | null) ?? null,
+                            });
+                          });
                         }
 
-                        const items = baseItems.map((it) => ({
-                          ...it,
-                          note: notesByClass[it.id] ?? null,
-                        }));
+                        const merged = baseItems.map((it) => {
+                          const att = attendanceMap.get(it.id);
+                          return {
+                            ...it,
+                            attendancePresent: att ? (att.present ?? null) : null,
+                            attendanceMarkedAt: att ? (att.marked_at ?? null) : null,
+                          };
+                        });
 
-                        items.sort((a, b) => b.date.localeCompare(a.date));
-                        setHistoryItems(items);
+                        merged.sort((a, b) => b.date.localeCompare(a.date));
+                        setHistoryItems(merged);
+
+                        try {
+                          setHistoryAuditLoading(true);
+                          setHistoryAuditError(null);
+                          const classIdsForAudit = Array.from(new Set(merged.map((x) => x.id).filter(Boolean)));
+                          if (classIdsForAudit.length) {
+                            const { data: auditRows, error: auditErr } = await supabase
+                              .from('audit_logs')
+                              .select('id,created_at,user_id,action,entity,entity_id,payload')
+                              .eq('entity', 'class_session')
+                              .in('entity_id', classIdsForAudit)
+                              .in('action', ['update', 'cancel', 'cancel_booking'])
+                              .order('created_at', { ascending: false })
+                              .limit(200);
+                            if (auditErr) throw auditErr;
+                            setHistoryAuditLogs((auditRows ?? []) as any);
+                          } else {
+                            setHistoryAuditLogs([]);
+                          }
+                        } catch (e: any) {
+                          setHistoryAuditError(e?.message ?? 'Error cargando cambios y cancelaciones');
+                          setHistoryAuditLogs([]);
+                        } finally {
+                          setHistoryAuditLoading(false);
+                        }
+
+                        const planOptionsMap = new Map<string, { id: string; label: string; purchasedAtMs: number }>();
+                        for (const it of merged) {
+                          const key = it.studentPlanId ?? 'unknown';
+                          if (planOptionsMap.has(key)) continue;
+                          const ms = it.planPurchasedAt ? new Date(it.planPurchasedAt).getTime() : 0;
+                          const d = it.planPurchasedAt ? new Date(it.planPurchasedAt) : null;
+                          const dd = d ? String(d.getDate()).padStart(2, '0') : '--';
+                          const mm = d ? String(d.getMonth() + 1).padStart(2, '0') : '--';
+                          const yyyy = d ? String(d.getFullYear()) : '----';
+                          const when = `${dd}/${mm}/${yyyy}`;
+                          const planName = it.planName ?? (key === 'unknown' ? 'Plan sin identificar' : 'Plan');
+                          planOptionsMap.set(key, { id: key, label: `${planName} — asignado el ${when}`, purchasedAtMs: ms });
+                        }
+                        const optionsSorted = Array.from(planOptionsMap.values()).sort((a, b) => b.purchasedAtMs - a.purchasedAtMs);
+                        if (optionsSorted.length > 0) {
+                          setHistorySelectedPlanId(optionsSorted[0].id);
+                        }
                       } catch (err: any) {
                         setHistoryError(err?.message ?? 'Error cargando historial de clases.');
                       } finally {
@@ -656,6 +737,11 @@ export default function FinancePage() {
                     setHistoryOpen(false);
                     setHistoryItems([]);
                     setHistoryError(null);
+                    setHistoryPlanOpen(false);
+                    setHistoryPlanSearch('');
+                    setHistoryAuditLoading(false);
+                    setHistoryAuditError(null);
+                    setHistoryAuditLogs([]);
                   }}
                 >
                   Cerrar
@@ -668,88 +754,306 @@ export default function FinancePage() {
                   <p className="text-sm text-gray-600">Todavía no tenés clases registradas.</p>
                 )}
                 {!historyLoading && !historyError && historyItems.length > 0 && (
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[320px] border-collapse text-sm">
-                      <thead>
-                        <tr className="border-b bg-gray-50 text-xs text-gray-600">
-                          <th className="py-1.5 px-2 text-left font-medium">Fecha</th>
-                          <th className="py-1.5 px-2 text-left font-medium">Hora</th>
-                          <th className="py-1.5 px-2 text-left font-medium">Cancha</th>
-                          <th className="py-1.5 px-2 text-left font-medium">Profesor</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(() => {
-                          const groups: Record<string, typeof historyItems> = {};
-                          historyItems.forEach((it) => {
-                            const key = it.studentPlanId ?? 'unknown';
-                            if (!groups[key]) groups[key] = [];
-                            groups[key].push(it);
-                          });
+                  <div className="space-y-4">
+                    {(() => {
+                      const planOptionsMap = new Map<string, { id: string; label: string; purchasedAtMs: number }>();
+                      for (const it of historyItems) {
+                        const key = it.studentPlanId ?? 'unknown';
+                        if (planOptionsMap.has(key)) continue;
+                        const ms = it.planPurchasedAt ? new Date(it.planPurchasedAt).getTime() : 0;
+                        const d = it.planPurchasedAt ? new Date(it.planPurchasedAt) : null;
+                        const dd = d ? String(d.getDate()).padStart(2, '0') : '--';
+                        const mm = d ? String(d.getMonth() + 1).padStart(2, '0') : '--';
+                        const yyyy = d ? String(d.getFullYear()) : '----';
+                        const when = `${dd}/${mm}/${yyyy}`;
+                        const planName = it.planName ?? (key === 'unknown' ? 'Plan sin identificar' : 'Plan');
+                        planOptionsMap.set(key, { id: key, label: `${planName} — asignado el ${when}`, purchasedAtMs: ms });
+                      }
+                      const planOptions = Array.from(planOptionsMap.values()).sort((a, b) => b.purchasedAtMs - a.purchasedAtMs);
 
-                          const groupKeys = Object.keys(groups).sort((a, b) => {
-                            const aItem = groups[a]?.[0] ?? null;
-                            const bItem = groups[b]?.[0] ?? null;
-                            const aMs = aItem?.planPurchasedAt ? new Date(aItem.planPurchasedAt).getTime() : 0;
-                            const bMs = bItem?.planPurchasedAt ? new Date(bItem.planPurchasedAt).getTime() : 0;
-                            if (aMs !== bMs) return bMs - aMs;
-                            return a.localeCompare(b);
-                          });
+                      const selectedPlanLabel = (() => {
+                        if (!historySelectedPlanId) return null;
+                        return planOptions.find((o) => o.id === historySelectedPlanId)?.label ?? null;
+                      })();
 
-                          return groupKeys.flatMap((key) => {
-                            const items = groups[key] ?? [];
-                            const headerName =
-                              items[0]?.planName ?? (key === 'unknown' ? 'Plan sin identificar' : 'Plan');
+                      const filteredPlanOptions = (() => {
+                        const q = historyPlanSearch.trim().toLowerCase();
+                        if (!q) return planOptions;
+                        return planOptions.filter((o) => o.label.toLowerCase().includes(q));
+                      })();
 
-                            const headerRow = (
-                              <tr key={`${key}-header`} className="border-b bg-slate-50">
-                                <td colSpan={4} className="py-2 px-2 text-xs font-semibold text-slate-700">
-                                  {headerName}
-                                </td>
-                              </tr>
+                      const confirmed = historyItems.filter((x) => x.usageStatus === 'confirmed');
+                      const pending = historyItems.filter((x) => x.usageStatus === 'pending');
+
+                      const renderSection = (title: string, itemsInSection: typeof historyItems) => {
+                        if (!itemsInSection.length) return null;
+
+                        const key = historySelectedPlanId || (itemsInSection[0]?.studentPlanId ?? 'unknown');
+                        const items = itemsInSection.filter((it) => (it.studentPlanId ?? 'unknown') === key);
+                        if (!items.length) return null;
+
+                        return (
+                          <div className="space-y-2">
+                            <h3 className="text-xs font-semibold text-slate-700">{title}</h3>
+                            <div className="overflow-x-auto">
+                              <table className="w-full min-w-[560px] border-collapse text-sm">
+                                <thead>
+                                  <tr className="border-b bg-gray-50 text-xs text-gray-600">
+                                    <th className="py-1.5 px-2 text-left font-medium">Fecha</th>
+                                    <th className="py-1.5 px-2 text-left font-medium">Hora</th>
+                                    <th className="py-1.5 px-2 text-left font-medium">Cancha</th>
+                                    <th className="py-1.5 px-2 text-left font-medium">Profesor</th>
+                                    <th className="py-1.5 px-2 text-left font-medium">Asistencia</th>
+                                    <th className="py-1.5 px-2 text-left font-medium">Marcado</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {items.map((item) => {
+                                      const d = new Date(item.date);
+                                      const yyyy = d.getFullYear();
+                                      const mm = String(d.getMonth() + 1).padStart(2, '0');
+                                      const dd = String(d.getDate()).padStart(2, '0');
+                                      const hh = String(d.getHours()).padStart(2, '0');
+                                      const min = String(d.getMinutes()).padStart(2, '0');
+
+                                      const attLabel =
+                                        item.attendancePresent == null
+                                          ? 'Sin marcar'
+                                          : item.attendancePresent
+                                            ? 'Presente'
+                                            : 'Ausente';
+
+                                      const attClass =
+                                        item.attendancePresent == null
+                                          ? 'bg-slate-50 text-slate-700 border border-slate-200'
+                                          : item.attendancePresent
+                                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                            : 'bg-red-50 text-red-700 border border-red-100';
+
+                                      let markedText = '-';
+                                      if (item.attendanceMarkedAt) {
+                                        const md = new Date(item.attendanceMarkedAt);
+                                        const mY = md.getFullYear();
+                                        const mM = String(md.getMonth() + 1).padStart(2, '0');
+                                        const mD = String(md.getDate()).padStart(2, '0');
+                                        const mH = String(md.getHours()).padStart(2, '0');
+                                        const mMin = String(md.getMinutes()).padStart(2, '0');
+                                        markedText = `${mD}/${mM}/${mY} ${mH}:${mMin}`;
+                                      }
+
+                                      return [
+                                        (
+                                          <tr key={`${title}-${item.id}-row`} className="border-b last:border-b-0">
+                                            <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
+                                            <td className="py-1.5 px-2">{`${hh}:${min}`}</td>
+                                            <td className="py-1.5 px-2">{item.courtName ?? '-'}</td>
+                                            <td className="py-1.5 px-2">{item.coachName ?? '-'}</td>
+                                            <td className="py-1.5 px-2">
+                                              <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${attClass}`}>
+                                                {attLabel}
+                                              </span>
+                                            </td>
+                                            <td className="py-1.5 px-2 text-xs text-slate-600">{markedText}</td>
+                                          </tr>
+                                        ),
+                                        (
+                                          <tr key={`${title}-${item.id}-note`} className="border-b last:border-b-0">
+                                            <td colSpan={6} className="py-1.5 px-2 bg-gray-50/40">
+                                              {item.note ? (
+                                                <p className="text-[12px] text-gray-700">
+                                                  <span className="font-semibold">Nota:</span>{' '}
+                                                  <span className="font-semibold">{item.note}</span>
+                                                </p>
+                                              ) : (
+                                                <p className="text-[12px] text-gray-500">
+                                                  Esta clase no tiene notas cargadas.
+                                                </p>
+                                              )}
+                                            </td>
+                                          </tr>
+                                        ),
+                                      ];
+                                    })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        );
+                      };
+
+                      return (
+                        <>
+                          {planOptions.length > 1 && (
+                            <div className="flex items-center justify-between gap-3">
+                              <label className="text-xs text-slate-600">Plan</label>
+                              <div className="w-full max-w-[360px]">
+                                <Popover
+                                  open={historyPlanOpen}
+                                  onOpenChange={(open) => {
+                                    setHistoryPlanOpen(open);
+                                    if (!open) setHistoryPlanSearch('');
+                                  }}
+                                >
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      className="w-full justify-between h-9 px-2 text-xs font-normal"
+                                    >
+                                      <span className="truncate mr-2">
+                                        {selectedPlanLabel ?? 'Seleccionar plan'}
+                                      </span>
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-80 max-w-[calc(100vw-2rem)] p-2" align="start">
+                                    <div className="space-y-2">
+                                      <Input
+                                        type="text"
+                                        placeholder="Buscar plan..."
+                                        value={historyPlanSearch}
+                                        onChange={(e) => setHistoryPlanSearch(e.target.value)}
+                                        className="h-10 text-base"
+                                      />
+                                      <div className="max-h-52 overflow-auto border rounded-md divide-y text-xs bg-white">
+                                        {filteredPlanOptions.map((opt) => (
+                                          <button
+                                            key={opt.id}
+                                            type="button"
+                                            onClick={() => {
+                                              setHistorySelectedPlanId(opt.id);
+                                              setHistoryPlanOpen(false);
+                                              setHistoryPlanSearch('');
+                                            }}
+                                            className={`w-full px-2 py-1.5 text-left hover:bg-slate-50 ${
+                                              opt.id === historySelectedPlanId ? 'bg-slate-50' : ''
+                                            }`}
+                                          >
+                                            {opt.label}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                              </div>
+                            </div>
+                          )}
+
+                          {(() => {
+                            const selectedKey = historySelectedPlanId || (historyItems[0]?.studentPlanId ?? 'unknown');
+                            const classIdsForPlan = new Set(
+                              historyItems
+                                .filter((it) => (it.studentPlanId ?? 'unknown') === selectedKey)
+                                .map((it) => it.id)
                             );
 
-                            const rows = items.flatMap((item) => {
-                              const d = new Date(item.date);
-                              const yyyy = d.getFullYear();
-                              const mm = String(d.getMonth() + 1).padStart(2, '0');
-                              const dd = String(d.getDate()).padStart(2, '0');
-                              const hh = String(d.getHours()).padStart(2, '0');
-                              const min = String(d.getMinutes()).padStart(2, '0');
+                            const studentIdForFilter = studentId;
+                            const isLogForStudent = (log: AuditLogRow) => {
+                              if (!studentIdForFilter) return false;
+                              if (log.action === 'update' || log.action === 'cancel') return true;
+                              if (log.action === 'cancel_booking') {
+                                const p = log.payload ?? {};
+                                return p?.student_id && String(p.student_id) === String(studentIdForFilter);
+                              }
+                              const p = log.payload ?? {};
+                              if (p?.student_id && String(p.student_id) === String(studentIdForFilter)) return true;
+                              const arrayKeys = ['students', 'add_students', 'remove_students'];
+                              for (const k of arrayKeys) {
+                                const arr = p?.[k];
+                                if (Array.isArray(arr) && arr.some((x) => String(x) === String(studentIdForFilter))) return true;
+                              }
+                              return false;
+                            };
 
-                              return [
-                                (
-                                  <tr key={`${item.id}-row`} className="border-b last:border-b-0">
-                                    <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
-                                    <td className="py-1.5 px-2">{`${hh}:${min}`}</td>
-                                    <td className="py-1.5 px-2">{item.courtName ?? '-'}</td>
-                                    <td className="py-1.5 px-2">{item.coachName ?? '-'}</td>
-                                  </tr>
-                                ),
-                                (
-                                  <tr key={`${item.id}-note`} className="border-b last:border-b-0">
-                                    <td colSpan={4} className="py-1.5 px-2 bg-gray-50/40">
-                                      {item.note ? (
-                                        <p className="text-[12px] text-gray-700">
-                                          <span className="font-semibold">Nota:</span>{' '}
-                                          <span className="font-semibold">{item.note}</span>
-                                        </p>
-                                      ) : (
-                                        <p className="text-[12px] text-gray-500">
-                                          Esta clase no tiene notas cargadas.
-                                        </p>
-                                      )}
-                                    </td>
-                                  </tr>
-                                ),
-                              ];
-                            });
+                            const logs = historyAuditLogs
+                              .filter((l) => !!l.entity_id && classIdsForPlan.has(String(l.entity_id)))
+                              .filter(isLogForStudent);
 
-                            return [headerRow, ...rows];
-                          });
-                        })()}
-                      </tbody>
-                    </table>
+                            if (!historyAuditLoading && !historyAuditError && logs.length === 0) return null;
+
+                            return (
+                              <div className="space-y-2">
+                                <h3 className="text-xs font-semibold text-slate-700">Cambios y cancelaciones</h3>
+                                {historyAuditLoading && (
+                                  <p className="text-sm text-gray-600">Cargando cambios y cancelaciones...</p>
+                                )}
+                                {historyAuditError && <p className="text-sm text-red-600">{historyAuditError}</p>}
+                                {!historyAuditLoading && !historyAuditError && logs.length > 0 && (
+                                  <div className="space-y-2">
+                                    {logs.map((log) => {
+                                      const at = new Date(log.created_at);
+                                      const atLabel = at.toLocaleString('es-ES', {
+                                        day: '2-digit',
+                                        month: '2-digit',
+                                        year: 'numeric',
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                      });
+
+                                      let title = log.action;
+                                      let detail: string | null = null;
+
+                                      if (log.action === 'cancel') {
+                                        title = 'Clase cancelada';
+                                      }
+                                      if (log.action === 'cancel_booking') {
+                                        title = 'Reserva cancelada';
+                                        const cancelledClass = !!log.payload?.cancelledClass;
+                                        detail = cancelledClass ? 'Era el último alumno, la clase quedó cancelada' : null;
+                                      }
+                                      if (log.action === 'update') {
+                                        const isRescheduled = !!log.payload?.isRescheduled;
+                                        if (isRescheduled) {
+                                          title = 'Clase re-agendada';
+                                          const oldDateIso = (log.payload?.oldDateIso as string | undefined) ?? null;
+                                          const newDateIso = (log.payload?.newDateIso as string | undefined) ?? null;
+                                          if (oldDateIso && newDateIso) {
+                                            const oldD = new Date(oldDateIso);
+                                            const newD = new Date(newDateIso);
+                                            const oldLabel = oldD.toLocaleString('es-ES', {
+                                              day: '2-digit',
+                                              month: '2-digit',
+                                              year: 'numeric',
+                                              hour: '2-digit',
+                                              minute: '2-digit',
+                                            });
+                                            const newLabel = newD.toLocaleString('es-ES', {
+                                              day: '2-digit',
+                                              month: '2-digit',
+                                              year: 'numeric',
+                                              hour: '2-digit',
+                                              minute: '2-digit',
+                                            });
+                                            detail = `${oldLabel} → ${newLabel}`;
+                                          }
+                                        } else {
+                                          title = 'Clase editada';
+                                        }
+                                      }
+
+                                      return (
+                                        <div key={log.id} className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                                          <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                              <div className="text-xs font-semibold text-slate-800">{title}</div>
+                                              {detail && <div className="text-xs text-slate-600 mt-0.5">{detail}</div>}
+                                            </div>
+                                            <div className="text-[11px] text-slate-500 whitespace-nowrap">{atLabel}</div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+
+                          {renderSection('Histórico confirmado', confirmed)}
+                          {renderSection('Reservas pendientes de confirmar', pending)}
+                        </>
+                      );
+                    })()}
                   </div>
                 )}
               </div>

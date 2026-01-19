@@ -275,6 +275,7 @@ export default function PlansClient() {
         .from('plan_usages')
         .select('id')
         .eq('student_plan_id', studentPlanId)
+        .in('status', ['pending', 'confirmed'])
         .limit(1);
       if (usageErr) throw usageErr;
       const hasUsages = (usageRows ?? []).length > 0;
@@ -333,7 +334,8 @@ export default function PlansClient() {
           .from('plan_usages')
           .select('student_plan_id')
           .eq('student_id', paymentStudentId)
-          .in('student_plan_id', planIds);
+          .in('student_plan_id', planIds)
+          .in('status', ['pending', 'confirmed']);
 
         if (error) {
           console.error('Error cargando plan_usages para registrar pago', error);
@@ -727,7 +729,8 @@ export default function PlansClient() {
         .from('plan_usages')
         .select('id,class_id')
         .eq('student_plan_id', planRow.id)
-        .eq('student_id', reportStudentId);
+        .eq('student_id', reportStudentId)
+        .in('status', ['pending', 'confirmed']);
       if (usagesErr) throw usagesErr;
 
       const remainingClasses = (planRow.remaining_classes ?? 0) as number;
@@ -822,7 +825,8 @@ export default function PlansClient() {
             .from('plan_usages')
             .select('id', { count: 'exact', head: true })
             .eq('student_plan_id', sp.id)
-            .eq('student_id', selectedStudentId);
+            .eq('student_id', selectedStudentId)
+            .in('status', ['pending', 'confirmed']);
           if (usageErr) {
             const msg = 'No se pudo verificar el uso de planes del alumno. Intenta nuevamente.';
             toast.error(msg);

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import PreloaderProvider from "./PreloaderProvider";
 import { Toaster } from "sonner";
@@ -57,7 +58,7 @@ export default function RootLayout({
         <link rel="manifest" href="/manifest.json" />
         <meta name="apple-mobile-web-app-title" content="AGENDO" />
         <meta name="theme-color" content="#3cadaf" />
-        <script src="capacitor://localhost/capacitor.js"></script>
+        <Script src="capacitor://localhost/capacitor.js" strategy="beforeInteractive" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#f5f7fa] text-[#31435d]`}
@@ -65,9 +66,8 @@ export default function RootLayout({
         <CapacitorDeeplinkHandler />
         <PreloaderProvider>{children}</PreloaderProvider>
         <Toaster richColors position="top-right" />
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
+        <Script id="sw-register" strategy="afterInteractive">
+          {`
         if ('serviceWorker' in navigator) {
           window.addEventListener('load', () => {
             navigator.serviceWorker.register('/sw.js').then((reg) => {
@@ -112,9 +112,8 @@ export default function RootLayout({
             }).catch(console.error);
           });
         }
-      `,
-          }}
-        />
+      `}
+        </Script>
       </body>
     </html>
   );
