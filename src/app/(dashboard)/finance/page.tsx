@@ -668,7 +668,7 @@ export default function FinancePage() {
                               .select('id,created_at,user_id,action,entity,entity_id,payload')
                               .eq('entity', 'class_session')
                               .in('entity_id', classIdsForAudit)
-                              .in('action', ['update', 'cancel', 'cancel_booking', 'attendance_update'])
+                              .in('action', ['update', 'cancel', 'cancel_booking'])
                               .order('created_at', { ascending: false })
                               .limit(200);
                             if (auditErr) throw auditErr;
@@ -954,10 +954,6 @@ export default function FinancePage() {
                                 const arr = p?.[k];
                                 if (Array.isArray(arr) && arr.some((x) => String(x) === String(studentIdForFilter))) return true;
                               }
-                              if (log.action === 'attendance_update') {
-                                const rows = p?.attendance;
-                                if (Array.isArray(rows) && rows.some((r: any) => String(r?.student_id) === String(studentIdForFilter))) return true;
-                              }
                               return false;
                             };
 
@@ -1024,16 +1020,6 @@ export default function FinancePage() {
                                           }
                                         } else {
                                           title = 'Clase editada';
-                                        }
-                                      }
-                                      if (log.action === 'attendance_update') {
-                                        title = 'Asistencia marcada';
-                                        const rows = (log.payload?.attendance as any[]) ?? [];
-                                        const row = studentIdForFilter
-                                          ? rows.find((r) => String(r?.student_id) === String(studentIdForFilter))
-                                          : null;
-                                        if (row) {
-                                          detail = row.present === true ? 'Presente' : row.present === false ? 'Ausente' : null;
                                         }
                                       }
 
