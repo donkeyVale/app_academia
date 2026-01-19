@@ -141,6 +141,16 @@ type Student = {
   full_name?: string | null;
 };
 
+type AuditLogRow = {
+  id: string;
+  created_at: string;
+  user_id: string | null;
+  action: string;
+  entity: string;
+  entity_id: string | null;
+  payload: any;
+};
+
 export default function SchedulePage() {
   const supabase = useMemo(() => createClientBrowser(), []);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -187,6 +197,11 @@ export default function SchedulePage() {
 
   const [pastWarningOpen, setPastWarningOpen] = useState(false);
   const [pastWarningLabel, setPastWarningLabel] = useState<string>('');
+
+  const [historyClass, setHistoryClass] = useState<ClassSession | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyLogs, setHistoryLogs] = useState<AuditLogRow[]>([]);
 
   // Filters for list
   const [filterLocationId, setFilterLocationId] = useState<string>('');
@@ -1246,6 +1261,30 @@ export default function SchedulePage() {
     }
   };
 
+  const openHistory = async (cls: ClassSession) => {
+    setHistoryClass(cls);
+    setHistoryLoading(true);
+    setHistoryError(null);
+    setHistoryLogs([]);
+    try {
+      const { data, error } = await supabase
+        .from('audit_logs')
+        .select('id,created_at,user_id,action,entity,entity_id,payload')
+        .eq('entity', 'class_session')
+        .eq('entity_id', cls.id)
+        .in('action', ['update', 'cancel', 'cancel_booking', 'attendance_update'])
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      setHistoryLogs((data ?? []) as any);
+    } catch (e: any) {
+      setHistoryError(e?.message ?? 'Error cargando historial');
+      setHistoryLogs([]);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
   const onCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     await createClassSessions(false);
@@ -1952,7 +1991,18 @@ export default function SchedulePage() {
         if (refundUsageErr) throw refundUsageErr;
       }
 
-      await logAudit('update', 'class_session', editing.id, { ...updates, add_students: toAdd, remove_students: toRemove });
+      await logAudit('update', 'class_session', editing.id, {
+        ...updates,
+        add_students: toAdd,
+        remove_students: toRemove,
+        isRescheduled: oldDateIso !== iso || oldCourtId !== editCourtId || oldCoachId !== editCoachId,
+        oldDateIso,
+        newDateIso: iso,
+        oldCourtId,
+        newCourtId: editCourtId,
+        oldCoachId,
+        newCoachId: editCoachId,
+      });
 
       const updated = upd as unknown as ClassSession;
       setClasses((prev) => prev.map((c) => (c.id === updated.id ? updated : c)).sort((a, b) => a.date.localeCompare(b.date)));
@@ -3094,6 +3144,14 @@ export default function SchedulePage() {
                                 const data = await res.json().catch(() => ({}));
                                 const msg = data?.error || 'No se pudo cancelar la reserva en el servidor.';
                                 toast.error(msg);
+                              } else {
+                                const data = await res.json().catch(() => ({} as any));
+                                await logAudit('cancel_booking', 'class_session', cls.id, {
+                                  class_id: cls.id,
+                                  student_id: studentId,
+                                  dateIso: cls.date,
+                                  cancelledClass: !!data?.cancelledClass,
+                                });
                               }
                             } catch (apiErr) {
                               console.error('Error llamando a /api/classes/cancel-single-student', apiErr);
@@ -3135,6 +3193,12 @@ export default function SchedulePage() {
                             onClick={() => openAttendance(cls)}
                           >
                             Asistencia
+                          </button>
+                          <button
+                            className="text-[11px] sm:text-xs px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+                            onClick={() => openHistory(cls)}
+                          >
+                            Histórico
                           </button>
                           <button
                             className="text-[11px] sm:text-xs px-3 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
@@ -3190,6 +3254,14 @@ export default function SchedulePage() {
                                 toast.error('Error al cancelar: ' + delErr.message);
                                 return;
                               }
+
+                              await logAudit('cancel', 'class_session', cls.id, {
+                                class_id: cls.id,
+                                dateIso: cls.date,
+                                students: studentsByClass[cls.id] ?? [],
+                                cancelledByRole: role,
+                                cancelledByUserId: currentUserId,
+                              });
 
                               setClasses((prev) => prev.filter((c) => c.id !== cls.id));
                               setBookingsCount((prev) => {
@@ -3669,6 +3741,127 @@ export default function SchedulePage() {
               >
                 {attendanceSaving ? "Guardando..." : "Guardar asistencia"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {historyClass && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-3 py-4">
+          <div className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-lg bg-white shadow-xl border border-slate-200">
+            <div className="flex items-center justify-between border-b px-4 pt-4 pb-3">
+              <div className="space-y-0.5">
+                <h3 className="text-base font-semibold text-[#31435d]">Histórico</h3>
+                <p className="text-xs text-gray-500">
+                  Clase del{' '}
+                  {new Date(historyClass.date).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })}{' '}
+                  a las{' '}
+                  {new Date(historyClass.date).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="text-xs text-gray-500 hover:text-gray-700 underline-offset-2 hover:underline"
+                onClick={() => {
+                  setHistoryClass(null);
+                  setHistoryLogs([]);
+                  setHistoryError(null);
+                }}
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <div className="px-4 py-3 overflow-y-auto text-sm">
+              {historyLoading && <p className="text-sm text-gray-600">Cargando historial...</p>}
+              {historyError && <p className="mb-2 text-sm text-red-600">{historyError}</p>}
+              {!historyLoading && !historyError && historyLogs.length === 0 && (
+                <p className="text-sm text-gray-600">No hay eventos registrados para esta clase.</p>
+              )}
+
+              {!historyLoading && !historyError && historyLogs.length > 0 && (
+                <div className="space-y-2">
+                  {historyLogs.map((log) => {
+                    const at = new Date(log.created_at);
+                    const atLabel = at.toLocaleString('es-ES', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    });
+
+                    let title = log.action;
+                    let detail: string | null = null;
+
+                    if (log.action === 'cancel') {
+                      title = 'Clase cancelada';
+                      const byRole = (log.payload?.cancelledByRole as string | undefined) ?? null;
+                      detail = byRole ? `Cancelada por: ${byRole}` : null;
+                    }
+
+                    if (log.action === 'cancel_booking') {
+                      title = 'Reserva cancelada';
+                      const sid = (log.payload?.student_id as string | undefined) ?? null;
+                      const who = sid
+                        ? (studentsMap[sid]?.full_name ?? studentsMap[sid]?.notes ?? studentsMap[sid]?.level ?? sid)
+                        : 'Alumno';
+                      const cancelledClass = !!log.payload?.cancelledClass;
+                      detail = cancelledClass ? `${who} (era el último, la clase quedó cancelada)` : who;
+                    }
+
+                    if (log.action === 'update') {
+                      const isRescheduled = !!log.payload?.isRescheduled;
+                      if (isRescheduled) {
+                        title = 'Clase re-agendada';
+                        const oldDateIso = (log.payload?.oldDateIso as string | undefined) ?? null;
+                        const newDateIso = (log.payload?.newDateIso as string | undefined) ?? null;
+                        if (oldDateIso && newDateIso) {
+                          const oldD = new Date(oldDateIso);
+                          const newD = new Date(newDateIso);
+                          const oldLabel = oldD.toLocaleString('es-ES', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          });
+                          const newLabel = newD.toLocaleString('es-ES', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          });
+                          detail = `${oldLabel} → ${newLabel}`;
+                        }
+                      } else {
+                        title = 'Clase editada';
+                      }
+                    }
+
+                    if (log.action === 'attendance_update') {
+                      title = 'Asistencia marcada';
+                      const rows = (log.payload?.attendance as any[]) ?? [];
+                      const present = rows.filter((r) => !!r?.present).length;
+                      const absent = rows.filter((r) => r?.present === false).length;
+                      detail = `Presentes: ${present} · Ausentes: ${absent}`;
+                    }
+
+                    return (
+                      <div key={log.id} className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-xs font-semibold text-slate-800">{title}</div>
+                            {detail && <div className="text-xs text-slate-600 mt-0.5">{detail}</div>}
+                          </div>
+                          <div className="text-[11px] text-slate-500 whitespace-nowrap">{atLabel}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>
