@@ -816,6 +816,7 @@ export default function SchedulePage() {
           .select('id')
           .eq('coach_id', coachId)
           .eq('date', iso)
+          .neq('status', 'cancelled')
           .limit(1);
         if (coachClashErr) {
           const msg = 'No se pudo verificar la disponibilidad del profesor. Intenta nuevamente.';
@@ -1038,6 +1039,7 @@ export default function SchedulePage() {
             .select('id')
             .eq('coach_id', coachId)
             .eq('date', sessionIso)
+            .neq('status', 'cancelled')
             .limit(1);
           if (coachClashErr) throw coachClashErr;
           if ((coachClash ?? []).length > 0) {
@@ -1910,6 +1912,7 @@ export default function SchedulePage() {
           .select('id')
           .eq('coach_id', editCoachId)
           .eq('date', iso)
+          .neq('status', 'cancelled')
           .neq('id', editing.id)
           .limit(1);
         if (coachClashErr) {
