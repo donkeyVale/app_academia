@@ -33,6 +33,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: delBookingErr.message }, { status: 500 });
     }
 
+    // Borrar asistencia del alumno para esta clase (si existe)
+    const { error: delAttendanceErr } = await supabaseAdmin
+      .from('attendance')
+      .delete()
+      .eq('class_id', classId)
+      .eq('student_id', studentId);
+    if (delAttendanceErr) {
+      console.error('Error borrando attendance en cancel-single-student', delAttendanceErr.message);
+      return NextResponse.json({ error: delAttendanceErr.message }, { status: 500 });
+    }
+
     // Verificar si quedan más alumnos reservados en la clase
     const { count: remainingCount, error: countErr } = await supabaseAdmin
       .from('bookings')
@@ -54,6 +65,17 @@ export async function POST(req: NextRequest) {
         console.error('Error marcando class_session como cancelled en cancel-single-student', updClassErr.message);
         return NextResponse.json({ error: updClassErr.message }, { status: 500 });
       }
+
+      // Si la clase queda cancelada, limpiamos cualquier registro de asistencia residual
+      const { error: delAttendanceClassErr } = await supabaseAdmin
+        .from('attendance')
+        .delete()
+        .eq('class_id', classId);
+      if (delAttendanceClassErr) {
+        console.error('Error borrando attendance residual en cancel-single-student', delAttendanceClassErr.message);
+        return NextResponse.json({ error: delAttendanceClassErr.message }, { status: 500 });
+      }
+
       cancelledClass = true;
     }
 

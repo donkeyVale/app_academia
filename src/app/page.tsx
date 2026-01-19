@@ -856,6 +856,7 @@ export default function Page() {
                 .from('class_sessions')
                 .select('id, courts!inner(location_id)', { count: 'exact', head: true })
                 .eq('coach_id', coachId)
+                .eq('status', 'active')
                 .gte('date', start.toISOString())
                 .lte('date', end.toISOString())
                 .in('courts.location_id', locationIds);
@@ -866,6 +867,7 @@ export default function Page() {
                 .from('class_sessions')
                 .select('id', { count: 'exact', head: true })
                 .eq('coach_id', coachId)
+                .eq('status', 'active')
                 .gte('date', start.toISOString())
                 .lte('date', end.toISOString());
               if (error) throw error;
@@ -890,6 +892,7 @@ export default function Page() {
                 .from('class_sessions')
                 .select('id, courts!inner(location_id)', { count: 'exact', head: true })
                 .eq('coach_id', coachId)
+                .eq('status', 'active')
                 .gte('date', weekStart.toISOString())
                 .lte('date', weekEnd.toISOString())
                 .in('courts.location_id', locationIds);
@@ -900,6 +903,7 @@ export default function Page() {
                 .from('class_sessions')
                 .select('id', { count: 'exact', head: true })
                 .eq('coach_id', coachId)
+                .eq('status', 'active')
                 .gte('date', weekStart.toISOString())
                 .lte('date', weekEnd.toISOString());
               if (error) throw error;
@@ -918,6 +922,7 @@ export default function Page() {
                 .from('class_sessions')
                 .select('id,date,courts!inner(location_id)')
                 .eq('coach_id', coachId)
+                .eq('status', 'active')
                 .gte('date', futureFrom.toISOString())
                 .lte('date', futureTo.toISOString())
                 .in('courts.location_id', locationIds);
@@ -928,6 +933,7 @@ export default function Page() {
                 .from('class_sessions')
                 .select('id,date')
                 .eq('coach_id', coachId)
+                .eq('status', 'active')
                 .gte('date', futureFrom.toISOString())
                 .lte('date', futureTo.toISOString());
               if (error) throw error;
@@ -971,6 +977,7 @@ export default function Page() {
               .from('bookings')
               .select('class_id,class_sessions!inner(id,date,court_id,courts!inner(location_id))')
               .eq('student_id', studentId)
+              .eq('class_sessions.status', 'active')
               .gte('class_sessions.date', nowIso);
             if (upcomingErr) throw upcomingErr;
 
