@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { History, Users, StickyNote } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import { createClientBrowser } from '@/lib/supabase';
 import { formatPyg } from '@/lib/formatters';
@@ -82,6 +84,8 @@ export default function StudentsPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historySelectedPlanId, setHistorySelectedPlanId] = useState<string>('');
+  const [historyPlanOpen, setHistoryPlanOpen] = useState(false);
+  const [historyPlanSearch, setHistoryPlanSearch] = useState('');
   const [historyItems, setHistoryItems] = useState<
     {
       id: string;
@@ -1459,6 +1463,8 @@ export default function StudentsPage() {
                   setHistoryStudent(null);
                   setHistoryItems([]);
                   setHistoryError(null);
+                  setHistoryPlanOpen(false);
+                  setHistoryPlanSearch('');
                 }}
               >
                 Cerrar
@@ -1492,6 +1498,17 @@ export default function StudentsPage() {
 
                     const confirmed = historyItems.filter((x) => x.usageStatus === 'confirmed');
                     const pending = historyItems.filter((x) => x.usageStatus === 'pending');
+
+                    const selectedPlanLabel = (() => {
+                      if (!historySelectedPlanId) return null;
+                      return planOptions.find((o) => o.id === historySelectedPlanId)?.label ?? null;
+                    })();
+
+                    const filteredPlanOptions = (() => {
+                      const q = historyPlanSearch.trim().toLowerCase();
+                      if (!q) return planOptions;
+                      return planOptions.filter((o) => o.label.toLowerCase().includes(q));
+                    })();
 
                     const renderSection = (title: string, itemsInSection: typeof historyItems) => {
                       if (!itemsInSection.length) return null;
@@ -1582,17 +1599,56 @@ export default function StudentsPage() {
                         {planOptions.length > 1 && (
                           <div className="flex items-center justify-between gap-3">
                             <label className="text-xs text-slate-600">Plan</label>
-                            <select
-                              className="h-9 w-full max-w-[360px] rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700"
-                              value={historySelectedPlanId}
-                              onChange={(e) => setHistorySelectedPlanId(e.target.value)}
-                            >
-                              {planOptions.map((opt) => (
-                                <option key={opt.id} value={opt.id}>
-                                  {opt.label}
-                                </option>
-                              ))}
-                            </select>
+                            <div className="w-full max-w-[360px]">
+                              <Popover
+                                open={historyPlanOpen}
+                                onOpenChange={(open) => {
+                                  setHistoryPlanOpen(open);
+                                  if (!open) setHistoryPlanSearch('');
+                                }}
+                              >
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    className="w-full justify-between h-9 px-2 text-xs font-normal"
+                                  >
+                                    <span className="truncate mr-2">
+                                      {selectedPlanLabel ?? 'Seleccionar plan'}
+                                    </span>
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-80 max-w-[calc(100vw-2rem)] p-2" align="start">
+                                  <div className="space-y-2">
+                                    <Input
+                                      type="text"
+                                      placeholder="Buscar plan..."
+                                      value={historyPlanSearch}
+                                      onChange={(e) => setHistoryPlanSearch(e.target.value)}
+                                      className="h-10 text-base"
+                                    />
+                                    <div className="max-h-52 overflow-auto border rounded-md divide-y text-xs bg-white">
+                                      {filteredPlanOptions.map((opt) => (
+                                        <button
+                                          key={opt.id}
+                                          type="button"
+                                          onClick={() => {
+                                            setHistorySelectedPlanId(opt.id);
+                                            setHistoryPlanOpen(false);
+                                            setHistoryPlanSearch('');
+                                          }}
+                                          className={`w-full px-2 py-1.5 text-left hover:bg-slate-50 ${
+                                            opt.id === historySelectedPlanId ? 'bg-slate-50' : ''
+                                          }`}
+                                        >
+                                          {opt.label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
+                            </div>
                           </div>
                         )}
                         {renderSection('Histórico confirmado', confirmed)}

@@ -7,6 +7,9 @@ import PlansClient from './PlansClient';
 import { CreditCard, History } from 'lucide-react';
 import { createClientBrowser } from '@/lib/supabase';
 import { formatPyg } from '@/lib/formatters';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 type Role = 'super_admin' | 'admin' | 'coach' | 'student' | null;
 
@@ -42,6 +45,8 @@ export default function FinancePage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historySelectedPlanId, setHistorySelectedPlanId] = useState<string>('');
+  const [historyPlanOpen, setHistoryPlanOpen] = useState(false);
+  const [historyPlanSearch, setHistoryPlanSearch] = useState('');
   const [historyItems, setHistoryItems] = useState<
     {
       id: string;
@@ -435,6 +440,8 @@ export default function FinancePage() {
                         setHistoryError(null);
                         setHistoryItems([]);
                         setHistorySelectedPlanId('');
+                        setHistoryPlanOpen(false);
+                        setHistoryPlanSearch('');
 
                         const { data: usagesData, error: usagesErr } = await supabase
                           .from('plan_usages')
@@ -715,6 +722,8 @@ export default function FinancePage() {
                     setHistoryOpen(false);
                     setHistoryItems([]);
                     setHistoryError(null);
+                    setHistoryPlanOpen(false);
+                    setHistoryPlanSearch('');
                   }}
                 >
                   Cerrar
@@ -743,6 +752,17 @@ export default function FinancePage() {
                         planOptionsMap.set(key, { id: key, label: `${planName} — asignado el ${when}`, purchasedAtMs: ms });
                       }
                       const planOptions = Array.from(planOptionsMap.values()).sort((a, b) => b.purchasedAtMs - a.purchasedAtMs);
+
+                      const selectedPlanLabel = (() => {
+                        if (!historySelectedPlanId) return null;
+                        return planOptions.find((o) => o.id === historySelectedPlanId)?.label ?? null;
+                      })();
+
+                      const filteredPlanOptions = (() => {
+                        const q = historyPlanSearch.trim().toLowerCase();
+                        if (!q) return planOptions;
+                        return planOptions.filter((o) => o.label.toLowerCase().includes(q));
+                      })();
 
                       const confirmed = historyItems.filter((x) => x.usageStatus === 'confirmed');
                       const pending = historyItems.filter((x) => x.usageStatus === 'pending');
@@ -848,17 +868,56 @@ export default function FinancePage() {
                           {planOptions.length > 1 && (
                             <div className="flex items-center justify-between gap-3">
                               <label className="text-xs text-slate-600">Plan</label>
-                              <select
-                                className="h-9 w-full max-w-[360px] rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700"
-                                value={historySelectedPlanId}
-                                onChange={(e) => setHistorySelectedPlanId(e.target.value)}
-                              >
-                                {planOptions.map((opt) => (
-                                  <option key={opt.id} value={opt.id}>
-                                    {opt.label}
-                                  </option>
-                                ))}
-                              </select>
+                              <div className="w-full max-w-[360px]">
+                                <Popover
+                                  open={historyPlanOpen}
+                                  onOpenChange={(open) => {
+                                    setHistoryPlanOpen(open);
+                                    if (!open) setHistoryPlanSearch('');
+                                  }}
+                                >
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      className="w-full justify-between h-9 px-2 text-xs font-normal"
+                                    >
+                                      <span className="truncate mr-2">
+                                        {selectedPlanLabel ?? 'Seleccionar plan'}
+                                      </span>
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-80 max-w-[calc(100vw-2rem)] p-2" align="start">
+                                    <div className="space-y-2">
+                                      <Input
+                                        type="text"
+                                        placeholder="Buscar plan..."
+                                        value={historyPlanSearch}
+                                        onChange={(e) => setHistoryPlanSearch(e.target.value)}
+                                        className="h-10 text-base"
+                                      />
+                                      <div className="max-h-52 overflow-auto border rounded-md divide-y text-xs bg-white">
+                                        {filteredPlanOptions.map((opt) => (
+                                          <button
+                                            key={opt.id}
+                                            type="button"
+                                            onClick={() => {
+                                              setHistorySelectedPlanId(opt.id);
+                                              setHistoryPlanOpen(false);
+                                              setHistoryPlanSearch('');
+                                            }}
+                                            className={`w-full px-2 py-1.5 text-left hover:bg-slate-50 ${
+                                              opt.id === historySelectedPlanId ? 'bg-slate-50' : ''
+                                            }`}
+                                          >
+                                            {opt.label}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                              </div>
                             </div>
                           )}
                           {renderSection('Histórico confirmado', confirmed)}
