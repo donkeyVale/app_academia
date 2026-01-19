@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { History, Users, StickyNote } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -66,7 +66,7 @@ type ProfileRow = {
 
 export default function StudentsPage() {
   const router = useRouter();
-  const supabase = createClientBrowser();
+  const supabase = useMemo(() => createClientBrowser(), []);
   const [checking, setChecking] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

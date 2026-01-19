@@ -142,7 +142,7 @@ type Student = {
 };
 
 export default function SchedulePage() {
-  const supabase = createClientBrowser();
+  const supabase = useMemo(() => createClientBrowser(), []);
   const [locations, setLocations] = useState<Location[]>([]);
   const [courts, setCourts] = useState<Court[]>([]);
   const [coaches, setCoaches] = useState<Coach[]>([]);
