@@ -250,7 +250,8 @@ export default function Page() {
             .select('id')
             .gte('date', fromIso)
             .lte('date', toIso)
-            .in('court_id', courtIds);
+            .in('court_id', courtIds)
+            .neq('status', 'cancelled');
           if (classErr) throw classErr;
           const classIds = ((classRows as { id: string }[] | null) ?? []).map((c) => c.id);
           if (classIds.length === 0) {
@@ -288,7 +289,8 @@ export default function Page() {
             .eq('coach_id', coachId)
             .gte('date', fromIso)
             .lte('date', toIso)
-            .in('court_id', courtIds);
+            .in('court_id', courtIds)
+            .neq('status', 'cancelled');
           if (cErr) throw cErr;
           setScheduleBadgeCount(count ?? 0);
           return;
@@ -299,10 +301,11 @@ export default function Page() {
           .select('id', { count: 'exact', head: true })
           .gte('date', fromIso)
           .lte('date', toIso)
-          .in('court_id', courtIds);
+          .in('court_id', courtIds)
+          .neq('status', 'cancelled');
         if (csErr) throw csErr;
         setScheduleBadgeCount(count ?? 0);
-      } catch {
+      } catch (e) {
         setScheduleBadgeCount(0);
       }
     };

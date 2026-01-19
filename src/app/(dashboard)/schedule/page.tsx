@@ -965,16 +965,23 @@ export default function SchedulePage() {
           .in('student_id', selectedStudents)
           .eq('class_sessions.date', iso);
 
-        if (conflictsErr) {
+        const { data: conflictsFiltered, error: conflictsStatusErr } = await supabase
+          .from('bookings')
+          .select('student_id, class_sessions!inner(id,date,status)')
+          .in('student_id', selectedStudents)
+          .eq('class_sessions.date', iso)
+          .neq('class_sessions.status', 'cancelled');
+
+        if (conflictsErr || conflictsStatusErr) {
           const msg = 'No se pudo verificar la disponibilidad de los alumnos. Intenta nuevamente.';
           toast.error(msg);
           setSaving(false);
           return;
         }
 
-        if ((conflicts ?? []).length > 0) {
+        if ((conflictsFiltered ?? []).length > 0) {
           const conflictIds = Array.from(
-            new Set((conflicts ?? []).map((c: any) => c.student_id as string))
+            new Set((conflictsFiltered ?? []).map((c: any) => c.student_id as string))
           );
           const labels = conflictIds.map((sid) => getStudentLabel(sid));
           const msg =
@@ -1047,8 +1054,15 @@ export default function SchedulePage() {
             .in('student_id', studentsToBook)
             .eq('class_sessions.date', sessionIso);
 
-          if (conflictsErr) throw conflictsErr;
-          if ((conflicts ?? []).length > 0) {
+          const { data: conflictsFiltered, error: conflictsStatusErr } = await supabase
+            .from('bookings')
+            .select('student_id, class_sessions!inner(id,date,status)')
+            .in('student_id', studentsToBook)
+            .eq('class_sessions.date', sessionIso)
+            .neq('class_sessions.status', 'cancelled');
+
+          if (conflictsErr || conflictsStatusErr) throw (conflictsErr ?? conflictsStatusErr);
+          if ((conflictsFiltered ?? []).length > 0) {
             skippedStudents += 1;
             return;
           }
@@ -1918,16 +1932,24 @@ export default function SchedulePage() {
           .eq('class_sessions.date', iso)
           .neq('class_sessions.id', editing.id);
 
-        if (conflictsErr) {
+        const { data: conflictsFiltered, error: conflictsStatusErr } = await supabase
+          .from('bookings')
+          .select('student_id, class_sessions!inner(id,date,status)')
+          .in('student_id', toAdd)
+          .eq('class_sessions.date', iso)
+          .neq('class_sessions.id', editing.id)
+          .neq('class_sessions.status', 'cancelled');
+
+        if (conflictsErr || conflictsStatusErr) {
           const msg = 'No se pudo verificar la disponibilidad de los alumnos. Intenta nuevamente.';
           toast.error(msg);
           setSaving(false);
           return;
         }
 
-        if ((conflicts ?? []).length > 0) {
+        if ((conflictsFiltered ?? []).length > 0) {
           const conflictIds = Array.from(
-            new Set((conflicts ?? []).map((c: any) => c.student_id as string))
+            new Set((conflictsFiltered ?? []).map((c: any) => c.student_id as string))
           );
           const labels = conflictIds.map((sid) => getStudentLabel(sid));
           const msg =
