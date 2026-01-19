@@ -794,6 +794,7 @@ export default function Page() {
               .select('id, courts!inner(location_id)', { count: 'exact', head: true })
               .gte('date', start.toISOString())
               .lte('date', end.toISOString())
+              .neq('status', 'cancelled')
               .in('courts.location_id', locationIds);
             if (clsErr) throw clsErr;
             todayCount = count ?? 0;
@@ -802,7 +803,8 @@ export default function Page() {
               .from('class_sessions')
               .select('id', { count: 'exact', head: true })
               .gte('date', start.toISOString())
-              .lte('date', end.toISOString());
+              .lte('date', end.toISOString())
+              .neq('status', 'cancelled');
             if (clsErr) throw clsErr;
             todayCount = count ?? 0;
           }
