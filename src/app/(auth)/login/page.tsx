@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createClientBrowser, createClientBrowserJs } from '@/lib/supabase';
 import { PasswordInput } from '@/components/ui/password-input';
 import { toast } from 'sonner';
@@ -16,7 +16,7 @@ import {
 } from '@/lib/capacitor-biometrics';
 
 export default function LoginPage() {
-  const supabase = createClientBrowser();
+  const supabase = useMemo(() => createClientBrowser(), []);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -113,12 +113,17 @@ export default function LoginPage() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     setError(null);
     setInfo(null);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setError(error.message);
-    else {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setError(error.message);
+        return;
+      }
+
       if (isBiometricEnabled()) {
         try {
           const { data } = await supabase.auth.getSession();
@@ -131,8 +136,9 @@ export default function LoginPage() {
       }
 
       await finishLoginRedirect();
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const onBiometricLogin = async () => {
