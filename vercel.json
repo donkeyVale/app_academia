@@ -5,6 +5,10 @@
       "schedule": "0 12 * * *"
     },
     {
+      "path": "/api/cron/attendance-pending",
+      "schedule": "0 */6 * * *"
+    },
+    {
       "path": "/api/cron/balance-reminder",
       "schedule": "0 10,22 * * *"
     },
