@@ -86,6 +86,25 @@ async function handle(req: NextRequest) {
       return endTs <= nowTs;
     });
 
+    // 2b) Solo clases con al menos 1 booking reservado
+    const finishedClassIds = finishedTodayRows.map((r) => r?.id as string | undefined).filter(Boolean) as string[];
+    const { data: bookingRows, error: bookingErr } = await supabaseAdmin
+      .from('bookings')
+      .select('class_id')
+      .eq('status', 'reserved')
+      .in('class_id', finishedClassIds);
+
+    if (bookingErr) {
+      return NextResponse.json({ error: bookingErr.message }, { status: 500 });
+    }
+
+    const classIdsWithBookings = new Set<string>(((bookingRows ?? []) as any[]).map((r) => r?.class_id as string).filter(Boolean));
+    const finishedTodayRowsWithBookings = finishedTodayRows.filter((r) => {
+      const id = r?.id as string | undefined;
+      if (!id) return false;
+      return classIdsWithBookings.has(id);
+    });
+
     if (finishedTodayRows.length === 0) {
       return NextResponse.json({
         ok: true,
@@ -97,7 +116,28 @@ async function handle(req: NextRequest) {
               dayRange: { startIso, endIso },
               today: allTodayRows.length,
               finished: 0,
+              finishedWithBookings: 0,
+              bookingRows: 0,
               reason: 'no_finished_classes_yet',
+            }
+          : undefined,
+      });
+    }
+
+    if (finishedTodayRowsWithBookings.length === 0) {
+      return NextResponse.json({
+        ok: true,
+        checked: 0,
+        academies: 0,
+        notifiedRequests: 0,
+        debug: debug
+          ? {
+              dayRange: { startIso, endIso },
+              today: allTodayRows.length,
+              finished: finishedTodayRows.length,
+              finishedWithBookings: 0,
+              bookingRows: (bookingRows ?? []).length,
+              reason: 'no_finished_classes_with_bookings',
             }
           : undefined,
       });
@@ -114,7 +154,7 @@ async function handle(req: NextRequest) {
     }
 
     const hasAttendance = new Set<string>(((attRows ?? []) as any[]).map((r) => r?.class_id as string).filter(Boolean));
-    const rows = finishedTodayRows.filter((r) => {
+    const rows = finishedTodayRowsWithBookings.filter((r) => {
       const id = r?.id as string | undefined;
       if (!id) return false;
       // Si ya hay filas de attendance para la clase, consideramos que ya fue marcada.
@@ -132,6 +172,8 @@ async function handle(req: NextRequest) {
               dayRange: { startIso, endIso },
               today: allTodayRows.length,
               finished: finishedTodayRows.length,
+              finishedWithBookings: finishedTodayRowsWithBookings.length,
+              bookingRows: (bookingRows ?? []).length,
               attendanceRows: (attRows ?? []).length,
               reason: 'all_marked',
             }
@@ -271,6 +313,8 @@ async function handle(req: NextRequest) {
             dayRange: { startIso, endIso },
             today: allTodayRows.length,
             finished: finishedTodayRows.length,
+            finishedWithBookings: finishedTodayRowsWithBookings.length,
+            bookingRows: (bookingRows ?? []).length,
             attendanceRows: (attRows ?? []).length,
             pendingSample,
             academies,
