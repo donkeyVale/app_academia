@@ -108,7 +108,7 @@ export default function StudentsPage() {
       studentPlanId: string | null;
       planName: string | null;
       planPurchasedAt: string | null;
-      usageStatus: 'pending' | 'confirmed';
+      usageStatus: 'pending' | 'confirmed' | 'refunded';
       attendancePresent: boolean | null;
       attendanceMarkedAt: string | null;
       attendanceMarkedByName: string | null;
@@ -588,7 +588,7 @@ export default function StudentsPage() {
         .from('plan_usages')
         .select('class_id, student_plan_id, status, class_sessions!inner(id,date,court_id,coach_id)')
         .eq('student_id', studentId)
-        .in('status', ['confirmed', 'pending'])
+        .in('status', ['confirmed', 'pending', 'refunded'])
         .limit(50);
 
       if (usagesErr) throw usagesErr;
@@ -599,7 +599,7 @@ export default function StudentsPage() {
         {
           classId: string;
           studentPlanId: string | null;
-          usageStatus: 'pending' | 'confirmed';
+          usageStatus: 'pending' | 'confirmed' | 'refunded';
           classSession: { id: string; date: string; court_id: string | null; coach_id: string | null };
         }
       > = {};
@@ -609,10 +609,13 @@ export default function StudentsPage() {
         const classId = (u.class_id as string | null) ?? (cls?.id as string | null);
         if (!classId || !cls?.id) return;
         if (byClassId[classId]) return;
+        const rawStatus = (u.status as string | null) ?? null;
+        const usageStatus: 'pending' | 'confirmed' | 'refunded' =
+          rawStatus === 'pending' ? 'pending' : rawStatus === 'refunded' ? 'refunded' : 'confirmed';
         byClassId[classId] = {
           classId,
           studentPlanId: (u.student_plan_id as string | null) ?? null,
-          usageStatus: ((u.status as string | null) === 'pending' ? 'pending' : 'confirmed'),
+          usageStatus,
           classSession: {
             id: cls.id as string,
             date: cls.date as string,
