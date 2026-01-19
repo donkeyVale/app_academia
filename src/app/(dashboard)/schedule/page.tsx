@@ -1971,6 +1971,32 @@ export default function SchedulePage() {
         }
       }
 
+      // Si se removieron alumnos de la clase, notificarles como clase cancelada (no reprogramada)
+      if (toRemove.length && academyIdToUse && currentUserId && role) {
+        try {
+          const res = await fetch('/api/push/class-cancelled', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              classId: editing.id,
+              studentIds: [...toRemove],
+              dateIso: oldDateIso,
+              academyId: academyIdToUse,
+              cancelledByRole: role,
+              cancelledByCoachId: role === 'coach' ? editing.coach_id : null,
+              cancelledByUserId: currentUserId,
+            }),
+          });
+
+          if (!res.ok) {
+            const txt = await res.text().catch(() => '');
+            console.error('Push class-cancelled (remove students) respondió con error', res.status, txt);
+          }
+        } catch (pushErr) {
+          console.error('Error enviando push de clase cancelada por remover alumnos', pushErr);
+        }
+      }
+
       if (isRescheduled && academyIdToUse) {
         try {
           const res = await fetch('/api/push/class-rescheduled', {
