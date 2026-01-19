@@ -40,7 +40,7 @@ function getUtcRangeForLocalDayUtcMinus3(y: number, m: number, d: number) {
   return { startIso: new Date(startUtcMs).toISOString(), endIso: new Date(endUtcMs).toISOString() };
 }
 
-export async function POST(req: NextRequest) {
+async function handle(req: NextRequest) {
   try {
     if (isUnauthorized(req)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -201,4 +201,12 @@ export async function POST(req: NextRequest) {
     console.error('Error en /api/cron/attendance-pending', e);
     return NextResponse.json({ error: e?.message ?? 'Error ejecutando cron de asistencia pendiente' }, { status: 500 });
   }
+}
+
+export async function GET(req: NextRequest) {
+  return handle(req);
+}
+
+export async function POST(req: NextRequest) {
+  return handle(req);
 }
