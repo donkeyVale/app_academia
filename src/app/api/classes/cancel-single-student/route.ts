@@ -43,21 +43,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: countErr.message }, { status: 500 });
     }
 
-    let deletedClass = false;
+    let cancelledClass = false;
 
     if (!remainingCount || remainingCount === 0) {
-      const { error: delClassErr } = await supabaseAdmin
+      const { error: updClassErr } = await supabaseAdmin
         .from('class_sessions')
-        .delete()
+        .update({ status: 'cancelled' })
         .eq('id', classId);
-      if (delClassErr) {
-        console.error('Error borrando class_session en cancel-single-student', delClassErr.message);
-        return NextResponse.json({ error: delClassErr.message }, { status: 500 });
+      if (updClassErr) {
+        console.error('Error marcando class_session como cancelled en cancel-single-student', updClassErr.message);
+        return NextResponse.json({ error: updClassErr.message }, { status: 500 });
       }
-      deletedClass = true;
+      cancelledClass = true;
     }
 
-    return NextResponse.json({ ok: true, deletedClass, remainingCount: remainingCount ?? 0 });
+    return NextResponse.json({ ok: true, cancelledClass, remainingCount: remainingCount ?? 0 });
   } catch (e: any) {
     console.error('Error en /api/classes/cancel-single-student', e);
     return NextResponse.json(

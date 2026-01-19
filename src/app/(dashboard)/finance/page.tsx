@@ -41,6 +41,7 @@ export default function FinancePage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historySelectedPlanId, setHistorySelectedPlanId] = useState<string>('');
   const [historyItems, setHistoryItems] = useState<
     {
       id: string;
@@ -433,6 +434,7 @@ export default function FinancePage() {
                         setHistoryLoading(true);
                         setHistoryError(null);
                         setHistoryItems([]);
+                        setHistorySelectedPlanId('');
 
                         const { data: usagesData, error: usagesErr } = await supabase
                           .from('plan_usages')
@@ -661,6 +663,24 @@ export default function FinancePage() {
 
                         items.sort((a, b) => b.date.localeCompare(a.date));
                         setHistoryItems(items);
+
+                        const planOptionsMap = new Map<string, { id: string; label: string; purchasedAtMs: number }>();
+                        for (const it of items) {
+                          const key = it.studentPlanId ?? 'unknown';
+                          if (planOptionsMap.has(key)) continue;
+                          const ms = it.planPurchasedAt ? new Date(it.planPurchasedAt).getTime() : 0;
+                          const d = it.planPurchasedAt ? new Date(it.planPurchasedAt) : null;
+                          const dd = d ? String(d.getDate()).padStart(2, '0') : '--';
+                          const mm = d ? String(d.getMonth() + 1).padStart(2, '0') : '--';
+                          const yyyy = d ? String(d.getFullYear()) : '----';
+                          const when = `${dd}/${mm}/${yyyy}`;
+                          const planName = it.planName ?? (key === 'unknown' ? 'Plan sin identificar' : 'Plan');
+                          planOptionsMap.set(key, { id: key, label: `${planName} — asignado el ${when}`, purchasedAtMs: ms });
+                        }
+                        const optionsSorted = Array.from(planOptionsMap.values()).sort((a, b) => b.purchasedAtMs - a.purchasedAtMs);
+                        if (optionsSorted.length > 0) {
+                          setHistorySelectedPlanId(optionsSorted[0].id);
+                        }
                       } catch (err: any) {
                         setHistoryError(err?.message ?? 'Error cargando historial de clases.');
                       } finally {
@@ -709,27 +729,30 @@ export default function FinancePage() {
                 {!historyLoading && !historyError && historyItems.length > 0 && (
                   <div className="space-y-4">
                     {(() => {
+                      const planOptionsMap = new Map<string, { id: string; label: string; purchasedAtMs: number }>();
+                      for (const it of historyItems) {
+                        const key = it.studentPlanId ?? 'unknown';
+                        if (planOptionsMap.has(key)) continue;
+                        const ms = it.planPurchasedAt ? new Date(it.planPurchasedAt).getTime() : 0;
+                        const d = it.planPurchasedAt ? new Date(it.planPurchasedAt) : null;
+                        const dd = d ? String(d.getDate()).padStart(2, '0') : '--';
+                        const mm = d ? String(d.getMonth() + 1).padStart(2, '0') : '--';
+                        const yyyy = d ? String(d.getFullYear()) : '----';
+                        const when = `${dd}/${mm}/${yyyy}`;
+                        const planName = it.planName ?? (key === 'unknown' ? 'Plan sin identificar' : 'Plan');
+                        planOptionsMap.set(key, { id: key, label: `${planName} — asignado el ${when}`, purchasedAtMs: ms });
+                      }
+                      const planOptions = Array.from(planOptionsMap.values()).sort((a, b) => b.purchasedAtMs - a.purchasedAtMs);
+
                       const confirmed = historyItems.filter((x) => x.usageStatus === 'confirmed');
                       const pending = historyItems.filter((x) => x.usageStatus === 'pending');
 
                       const renderSection = (title: string, itemsInSection: typeof historyItems) => {
                         if (!itemsInSection.length) return null;
 
-                        const groups: Record<string, typeof historyItems> = {};
-                        itemsInSection.forEach((it) => {
-                          const key = it.studentPlanId ?? 'unknown';
-                          if (!groups[key]) groups[key] = [];
-                          groups[key].push(it);
-                        });
-
-                        const groupKeys = Object.keys(groups).sort((a, b) => {
-                          const aItem = groups[a]?.[0] ?? null;
-                          const bItem = groups[b]?.[0] ?? null;
-                          const aMs = aItem?.planPurchasedAt ? new Date(aItem.planPurchasedAt).getTime() : 0;
-                          const bMs = bItem?.planPurchasedAt ? new Date(bItem.planPurchasedAt).getTime() : 0;
-                          if (aMs !== bMs) return bMs - aMs;
-                          return a.localeCompare(b);
-                        });
+                        const key = historySelectedPlanId || (itemsInSection[0]?.studentPlanId ?? 'unknown');
+                        const items = itemsInSection.filter((it) => (it.studentPlanId ?? 'unknown') === key);
+                        if (!items.length) return null;
 
                         return (
                           <div className="space-y-2">
@@ -747,20 +770,7 @@ export default function FinancePage() {
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {groupKeys.flatMap((key) => {
-                                    const items = groups[key] ?? [];
-                                    const headerName =
-                                      items[0]?.planName ?? (key === 'unknown' ? 'Plan sin identificar' : 'Plan');
-
-                                    const headerRow = (
-                                      <tr key={`${title}-${key}-header`} className="border-b bg-slate-50">
-                                        <td colSpan={6} className="py-2 px-2 text-xs font-semibold text-slate-700">
-                                          {headerName}
-                                        </td>
-                                      </tr>
-                                    );
-
-                                    const rows = items.flatMap((item) => {
+                                  {items.map((item) => {
                                       const d = new Date(item.date);
                                       const yyyy = d.getFullYear();
                                       const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -825,10 +835,7 @@ export default function FinancePage() {
                                           </tr>
                                         ),
                                       ];
-                                    });
-
-                                    return [headerRow, ...rows];
-                                  })}
+                                    })}
                                 </tbody>
                               </table>
                             </div>
@@ -838,6 +845,22 @@ export default function FinancePage() {
 
                       return (
                         <>
+                          {planOptions.length > 1 && (
+                            <div className="flex items-center justify-between gap-3">
+                              <label className="text-xs text-slate-600">Plan</label>
+                              <select
+                                className="h-9 w-full max-w-[360px] rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700"
+                                value={historySelectedPlanId}
+                                onChange={(e) => setHistorySelectedPlanId(e.target.value)}
+                              >
+                                {planOptions.map((opt) => (
+                                  <option key={opt.id} value={opt.id}>
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
                           {renderSection('Histórico confirmado', confirmed)}
                           {renderSection('Reservas pendientes de confirmar', pending)}
                         </>

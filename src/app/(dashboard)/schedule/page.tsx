@@ -463,6 +463,7 @@ export default function SchedulePage() {
       let clsQuery = supabase
         .from('class_sessions')
         .select('*, courts!inner(location_id)')
+        .eq('status', 'active')
         .gte('date', from.toISOString())
         .lte('date', to.toISOString())
         .order('date', { ascending: true });
@@ -477,6 +478,7 @@ export default function SchedulePage() {
       let pendingQuery = supabase
         .from('class_sessions')
         .select('*, courts!inner(location_id)')
+        .eq('status', 'active')
         .eq('attendance_pending', true)
         .order('date', { ascending: true });
 
@@ -3150,7 +3152,7 @@ export default function SchedulePage() {
                                 return;
                               }
 
-                              if (!confirm('¿Cancelar y eliminar esta clase? Se eliminarán reservas, asistencias y usos de plan asociados.')) return;
+                              if (!confirm('¿Cancelar esta clase? Se devolverán las clases a los planes y se avisará a los alumnos.')) return;
 
                               const { error: delUsageErr } = await supabase
                                 .from('plan_usages')
@@ -3182,7 +3184,7 @@ export default function SchedulePage() {
 
                               const { error: delErr } = await supabase
                                 .from('class_sessions')
-                                .delete()
+                                .update({ status: 'cancelled' })
                                 .eq('id', cls.id);
                               if (delErr) {
                                 toast.error('Error al cancelar: ' + delErr.message);

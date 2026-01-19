@@ -81,6 +81,7 @@ export default function StudentsPage() {
   const [historyStudent, setHistoryStudent] = useState<{ id: string; name: string } | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historySelectedPlanId, setHistorySelectedPlanId] = useState<string>('');
   const [historyItems, setHistoryItems] = useState<
     {
       id: string;
@@ -557,6 +558,7 @@ export default function StudentsPage() {
     setHistoryLoading(true);
     setHistoryError(null);
     setHistoryItems([]);
+    setHistorySelectedPlanId('');
     setClassNotesByClass({});
     setEditingNote(null);
     setNotesError(null);
@@ -788,6 +790,25 @@ export default function StudentsPage() {
       });
 
       setHistoryItems(merged);
+
+      const planOptionsMap = new Map<string, { id: string; label: string; purchasedAtMs: number }>();
+      for (const it of merged) {
+        const key = it.studentPlanId ?? 'unknown';
+        if (planOptionsMap.has(key)) continue;
+        const ms = it.planPurchasedAt ? new Date(it.planPurchasedAt).getTime() : 0;
+        const d = it.planPurchasedAt ? new Date(it.planPurchasedAt) : null;
+        const dd = d ? String(d.getDate()).padStart(2, '0') : '--';
+        const mm = d ? String(d.getMonth() + 1).padStart(2, '0') : '--';
+        const yyyy = d ? String(d.getFullYear()) : '----';
+        const when = `${dd}/${mm}/${yyyy}`;
+        const planName = it.planName ?? (key === 'unknown' ? 'Plan sin identificar' : 'Plan');
+        planOptionsMap.set(key, { id: key, label: `${planName} — asignado el ${when}`, purchasedAtMs: ms });
+      }
+
+      const optionsSorted = Array.from(planOptionsMap.values()).sort((a, b) => b.purchasedAtMs - a.purchasedAtMs);
+      if (optionsSorted.length > 0) {
+        setHistorySelectedPlanId(optionsSorted[0].id);
+      }
 
       // Cargar notas de clase para este alumno y estas clases
       const classIds = merged.map((i) => i.id);
@@ -1264,7 +1285,7 @@ export default function StudentsPage() {
               ) : (
                 <>
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div className="inline-flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-2 py-1 text-[11px] text-slate-700">
+                    <div className="inline-flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-2 py-1 text-[11px] font-medium text-slate-700">
                       <span className="font-semibold">{students.length}</span>
                       <span>alumnos totales</span>
                     </div>
@@ -1371,7 +1392,7 @@ export default function StudentsPage() {
                                     (remaining !== null && remaining > 0
                                       ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
                                       : remaining === 0
-                                      ? "bg-amber-50 text-amber-700 border-amber-100 border"
+                                      ? "bg-amber-50 text-amber-700 border border-amber-100"
                                       : "bg-slate-50 text-slate-500 border border-slate-200")
                                   }
                                 >
@@ -1453,27 +1474,31 @@ export default function StudentsPage() {
                 <div className="space-y-4">
                   {(() => {
                     const showMarkedBy = role === 'admin' || role === 'super_admin' || role === 'coach';
+
+                    const planOptionsMap = new Map<string, { id: string; label: string; purchasedAtMs: number }>();
+                    for (const it of historyItems) {
+                      const key = it.studentPlanId ?? 'unknown';
+                      if (planOptionsMap.has(key)) continue;
+                      const ms = it.planPurchasedAt ? new Date(it.planPurchasedAt).getTime() : 0;
+                      const d = it.planPurchasedAt ? new Date(it.planPurchasedAt) : null;
+                      const dd = d ? String(d.getDate()).padStart(2, '0') : '--';
+                      const mm = d ? String(d.getMonth() + 1).padStart(2, '0') : '--';
+                      const yyyy = d ? String(d.getFullYear()) : '----';
+                      const when = `${dd}/${mm}/${yyyy}`;
+                      const planName = it.planName ?? (key === 'unknown' ? 'Plan sin identificar' : 'Plan');
+                      planOptionsMap.set(key, { id: key, label: `${planName} — asignado el ${when}`, purchasedAtMs: ms });
+                    }
+                    const planOptions = Array.from(planOptionsMap.values()).sort((a, b) => b.purchasedAtMs - a.purchasedAtMs);
+
                     const confirmed = historyItems.filter((x) => x.usageStatus === 'confirmed');
                     const pending = historyItems.filter((x) => x.usageStatus === 'pending');
 
                     const renderSection = (title: string, itemsInSection: typeof historyItems) => {
                       if (!itemsInSection.length) return null;
 
-                      const groups: Record<string, typeof historyItems> = {};
-                      itemsInSection.forEach((it) => {
-                        const key = it.studentPlanId ?? 'unknown';
-                        if (!groups[key]) groups[key] = [];
-                        groups[key].push(it);
-                      });
-
-                      const groupKeys = Object.keys(groups).sort((a, b) => {
-                        const aItem = groups[a]?.[0] ?? null;
-                        const bItem = groups[b]?.[0] ?? null;
-                        const aMs = aItem?.planPurchasedAt ? new Date(aItem.planPurchasedAt).getTime() : 0;
-                        const bMs = bItem?.planPurchasedAt ? new Date(bItem.planPurchasedAt).getTime() : 0;
-                        if (aMs !== bMs) return bMs - aMs;
-                        return a.localeCompare(b);
-                      });
+                      const key = historySelectedPlanId || (itemsInSection[0]?.studentPlanId ?? 'unknown');
+                      const items = itemsInSection.filter((it) => (it.studentPlanId ?? 'unknown') === key);
+                      if (!items.length) return null;
 
                       return (
                         <div className="space-y-2">
@@ -1491,19 +1516,7 @@ export default function StudentsPage() {
                                 </tr>
                               </thead>
                               <tbody>
-                                {groupKeys.flatMap((key) => {
-                                  const items = groups[key] ?? [];
-                                  const headerName = items[0]?.planName ?? (key === 'unknown' ? 'Plan sin identificar' : 'Plan');
-
-                                  const headerRow = (
-                                    <tr key={`${title}-${key}-header`} className="border-b bg-slate-50">
-                                      <td colSpan={6} className="py-2 px-2 text-xs font-semibold text-slate-700">
-                                        {headerName}
-                                      </td>
-                                    </tr>
-                                  );
-
-                                  const rows = items.flatMap((item) => {
+                                {items.map((item) => {
                                     const d = new Date(item.date);
                                     const yyyy = d.getFullYear();
                                     const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -1542,236 +1555,51 @@ export default function StudentsPage() {
                                       }
                                     }
 
-                                    const notesArr = classNotesByClass[item.id] ?? [];
-                                    const firstNote = notesArr[0] ?? null;
-                                    const isCoach = role === 'coach';
-                                    const isAdmin = role === 'admin' || role === 'super_admin';
-                                    const coachCanEditThisNote =
-                                      !isCoach || !firstNote || (!!coachIdForNotes && firstNote.coach_id === coachIdForNotes);
+                                    return (
+                                      <tr key={`${title}-${item.id}-row`} className="border-b last:border-b-0">
+                                        <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
+                                        <td className="py-1.5 px-2">{`${hh}:${min}`}</td>
+                                        <td className="py-1.5 px-2">{item.courtName ?? '-'}</td>
+                                        <td className="py-1.5 px-2">{item.coachName ?? '-'}</td>
+                                        <td className="py-1.5 px-2">
+                                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${attClass}`}>
+                                            {attLabel}
+                                          </span>
+                                        </td>
+                                        <td className="py-1.5 px-2 text-xs text-slate-600">{markedText}</td>
+                                      </tr>
+                                    );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    };
 
-                                    return [
-                                      (
-                                        <tr key={`${title}-${item.id}-row`} className="border-b last:border-b-0">
-                                          <td className="py-1.5 px-2">{`${dd}/${mm}/${yyyy}`}</td>
-                                          <td className="py-1.5 px-2">{`${hh}:${min}`}</td>
-                                          <td className="py-1.5 px-2">{item.courtName ?? '-'}</td>
-                                          <td className="py-1.5 px-2">{item.coachName ?? '-'}</td>
-                                          <td className="py-1.5 px-2">
-                                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${attClass}`}>
-                                              {attLabel}
-                                            </span>
-                                          </td>
-                                          <td className="py-1.5 px-2 text-xs text-slate-600">{markedText}</td>
-                                        </tr>
-                                      ),
-                                      (
-                                        <tr key={`${title}-${item.id}-note`} className="border-b last:border-b-0">
-                                          <td colSpan={6} className="py-1.5 px-2 bg-gray-50/40">
-                                            {isCoach ? (
-                                      <div className="space-y-1">
-                                        {editingNote && editingNote.classId === item.id ? (
-                                          <div className="space-y-1">
-                                            <label className="block text-xs text-gray-600">Nota para esta clase</label>
-                                            <textarea
-                                              className="w-full border rounded-md px-2 py-1 text-base resize-y min-h-[60px]"
-                                              style={{ fontSize: '16px' }}
-                                              value={editingNote.draft}
-                                              onChange={(e) =>
-                                                setEditingNote((prev) =>
-                                                  prev && prev.classId === item.id
-                                                    ? { ...prev, draft: e.target.value }
-                                                    : prev,
-                                                )
-                                              }
-                                              placeholder="Escribí una nota sobre el rendimiento del alumno en esta clase..."
-                                            />
-                                            <div className="flex items-center justify-between gap-2">
-                                              <label className="text-[11px] text-gray-600">Visible para el alumno</label>
-                                              <Switch
-                                                checked={editingNote.visibleToStudent}
-                                                onCheckedChange={(checked) =>
-                                                  setEditingNote((prev) =>
-                                                    prev && prev.classId === item.id
-                                                      ? { ...prev, visibleToStudent: checked }
-                                                      : prev,
-                                                  )
-                                                }
-                                              />
-                                            </div>
-                                            {notesError && (
-                                              <p className="text-[11px] text-red-600">{notesError}</p>
-                                            )}
-                                            <div className="flex items-center gap-2 mt-1">
-                                              <button
-                                                type="button"
-                                                onClick={handleSaveNote}
-                                                disabled={savingNote}
-                                                className="px-3 py-1 rounded-full bg-[#3cadaf] text-white text-[11px] font-semibold hover:bg-[#31435d] disabled:opacity-60"
-                                              >
-                                                {savingNote ? 'Guardando...' : 'Guardar nota'}
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={handleCancelEditNote}
-                                                disabled={savingNote}
-                                                className="px-3 py-1 rounded-full border border-slate-300 text-[11px] text-slate-700 bg-white hover:bg-slate-50"
-                                              >
-                                                Cancelar
-                                              </button>
-                                            </div>
-                                          </div>
-                                        ) : (
-                                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                                            <p className="text-[12px] text-gray-700">
-                                              {firstNote ? (
-                                                <>
-                                                  <span className="font-semibold">
-                                                    {firstNote.coach_id ? 'Tu nota:' : 'Nota del admin:'}
-                                                  </span>{' '}
-                                                  <span className="font-semibold">{firstNote.note}</span>
-                                                </>
-                                              ) : (
-                                                'Aún no dejaste una nota para esta clase.'
-                                              )}
-                                            </p>
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                handleStartEditNote(item.id, firstNote ? firstNote.note : '')
-                                              }
-                                              disabled={!coachCanEditThisNote}
-                                              className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
-                                            >
-                                              <StickyNote className="w-3.5 h-3.5 text-[#3cadaf]" />
-                                              {firstNote ? 'Editar nota' : 'Agregar nota'}
-                                            </button>
-                                            {!coachCanEditThisNote && (
-                                              <p className="text-[11px] text-gray-500">
-                                                Esta nota fue creada por un admin. No podés editarla.
-                                              </p>
-                                            )}
-                                          </div>
-                                        )}
-                                      </div>
-                                    ) : isAdmin ? (
-                                      <div className="space-y-1">
-                                        {editingNote && editingNote.classId === item.id ? (
-                                          <div className="space-y-2">
-                                            <label className="block text-xs text-gray-600">Nota para el alumno (en esta clase)</label>
-                                            <textarea
-                                              className="w-full border rounded-md px-2 py-1 text-base resize-y min-h-[60px]"
-                                              style={{ fontSize: '16px' }}
-                                              value={editingNote.draft}
-                                              onChange={(e) =>
-                                                setEditingNote((prev) =>
-                                                  prev && prev.classId === item.id
-                                                    ? { ...prev, draft: e.target.value }
-                                                    : prev,
-                                                )
-                                              }
-                                              placeholder="Escribí una nota para el alumno..."
-                                            />
-                                            <div className="flex items-center justify-between gap-2">
-                                              <label className="text-[11px] text-gray-600">Visible para el profesor</label>
-                                              <Switch
-                                                checked={editingNote.visibleToCoach}
-                                                onCheckedChange={(checked) =>
-                                                  setEditingNote((prev) =>
-                                                    prev && prev.classId === item.id
-                                                      ? { ...prev, visibleToCoach: checked }
-                                                      : prev,
-                                                  )
-                                                }
-                                              />
-                                            </div>
-                                            <div className="flex items-center justify-between gap-2">
-                                              <label className="text-[11px] text-gray-600">Visible para el alumno</label>
-                                              <Switch
-                                                checked={editingNote.visibleToStudent}
-                                                onCheckedChange={(checked) =>
-                                                  setEditingNote((prev) =>
-                                                    prev && prev.classId === item.id
-                                                      ? { ...prev, visibleToStudent: checked }
-                                                      : prev,
-                                                  )
-                                                }
-                                              />
-                                            </div>
-                                            {notesError && (
-                                              <p className="text-[11px] text-red-600">{notesError}</p>
-                                            )}
-                                            <div className="flex items-center gap-2">
-                                              <button
-                                                type="button"
-                                                onClick={handleSaveNote}
-                                                disabled={savingNote}
-                                                className="px-3 py-1 rounded-full bg-[#3cadaf] text-white text-[11px] font-semibold hover:bg-[#31435d] disabled:opacity-60"
-                                              >
-                                                {savingNote ? 'Guardando...' : 'Guardar nota'}
-                                              </button>
-                                              <button
-                                                type="button"
-                                                onClick={handleCancelEditNote}
-                                                disabled={savingNote}
-                                                className="px-3 py-1 rounded-full border border-slate-300 text-[11px] text-slate-700 bg-white hover:bg-slate-50"
-                                              >
-                                                Cancelar
-                                              </button>
-                                            </div>
-                                          </div>
-                                        ) : (
-                                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                                            <p className="text-[12px] text-gray-700">
-                                              {firstNote ? (
-                                                <>
-                                                  <span className="font-semibold">Nota:</span>{' '}
-                                                  <span className="font-semibold">{firstNote.note}</span>
-                                                </>
-                                              ) : (
-                                                'Aún no hay nota para esta clase.'
-                                              )}
-                                            </p>
-                                            <button
-                                              type="button"
-                                              onClick={() =>
-                                                handleStartEditNote(item.id, firstNote ? firstNote.note : '')
-                                              }
-                                              className="inline-flex items-center gap-1 rounded-full border border-slate-300 bg-white px-2.5 py-0.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
-                                            >
-                                              <StickyNote className="w-3.5 h-3.5 text-[#3cadaf]" />
-                                              {firstNote ? 'Editar nota' : 'Agregar nota'}
-                                            </button>
-                                          </div>
-                                        )}
-                                      </div>
-                                    ) : role === 'student' && firstNote ? (
-                                      <p className="text-[13px] text-gray-700">
-                                        <span className="font-semibold">Nota del profesor:</span>{' '}
-                                        <span className="font-semibold">{firstNote.note}</span>
-                                      </p>
-                                    ) : null}
-                                  </td>
-                                </tr>
-                              ),
-                            ];
-                          });
-
-                          return [headerRow, ...rows];
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              );
-            };
-
-            return (
-              <>
-                {renderSection('Histórico confirmado', confirmed)}
-                {renderSection('Reservas pendientes de confirmar', pending)}
-              </>
-            );
-          })()}
+                    return (
+                      <>
+                        {planOptions.length > 1 && (
+                          <div className="flex items-center justify-between gap-3">
+                            <label className="text-xs text-slate-600">Plan</label>
+                            <select
+                              className="h-9 w-full max-w-[360px] rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700"
+                              value={historySelectedPlanId}
+                              onChange={(e) => setHistorySelectedPlanId(e.target.value)}
+                            >
+                              {planOptions.map((opt) => (
+                                <option key={opt.id} value={opt.id}>
+                                  {opt.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                        {renderSection('Histórico confirmado', confirmed)}
+                        {renderSection('Reservas pendientes de confirmar', pending)}
+                      </>
+                    );
+                  })()}
                 </div>
               )}
             </div>
