@@ -525,6 +525,25 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    try {
+      await supabaseAdmin.from('audit_logs').insert({
+        action: 'user_created',
+        entity: 'user',
+        entity_id: newUserId,
+        user_id: currentUserId,
+        payload: {
+          academy_id: academyId ?? null,
+          roles: uniqueRoles,
+          main_role: mainRole,
+          new_user_email: email,
+          new_user_full_name: fullName,
+          created_by_role: currentRole,
+        },
+      });
+    } catch {
+      // ignore
+    }
+
     return NextResponse.json({ success: true });
   } catch (err: any) {
     return NextResponse.json(

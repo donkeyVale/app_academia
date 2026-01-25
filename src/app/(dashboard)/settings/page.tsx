@@ -894,6 +894,12 @@ const onSaveRentFees = async () => {
               >
                 Sedes y canchas
               </Link>
+              <Link
+                href="/super-admin/billing"
+                className="inline-flex items-center rounded-md bg-emerald-600 px-4 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-emerald-700"
+              >
+                Facturación Agendo
+              </Link>
             </div>
           </div>
         </div>
