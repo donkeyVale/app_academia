@@ -21,7 +21,7 @@ type Props = {
 };
 
 export function NotificationsMenuItem({ userId, onUnreadCountChange }: Props) {
-  const supabase = createClientBrowser();
+  const supabase = useMemo(() => createClientBrowser(), []);
   const router = useRouter();
 
   const [open, setOpen] = useState(false);

@@ -103,7 +103,7 @@ const IconUsers = (props: React.SVGProps<SVGSVGElement>) => (
 type AppRole = 'super_admin' | 'admin' | 'coach' | 'student' | null;
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const supabase = createClientBrowser();
+  const supabase = useMemo(() => createClientBrowser(), []);
   const router = useRouter();
   const avatarMenuRef = useRef<HTMLDivElement | null>(null);
   const avatarButtonRef = useRef<HTMLButtonElement>(null);

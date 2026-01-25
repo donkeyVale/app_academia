@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { createClientBrowser } from "@/lib/supabase";
@@ -15,7 +15,7 @@ type Academy = {
 };
 
 export default function AcademiesPage() {
-  const supabase = createClientBrowser();
+  const supabase = useMemo(() => createClientBrowser(), []);
   const [role, setRole] = useState<AppRole>(null);
   const [loadingUser, setLoadingUser] = useState(true);
   const [loading, setLoading] = useState(false);

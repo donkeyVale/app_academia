@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { createClientBrowser } from "@/lib/supabase";
@@ -91,7 +91,7 @@ function DatePickerField({ value, onChange }: DatePickerFieldProps) {
 }
 
 export default function SettingsPage() {
-  const supabase = createClientBrowser();
+  const supabase = useMemo(() => createClientBrowser(), []);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);

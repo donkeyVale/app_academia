@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { createClientBrowser } from "@/lib/supabase";
@@ -36,7 +36,7 @@ function getLocalYmdFromIso(iso: string, timeZone: string): string {
 }
 
 export default function AdminHomeIncomeExpensesCard() {
-  const supabase = createClientBrowser();
+  const supabase = useMemo(() => createClientBrowser(), []);
   const router = useRouter();
 
   const [role, setRole] = useState<Role>(null);

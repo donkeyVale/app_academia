@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClientBrowser, createClientBrowserJs } from '@/lib/supabase';
 import { PasswordInput } from '@/components/ui/password-input';
 import { toast } from 'sonner';
@@ -17,6 +17,8 @@ import {
 
 export default function LoginPage() {
   const supabase = useMemo(() => createClientBrowser(), []);
+  const isSubmittingRef = useRef(false);
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,6 +35,17 @@ export default function LoginPage() {
     return params.get('inactive') === '1' ? inactiveMsg : null;
   };
   const [info, setInfo] = useState<string | null>(() => getInactiveInfoFromUrl());
+
+  const cooldownActive = useMemo(() => {
+    if (!cooldownUntil) return false;
+    return Date.now() < cooldownUntil;
+  }, [cooldownUntil]);
+
+  const cooldownSecondsLeft = useMemo(() => {
+    if (!cooldownUntil) return 0;
+    const diff = Math.ceil((cooldownUntil - Date.now()) / 1000);
+    return diff > 0 ? diff : 0;
+  }, [cooldownUntil]);
 
   useEffect(() => {
     const msg = getInactiveInfoFromUrl();
@@ -113,14 +126,26 @@ export default function LoginPage() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (cooldownActive) return;
     if (loading) return;
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setLoading(true);
     setError(null);
     setInfo(null);
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        setError(error.message);
+        const anyErr = error as any;
+        const code = String(anyErr?.code ?? '').trim();
+        const status = Number(anyErr?.status ?? 0);
+        if (status === 429 || code === 'over_request_rate_limit') {
+          // Evitar que el usuario dispare más requests mientras Supabase está rate limited.
+          setCooldownUntil(Date.now() + 60_000);
+          setError('Se alcanzó el límite de intentos. Esperá 60 segundos y volvé a intentar.');
+        } else {
+          setError(error.message);
+        }
         return;
       }
 
@@ -138,6 +163,7 @@ export default function LoginPage() {
       await finishLoginRedirect();
     } finally {
       setLoading(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -347,9 +373,13 @@ export default function LoginPage() {
 
           <button
             className="w-full bg-[#3cadaf] hover:bg-[#31435d] text-white h-10 rounded-md text-base md:text-sm font-medium disabled:opacity-50 transition-colors"
-            disabled={loading}
+            disabled={loading || cooldownActive}
           >
-            {loading ? 'Ingresando...' : 'Ingresar'}
+            {loading
+              ? 'Ingresando...'
+              : cooldownActive
+                ? `Esperá ${cooldownSecondsLeft}s`
+                : 'Ingresar'}
           </button>
 
           {biometricEnabled && biometricAvailable && (

@@ -16,7 +16,7 @@ type NotificationRow = {
 };
 
 export function NotificationsBell() {
-  const supabase = createClientBrowser();
+  const supabase = useMemo(() => createClientBrowser(), []);
   const router = useRouter();
 
   const [userId, setUserId] = useState<string | null>(null);

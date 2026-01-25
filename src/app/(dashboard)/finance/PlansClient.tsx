@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClientBrowser } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -132,7 +132,7 @@ type PaymentRow = {
 };
 
 export default function PlansClient() {
-  const supabase = createClientBrowser();
+  const supabase = useMemo(() => createClientBrowser(), []);
   const [plans, setPlans] = useState<Plan[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [studentPlans, setStudentPlans] = useState<StudentPlanRow[]>([]);
@@ -754,12 +754,14 @@ export default function PlansClient() {
         .eq('student_id', reportStudentId);
       if (attErr) throw attErr;
 
-      let rows = (attData ?? []).map((row: any) => ({
-        classId: row.class_id as string,
-        date: row.class_sessions?.date as string,
-        present: !!row.present,
-        consumedPlan: usedClassIds.has(row.class_id as string),
-      }));
+      let rows: { classId: string; date: string; present: boolean; consumedPlan: boolean }[] = (attData ?? []).map(
+        (row: any) => ({
+          classId: row.class_id as string,
+          date: row.class_sessions?.date as string,
+          present: !!row.present,
+          consumedPlan: usedClassIds.has(row.class_id as string),
+        })
+      );
 
       if (planRow.purchased_at) {
         const purchasedTs = new Date(planRow.purchased_at).getTime();

@@ -118,7 +118,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 type AppRole = 'super_admin' | 'admin' | 'coach' | 'student' | null;
 
 export default function Page() {
-  const supabase = createClientBrowser();
+  const supabase = useMemo(() => createClientBrowser(), []);
   const router = useRouter();
   const avatarMenuRef = useRef<HTMLDivElement | null>(null);
   const avatarButtonRef = useRef<HTMLButtonElement>(null);

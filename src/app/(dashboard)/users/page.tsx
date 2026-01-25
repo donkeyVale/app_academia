@@ -104,7 +104,7 @@ type AcademyOption = {
 };
 
 export default function UsersPage() {
-  const supabase = createClientBrowser();
+  const supabase = useMemo(() => createClientBrowser(), []);
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');

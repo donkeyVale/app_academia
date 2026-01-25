@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClientBrowser } from "@/lib/supabase";
 import { UserCircle2, Upload, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -76,7 +76,7 @@ function DatePickerField({ value, onChange }: DatePickerFieldProps) {
 }
 
 export default function ProfilePage() {
-  const supabase = createClientBrowser();
+  const supabase = useMemo(() => createClientBrowser(), []);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

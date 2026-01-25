@@ -306,7 +306,7 @@ function DatePickerField({ value, onChange }: DatePickerFieldProps) {
 }
 
 export default function ReportsPage() {
-  const supabase = createClientBrowser();
+  const supabase = useMemo(() => createClientBrowser(), []);
   const CLASS_DURATION_MINUTES = 60;
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");

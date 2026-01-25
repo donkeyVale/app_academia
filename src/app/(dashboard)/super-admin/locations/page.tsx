@@ -34,7 +34,7 @@ type AcademyLocation = {
 };
 
 export default function LocationsAdminPage() {
-  const supabase = createClientBrowser();
+  const supabase = useMemo(() => createClientBrowser(), []);
   const [role, setRole] = useState<AppRole>(null);
   const [loadingUser, setLoadingUser] = useState(true);
   const [loadingData, setLoadingData] = useState(false);

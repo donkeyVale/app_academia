@@ -18,7 +18,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 export function PushPermissionPrompt() {
-  const supabase = createClientBrowser();
+  const supabase = useMemo(() => createClientBrowser(), []);
   const [dismissed, setDismissed] = useState(() => {
     if (typeof window === "undefined") return false;
     try {

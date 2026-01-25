@@ -30,7 +30,7 @@ type UserAcademy = {
 };
 
 export default function AssignmentsPage() {
-  const supabase = createClientBrowser();
+  const supabase = useMemo(() => createClientBrowser(), []);
   const [role, setRole] = useState<AppRole>(null);
   const [loadingUser, setLoadingUser] = useState(true);
   const [loadingData, setLoadingData] = useState(false);
