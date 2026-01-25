@@ -11,6 +11,7 @@ import { PushPermissionPrompt } from '@/components/push-permission-prompt';
 import { NotificationsMenuItem } from '@/components/notifications-menu-item';
 import { AgendoLogo } from '@/components/agendo-logo';
 import AdminHomeIncomeExpensesCard from '@/app/(dashboard)/AdminHomeIncomeExpensesCard';
+import SuperAdminHomeClient from '@/app/(dashboard)/SuperAdminHomeClient';
 import { useRouter } from 'next/navigation';
 import { createClientBrowser } from "@/lib/supabase";
 import { toast } from "sonner";
@@ -117,6 +118,21 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 
 type AppRole = 'super_admin' | 'admin' | 'coach' | 'student' | null;
 
+const IMPERSONATE_KEY = 'impersonateAcademyId';
+const IMPERSONATE_EVT = 'impersonateAcademyIdChanged';
+const LS_PREV_KEY = 'selectedAcademyIdBeforeImpersonation';
+const LS_NAME_KEY = 'impersonateAcademyName';
+
+type SuperAdminAuditRow = {
+  id: string;
+  created_at: string;
+  action: string;
+  entity: string;
+  entity_id: string | null;
+  user_id: string | null;
+  payload: any;
+};
+
 export default function Page() {
   const supabase = useMemo(() => createClientBrowser(), []);
   const router = useRouter();
@@ -140,6 +156,16 @@ export default function Page() {
     if (typeof window === 'undefined') return null;
     return window.localStorage.getItem('selectedAcademyId');
   });
+  const [impersonateAcademyId, setImpersonateAcademyId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const v = window.localStorage.getItem(IMPERSONATE_KEY);
+    return v && v.trim() ? v : null;
+  });
+  const [impersonateAcademyName, setImpersonateAcademyName] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const v = window.localStorage.getItem(LS_NAME_KEY);
+    return v && v.trim() ? v : null;
+  });
   const [academyOptions, setAcademyOptions] = useState<{ id: string; name: string }[]>([]);
   const [hasAcademies, setHasAcademies] = useState<boolean | null>(null);
   const [academyLocationIds, setAcademyLocationIds] = useState<Set<string>>(new Set());
@@ -159,6 +185,55 @@ export default function Page() {
   const [studentUpcomingClasses, setStudentUpcomingClasses] = useState(0);
   const [studentRemainingClasses, setStudentRemainingClasses] = useState<number | null>(null);
 
+  const [superAdminTotalUsers, setSuperAdminTotalUsers] = useState<number | null>(null);
+  const [superAdminCountsByAcademy, setSuperAdminCountsByAcademy] = useState<
+    Record<string, { admin: number; coach: number; student: number; total: number }>
+  >({});
+  const [superAdminAudit, setSuperAdminAudit] = useState<SuperAdminAuditRow[]>([]);
+
+  const superAdminRecentStudentCreates = useMemo(() => {
+    const now = Date.now();
+    const fromTs = now - 30 * 24 * 60 * 60 * 1000;
+
+    const rows = (superAdminAudit ?? [])
+      .filter((r) => r.action === 'user_created')
+      .filter((r) => {
+        const ts = new Date(r.created_at).getTime();
+        return Number.isFinite(ts) && ts >= fromTs;
+      })
+      .filter((r) => {
+        const p = r.payload as any;
+        const main = String(p?.main_role ?? '').trim();
+        if (main === 'student') return true;
+        const roles = Array.isArray(p?.roles) ? (p.roles as any[]) : [];
+        return roles.includes('student');
+      });
+
+    const byAcademy: Record<
+      string,
+      {
+        academyName: string;
+        days: Record<string, { createdAt: string; fullName: string; email: string }[]>;
+      }
+    > = {};
+
+    for (const r of rows) {
+      const p = r.payload as any;
+      const academyId = String(p?.academy_id ?? '').trim();
+      if (!academyId) continue;
+
+      const academyName = academyOptions.find((a) => a.id === academyId)?.name ?? academyId;
+      const day = String(r.created_at).slice(0, 10);
+      const fullName = String(p?.new_user_full_name ?? '').trim();
+      const email = String(p?.new_user_email ?? '').trim();
+
+      const bucket = (byAcademy[academyId] ||= { academyName, days: {} });
+      (bucket.days[day] ||= []).push({ createdAt: r.created_at, fullName, email });
+    }
+
+    return byAcademy;
+  }, [superAdminAudit, academyOptions]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut(isBiometricEnabled() ? ({ scope: 'local' } as any) : undefined);
     window.location.href = '/login';
@@ -174,6 +249,60 @@ export default function Page() {
     const id = window.setInterval(() => setScheduleBadgeTick(Date.now()), 60 * 1000);
     return () => window.clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const read = () => {
+      const v = window.localStorage.getItem(IMPERSONATE_KEY);
+      setImpersonateAcademyId(v && v.trim() ? v : null);
+      const n = window.localStorage.getItem(LS_NAME_KEY);
+      setImpersonateAcademyName(n && n.trim() ? n : null);
+    };
+    read();
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === IMPERSONATE_KEY) read();
+      if (e.key === LS_NAME_KEY) read();
+    };
+    const onEvt = () => read();
+    window.addEventListener('storage', onStorage);
+    window.addEventListener(IMPERSONATE_EVT, onEvt as EventListener);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener(IMPERSONATE_EVT, onEvt as EventListener);
+    };
+  }, []);
+
+  const effectiveRole: AppRole = useMemo(() => {
+    if (role === 'super_admin' && impersonateAcademyId) return 'admin';
+    return role;
+  }, [role, impersonateAcademyId]);
+
+  useEffect(() => {
+    // Solo un super_admin puede impersonar; si un admin normal abre el sitio con localStorage sucio, limpiamos.
+    if (role === null) return;
+    if (role === 'super_admin') return;
+    if (!impersonateAcademyId) return;
+    try {
+      window.localStorage.removeItem(IMPERSONATE_KEY);
+      window.localStorage.removeItem(LS_PREV_KEY);
+      window.dispatchEvent(new CustomEvent(IMPERSONATE_EVT, { detail: { academyId: null } }));
+    } catch {
+      // ignore
+    }
+  }, [role, impersonateAcademyId]);
+
+  const onExitImpersonation = () => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.removeItem(IMPERSONATE_KEY);
+    window.dispatchEvent(new CustomEvent(IMPERSONATE_EVT, { detail: { academyId: null } }));
+
+    const prev = window.localStorage.getItem(LS_PREV_KEY);
+    if (prev && prev.trim()) {
+      window.localStorage.setItem('selectedAcademyId', prev);
+      window.dispatchEvent(new CustomEvent('selectedAcademyIdChanged', { detail: { academyId: prev } }));
+    }
+    window.localStorage.removeItem(LS_PREV_KEY);
+  };
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1044,8 +1173,61 @@ export default function Page() {
       }
     })();
 
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [supabase, role, selectedAcademyId, academyLocationIds, hasAcademies]);
+
+  useEffect(() => {
+    if (role !== 'super_admin') return;
+    let active = true;
+    (async () => {
+      try {
+        const [{ count: usersCount, error: usersErr }, { data: uaRows, error: uaErr }, { data: auditRows, error: auditErr }] =
+          await Promise.all([
+            supabase.from('profiles').select('id', { count: 'exact', head: true }),
+            supabase.from('user_academies').select('academy_id, role, is_active'),
+            supabase
+              .from('audit_logs')
+              .select('id, created_at, action, entity, entity_id, user_id, payload')
+              .order('created_at', { ascending: false })
+              .limit(25),
+          ]);
+
+        if (!active) return;
+        if (usersErr) throw usersErr;
+        if (uaErr) throw uaErr;
+        if (auditErr) throw auditErr;
+
+        setSuperAdminTotalUsers(usersCount ?? 0);
+
+        const nextCounts: Record<string, { admin: number; coach: number; student: number; total: number }> = {};
+        for (const row of (uaRows ?? []) as any[]) {
+          const academyId = row?.academy_id as string | null;
+          const r = row?.role as 'admin' | 'coach' | 'student' | null;
+          const isActive = (row?.is_active as boolean | null) ?? true;
+          if (!academyId) continue;
+          if (!isActive) continue;
+          if (r !== 'admin' && r !== 'coach' && r !== 'student') continue;
+          const bucket = (nextCounts[academyId] ||= { admin: 0, coach: 0, student: 0, total: 0 });
+          bucket[r] += 1;
+          bucket.total += 1;
+        }
+        setSuperAdminCountsByAcademy(nextCounts);
+
+        setSuperAdminAudit((auditRows ?? []) as any);
+      } catch {
+        if (!active) return;
+        setSuperAdminTotalUsers(null);
+        setSuperAdminCountsByAcademy({});
+        setSuperAdminAudit([]);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [role, supabase]);
 
   // Cargar locations vinculadas a la academia seleccionada (para filtrar métricas por sede)
   useEffect(() => {
@@ -1117,18 +1299,107 @@ export default function Page() {
     );
   }
 
+  if (isSuperAdmin && !impersonateAcademyId) {
+    return (
+      <>
+        <SuperAdminHomeClient userEmail={userName ?? ''} />
+
+        <PwaInstallPrompt />
+
+        <PushPermissionPrompt />
+
+        <FooterNav
+          isAdmin={true}
+          isSuperAdmin={true}
+          canSeeReports={true}
+          canSeeFinance={false}
+          canSeeSettings={true}
+          studentsLabel="Alumnos"
+          scheduleBadgeCount={scheduleBadgeCount}
+          rightSlot={(
+            <div ref={avatarMenuRef} className="relative flex items-center">
+              <FooterAvatarButton
+                ref={avatarButtonRef}
+                avatarUrl={avatarUrl}
+                initials={initials}
+                avatarOffsetX={avatarOffsetX}
+                avatarOffsetY={avatarOffsetY}
+                unreadBadgeText={unreadLabel}
+                hasUnread={unreadCount > 0}
+                isMenuOpen={avatarMenuOpen}
+                onClick={() => setAvatarMenuOpen((v) => !v)}
+              />
+              {avatarMenuOpen && (
+                <div
+                  ref={avatarMenuPanelRef}
+                  role="menu"
+                  className="absolute bottom-12 right-0 w-48 rounded-md border bg-white shadow-lg text-xs sm:text-sm py-1.5 z-50"
+                >
+                  {userId && (
+                    <NotificationsMenuItem userId={userId} onUnreadCountChange={setUnreadCount} />
+                  )}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="w-full flex items-center gap-2 px-3.5 py-2 hover:bg-gray-50 text-left"
+                    onClick={() => {
+                      setAvatarMenuOpen(false);
+                      router.push('/profile');
+                    }}
+                  >
+                    <UserCircle2 className="w-3.5 h-3.5" />
+                    <span>Mi perfil</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="w-full flex items-center gap-2 px-3.5 py-2 hover:bg-red-50 text-left text-red-600"
+                    onClick={() => {
+                      setAvatarMenuOpen(false);
+                      handleLogout();
+                    }}
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Cerrar sesión</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        />
+      </>
+    );
+  }
+
   return (
     <section
       className="space-y-6 max-w-5xl mx-auto px-4 pt-6"
       style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)' }}
     >
+      {isSuperAdmin && impersonateAcademyId && (
+        <div className="sticky top-0 z-30 -mx-4 px-4 py-2 bg-amber-50 border-b border-amber-200">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-xs text-amber-900 truncate">
+              Modo admin activo · Academia:{' '}
+              <span className="font-semibold">{impersonateAcademyName ?? impersonateAcademyId}</span>
+            </div>
+            <button
+              type="button"
+              onClick={onExitImpersonation}
+              className="inline-flex items-center rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-amber-700"
+            >
+              Volver a Super Admin
+            </button>
+          </div>
+        </div>
+      )}
       <div className="flex items-center justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold text-[#31435d]">
             Hola {userName ?? '...'}
           </h1>
           <p className="text-sm text-gray-600">
-            {role === 'student'
+            {effectiveRole === 'student'
               ? 'Revisá tus próximas clases y tu plan en un solo lugar.'
               : 'Gestioná tu agenda desde un solo lugar.'}
           </p>
@@ -1466,11 +1737,11 @@ export default function Page() {
 
       <FooterNav
         isAdmin={isAdmin}
-        isStudent={role === 'student'}
-        canSeeReports={role === 'admin' || role === 'super_admin'}
-        canSeeFinance={role === 'admin' || role === 'super_admin'}
-        canSeeSettings={role === 'admin' || role === 'coach' || role === 'student' || role === 'super_admin'}
-        studentsLabel={role === 'student' ? 'Mi cuenta' : 'Alumnos'}
+        isStudent={effectiveRole === 'student'}
+        canSeeReports={effectiveRole === 'admin'}
+        canSeeFinance={effectiveRole === 'admin'}
+        canSeeSettings={effectiveRole === 'admin' || effectiveRole === 'coach' || effectiveRole === 'student'}
+        studentsLabel={effectiveRole === 'student' ? 'Mi cuenta' : 'Alumnos'}
         scheduleBadgeCount={scheduleBadgeCount}
         rightSlot={(
           <div ref={avatarMenuRef} className="relative flex items-center">

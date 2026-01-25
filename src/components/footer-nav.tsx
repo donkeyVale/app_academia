@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarDays, Users, CreditCard, UserCog, BarChart3, Settings, MoreHorizontal } from "lucide-react";
+import { CalendarDays, Users, CreditCard, UserCog, BarChart3, Settings, MoreHorizontal, Building2, MapPin } from "lucide-react";
+import { usePathname } from "next/navigation";
 import React, { useState } from "react";
 
 interface FooterNavProps {
   isAdmin: boolean;
+  isSuperAdmin?: boolean;
   isStudent?: boolean;
   canSeeReports?: boolean;
   canSeeFinance?: boolean;
@@ -15,7 +17,8 @@ interface FooterNavProps {
   rightSlot: React.ReactNode;
 }
 
-export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, canSeeSettings, studentsLabel, scheduleBadgeCount, rightSlot }: FooterNavProps) {
+export function FooterNav({ isAdmin, isSuperAdmin, isStudent, canSeeReports, canSeeFinance, canSeeSettings, studentsLabel, scheduleBadgeCount, rightSlot }: FooterNavProps) {
+  const pathname = usePathname();
   const showReports = canSeeReports !== false;
   const showFinance = canSeeFinance !== false;
   const showSettings = canSeeSettings === true;
@@ -23,7 +26,7 @@ export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, ca
   // Caso típico de alumno: solo 3 ítems (Agenda, Mi cuenta, Configuración)
   const isStudentCompactNav = !isAdmin && !showReports && !showFinance && showSettings;
   const [moreOpen, setMoreOpen] = useState(false);
-  const useMobileAdminCompactMenu = isAdmin;
+  const useMobileAdminCompactMenu = isAdmin && !isSuperAdmin;
 
   const scheduleBadgeLabel = (() => {
     const n = Number(scheduleBadgeCount ?? 0);
@@ -32,13 +35,95 @@ export function FooterNav({ isAdmin, isStudent, canSeeReports, canSeeFinance, ca
     return String(n);
   })();
 
+  const showSuperAdminSubNav =
+    !!isSuperAdmin &&
+    (pathname === '/super-admin/academias' ||
+      pathname === '/super-admin/asignaciones' ||
+      pathname === '/super-admin/locations');
+
   return (
     <nav
       className="fixed bottom-0 inset-x-0 border-t bg-white/95 backdrop-blur-sm"
       style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}
     >
+      {showSuperAdminSubNav && (
+        <div className="border-t bg-white/95 backdrop-blur-sm">
+          <div className="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-2 text-[11px]">
+            <Link
+              href="/super-admin/academias"
+              className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-2 py-1 border ${
+                pathname === '/super-admin/academias' ? 'bg-gray-50 border-gray-300' : 'bg-white border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              <Building2 className="w-4 h-4 text-[#3cadaf]" />
+              <span>Academias</span>
+            </Link>
+            <Link
+              href="/super-admin/asignaciones"
+              className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-2 py-1 border ${
+                pathname === '/super-admin/asignaciones'
+                  ? 'bg-gray-50 border-gray-300'
+                  : 'bg-white border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              <Users className="w-4 h-4 text-[#6366f1]" />
+              <span>Asignaciones</span>
+            </Link>
+            <Link
+              href="/super-admin/locations"
+              className={`flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-2 py-1 border ${
+                pathname === '/super-admin/locations' ? 'bg-gray-50 border-gray-300' : 'bg-white border-gray-200 hover:bg-gray-50'
+              }`}
+            >
+              <MapPin className="w-4 h-4 text-[#0f172a]" />
+              <span>Complejos</span>
+            </Link>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-        {useMobileAdminCompactMenu ? (
+        {isSuperAdmin ? (
+          <>
+            <div className="flex-1 flex items-center justify-between text-xs">
+              <Link
+                href="/super-admin/academias"
+                className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
+              >
+                <Building2 className="w-5 h-5 text-[#3cadaf]" />
+                <span>Academias</span>
+              </Link>
+              <Link
+                href="/super-admin/billing"
+                className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
+              >
+                <CreditCard className="w-5 h-5 text-[#3cadaf]" />
+                <span>Facturación</span>
+              </Link>
+              <Link
+                href="/users"
+                className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
+              >
+                <UserCog className="w-5 h-5 text-[#f97316]" />
+                <span>Usuarios</span>
+              </Link>
+              <Link
+                href="/reports"
+                className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
+              >
+                <BarChart3 className="w-5 h-5 text-[#6366f1]" />
+                <span>Reportes</span>
+              </Link>
+              <Link
+                href="/settings"
+                className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
+              >
+                <Settings className="w-5 h-5 text-[#64748b]" />
+                <span>Config</span>
+              </Link>
+            </div>
+          </>
+        ) : useMobileAdminCompactMenu ? (
           <>
             <div className="flex-1 sm:hidden flex items-center justify-between text-xs">
               <Link

@@ -1,9 +1,25 @@
 import { requireUser } from '@/lib/auth';
+import { createClientServer } from '@/lib/supabase-server';
 import { LayoutDashboard } from 'lucide-react';
 import AdminHomeIncomeExpensesCard from './AdminHomeIncomeExpensesCard';
+import SuperAdminHomeClient from './SuperAdminHomeClient';
 
 export default async function HomePage() {
   const user = await requireUser();
+
+  const supabase = createClientServer();
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const role = (profile?.role as string | null) ?? null;
+
+  if (role === 'super_admin') {
+    return <SuperAdminHomeClient userEmail={user.email ?? ''} />;
+  }
+
   return (
     <section className="mt-4 space-y-4 max-w-5xl mx-auto px-4">
       <div className="flex items-center gap-2">

@@ -6,7 +6,7 @@ import { oneSignalLoginExternalUserId } from '@/lib/capacitor-onesignal';
 import { isBiometricEnabled } from '@/lib/capacitor-biometrics';
 import Image from 'next/image';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { CalendarDays, Users, CreditCard, UserCog, BarChart3, LogOut, UserCircle2, Smartphone } from 'lucide-react';
 import { FooterAvatarButton } from '@/components/footer-avatar-button';
 import { FooterNav } from '@/components/footer-nav';
@@ -102,9 +102,15 @@ const IconUsers = (props: React.SVGProps<SVGSVGElement>) => (
 
 type AppRole = 'super_admin' | 'admin' | 'coach' | 'student' | null;
 
+const IMPERSONATE_KEY = 'impersonateAcademyId';
+const IMPERSONATE_EVT = 'impersonateAcademyIdChanged';
+const LS_PREV_KEY = 'selectedAcademyIdBeforeImpersonation';
+const LS_NAME_KEY = 'impersonateAcademyName';
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => createClientBrowser(), []);
   const router = useRouter();
+  const pathname = usePathname();
   const avatarMenuRef = useRef<HTMLDivElement | null>(null);
   const avatarButtonRef = useRef<HTMLButtonElement>(null);
   const avatarMenuPanelRef = useRef<HTMLDivElement | null>(null);
@@ -114,10 +120,28 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [avatarOffsetX, setAvatarOffsetX] = useState(0);
   const [avatarOffsetY, setAvatarOffsetY] = useState(0);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [role, setRole] = useState<AppRole>(null);
+  const [role, setRole] = useState<AppRole>(() => {
+    if (typeof window === 'undefined') return null;
+    const v = window.localStorage.getItem('currentUserRole');
+    if (v === 'super_admin' || v === 'admin' || v === 'coach' || v === 'student') return v;
+    return null;
+  });
+  const [isAdmin, setIsAdmin] = useState(() => {
+    const r = (typeof window !== 'undefined' ? window.localStorage.getItem('currentUserRole') : null) as AppRole;
+    return r === 'admin' || r === 'super_admin';
+  });
   const [academyOptions, setAcademyOptions] = useState<{ id: string; name: string }[]>([]);
   const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
+  const [impersonateAcademyId, setImpersonateAcademyId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const v = window.localStorage.getItem(IMPERSONATE_KEY);
+    return v && v.trim() ? v : null;
+  });
+  const [impersonateAcademyName, setImpersonateAcademyName] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const v = window.localStorage.getItem(LS_NAME_KEY);
+    return v && v.trim() ? v : null;
+  });
 
   const [userId, setUserId] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -149,6 +173,87 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const id = window.setInterval(() => setScheduleBadgeTick(Date.now()), 60 * 1000);
     return () => window.clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const read = () => {
+      const v = window.localStorage.getItem(IMPERSONATE_KEY);
+      setImpersonateAcademyId(v && v.trim() ? v : null);
+      const n = window.localStorage.getItem(LS_NAME_KEY);
+      setImpersonateAcademyName(n && n.trim() ? n : null);
+    };
+    read();
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === IMPERSONATE_KEY) read();
+      if (e.key === LS_NAME_KEY) read();
+    };
+    const onEvt = () => read();
+    window.addEventListener('storage', onStorage);
+    window.addEventListener(IMPERSONATE_EVT, onEvt as EventListener);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener(IMPERSONATE_EVT, onEvt as EventListener);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!impersonateAcademyId) return;
+    // Esperar a que el rol real esté resuelto antes de limpiar.
+    if (role === null) return;
+    // Solo un super_admin puede impersonar; si no lo es, limpiamos por seguridad.
+    if (role !== 'super_admin') {
+      try {
+        window.localStorage.removeItem(IMPERSONATE_KEY);
+        window.localStorage.removeItem(LS_PREV_KEY);
+        window.dispatchEvent(new CustomEvent(IMPERSONATE_EVT, { detail: { academyId: null } }));
+      } catch {
+        // ignore
+      }
+      return;
+    }
+
+    // Si está impersonando, no permitir entrar a módulos super-admin
+    if (pathname.startsWith('/super-admin')) {
+      router.replace('/');
+    }
+  }, [impersonateAcademyId, pathname, router]);
+
+  useEffect(() => {
+    // Cleanup defensivo: si el rol real no es super_admin, nunca debe quedar activa la impersonación.
+    if (role === null) return;
+    if (role === 'super_admin') return;
+    if (!impersonateAcademyId) return;
+    try {
+      window.localStorage.removeItem(IMPERSONATE_KEY);
+      window.localStorage.removeItem(LS_PREV_KEY);
+      window.dispatchEvent(new CustomEvent(IMPERSONATE_EVT, { detail: { academyId: null } }));
+    } catch {
+      // ignore
+    }
+  }, [role, impersonateAcademyId]);
+
+  const onExitImpersonation = () => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.removeItem(IMPERSONATE_KEY);
+    window.dispatchEvent(new CustomEvent(IMPERSONATE_EVT, { detail: { academyId: null } }));
+
+    const prev = window.localStorage.getItem(LS_PREV_KEY);
+    if (prev && prev.trim()) {
+      window.localStorage.setItem('selectedAcademyId', prev);
+      window.dispatchEvent(new CustomEvent('selectedAcademyIdChanged', { detail: { academyId: prev } }));
+    }
+    window.localStorage.removeItem(LS_PREV_KEY);
+    router.replace('/');
+  };
+
+  const effectiveRole: AppRole = useMemo(() => {
+    if (role === 'super_admin' && impersonateAcademyId) return 'admin';
+    return role;
+  }, [role, impersonateAcademyId]);
+
+  const effectiveIsAdmin = useMemo(() => {
+    return effectiveRole === 'admin' || role === 'super_admin';
+  }, [effectiveRole, role]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -630,8 +735,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div
       className="min-h-dvh bg-gray-50"
-      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)' }}
+      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 140px)' }}
     >
+      {role === 'super_admin' && impersonateAcademyId && (
+        <div className="sticky top-0 z-30 bg-amber-50 border-b border-amber-200">
+          <div className="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
+            <div className="text-xs text-amber-900 truncate">
+              Modo admin activo · Academia:{' '}
+              <span className="font-semibold">{impersonateAcademyName ?? impersonateAcademyId}</span>
+            </div>
+            <button
+              type="button"
+              onClick={onExitImpersonation}
+              className="inline-flex items-center rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-amber-700"
+            >
+              Volver a Super Admin
+            </button>
+          </div>
+        </div>
+      )}
+
       <main className="w-full flex justify-center px-4 py-3 overflow-x-hidden">
         <div className="w-full max-w-5xl">{children}</div>
       </main>
@@ -641,11 +764,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <PushPermissionPrompt />
 
       <FooterNav
-        isAdmin={isAdmin}
-        canSeeReports={role === 'admin' || role === 'super_admin'}
-        canSeeFinance={role === 'admin' || role === 'super_admin'}
-        canSeeSettings={role === 'admin' || role === 'coach' || role === 'student' || role === 'super_admin'}
-        studentsLabel={role === 'student' ? 'Mi cuenta' : 'Alumnos'}
+        isAdmin={effectiveIsAdmin}
+        isSuperAdmin={role === 'super_admin' && !impersonateAcademyId}
+        canSeeReports={effectiveRole === 'admin' || role === 'super_admin'}
+        canSeeFinance={effectiveRole === 'admin' || role === 'super_admin'}
+        canSeeSettings={effectiveRole === 'admin' || effectiveRole === 'coach' || effectiveRole === 'student' || role === 'super_admin'}
+        studentsLabel={effectiveRole === 'student' ? 'Mi cuenta' : 'Alumnos'}
         scheduleBadgeCount={scheduleBadgeCount}
         rightSlot={(
           <div ref={avatarMenuRef} className="relative flex items-center">

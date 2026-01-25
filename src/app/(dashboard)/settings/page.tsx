@@ -866,46 +866,7 @@ const onSaveRentFees = async () => {
         </div>
       )}
 
-      {role === "super_admin" && (
-        <div className="border rounded-lg bg-white shadow-sm border-t-4 border-indigo-500">
-          <div className="px-4 py-3 border-b bg-gray-50 rounded-t-lg">
-            <p className="text-sm font-semibold text-[#31435d]">Configuración avanzada (super admin)</p>
-          </div>
-          <div className="px-4 py-4 space-y-3 text-sm">
-            <p className="text-xs text-gray-600">
-              Gestioná las academias y las asignaciones de usuarios a academias.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href="/super-admin/academias"
-                className="inline-flex items-center rounded-md bg-[#3cadaf] px-4 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-[#34989e]"
-              >
-                Administrar academias
-              </Link>
-              <Link
-                href="/super-admin/asignaciones"
-                className="inline-flex items-center rounded-md bg-indigo-600 px-4 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-indigo-700"
-              >
-                Asignar academias a usuarios
-              </Link>
-              <Link
-                href="/super-admin/locations"
-                className="inline-flex items-center rounded-md bg-slate-700 px-4 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-slate-800"
-              >
-                Sedes y canchas
-              </Link>
-              <Link
-                href="/super-admin/billing"
-                className="inline-flex items-center rounded-md bg-emerald-600 px-4 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-emerald-700"
-              >
-                Facturación Agendo
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {(role === 'admin' || role === 'super_admin') && (
+      {role === 'admin' && (
         <div className="border rounded-lg bg-white shadow-sm border-t-4 border-emerald-500">
           <div className="px-4 py-3 border-b bg-gray-50 rounded-t-lg flex items-center justify-between">
             <div>
