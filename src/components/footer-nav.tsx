@@ -108,7 +108,7 @@ export function FooterNav({ isAdmin, isSuperAdmin, isStudent, canSeeReports, can
                 <span>Usuarios</span>
               </Link>
               <Link
-                href="/reports"
+                href="/super-admin/reports"
                 className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
               >
                 <BarChart3 className="w-5 h-5 text-[#6366f1]" />

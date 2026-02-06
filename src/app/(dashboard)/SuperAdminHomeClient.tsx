@@ -42,7 +42,7 @@ export default function SuperAdminHomeClient({ userEmail }: { userEmail: string 
             <span>Academias</span>
           </Link>
           <Link
-            href="/reports"
+            href="/super-admin/reports"
             className="inline-flex items-center justify-center gap-2 rounded-xl border bg-white px-3 py-2 text-xs font-medium text-[#0f172a] shadow-sm hover:bg-gray-50"
           >
             <FileText className="h-4 w-4 text-[#3cadaf]" />
