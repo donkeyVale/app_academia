@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
+import { createClientServer } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase-service';
 
 function monthLabel(year: number, month: number): string {
@@ -81,8 +82,32 @@ async function sendEmail(params: {
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = createClientServer();
+    const { data: authData, error: authErr } = await supabase.auth.getUser();
+    if (authErr || !authData.user) {
+      return NextResponse.json({ error: 'No autenticado.' }, { status: 401 });
+    }
+
+    console.log('[billing] commission-mark-paid:start', { userId: authData.user.id });
+
+    const { data: currentProfile, error: currentProfileErr } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', authData.user.id)
+      .maybeSingle();
+
+    if (currentProfileErr) {
+      return NextResponse.json({ error: 'No se pudo verificar permisos.' }, { status: 403 });
+    }
+
+    if ((currentProfile?.role as string | null) !== 'super_admin') {
+      return NextResponse.json({ error: 'No autorizado.' }, { status: 403 });
+    }
+
     const body = await req.json().catch(() => ({}));
     const { salesAgentId, periodYear, periodMonth, paidAt } = body || {};
+
+    console.log('[billing] commission-mark-paid:payload', { salesAgentId, periodYear, periodMonth, paidAt });
 
     if (!salesAgentId || typeof salesAgentId !== 'string') {
       return NextResponse.json({ error: 'Falta salesAgentId.' }, { status: 400 });
@@ -113,6 +138,8 @@ export async function POST(req: NextRequest) {
       .eq('id', (row as any).id);
 
     if (updErr) throw updErr;
+
+    console.log('[billing] commission-mark-paid:updated', { salesAgentId, periodYear: y, periodMonth: m, paidAt: paidAtIso });
 
     // email al vendedor (best effort)
     try {
@@ -146,6 +173,8 @@ export async function POST(req: NextRequest) {
           bodyHtml,
           ctaText: 'Ver facturación',
         });
+
+        console.log('[billing] commission-mark-paid:email', { salesAgentId, to, periodYear: y, periodMonth: m });
       }
     } catch (e) {
       console.error('Error enviando email de comisión pagada', e);

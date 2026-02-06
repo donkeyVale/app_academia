@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 // @ts-ignore - web-push no tiene tipos instalados en este proyecto
 import webPush from 'web-push';
+import { createClientServer } from '@/lib/supabase-server';
 import { supabaseAdmin } from '@/lib/supabase-service';
 import { createInAppNotifications } from '@/lib/in-app-notifications';
 import { sendOneSignalNotification } from '@/lib/onesignal-server';
@@ -111,20 +112,7 @@ async function resolveAdminRecipients(academyId: string): Promise<{ userIds: str
 
   const emailsByUserId: Record<string, string> = {};
 
-  // Try profiles.email first (if exists), fallback to auth user email.
   if (userIds.length > 0) {
-    try {
-      const { data: profRows, error: profErr } = await supabaseAdmin.from('profiles').select('id,email').in('id', userIds);
-      if (!profErr) {
-        for (const r of profRows ?? []) {
-          const id = (r as any)?.id as string | undefined;
-          const email = (r as any)?.email as string | undefined;
-          if (id && email) emailsByUserId[id] = email;
-        }
-      }
-    } catch {
-    }
-
     for (const userId of userIds) {
       if (emailsByUserId[userId]) continue;
       try {
@@ -226,8 +214,32 @@ async function sendPushToUsers(userIds: string[], payload: any) {
 
 export async function POST(req: NextRequest) {
   try {
+    const supabase = createClientServer();
+    const { data: authData, error: authErr } = await supabase.auth.getUser();
+    if (authErr || !authData.user) {
+      return NextResponse.json({ error: 'No autenticado.' }, { status: 401 });
+    }
+
+    console.log('[billing] invoice-issued:start', { userId: authData.user.id });
+
+    const { data: currentProfile, error: currentProfileErr } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', authData.user.id)
+      .maybeSingle();
+
+    if (currentProfileErr) {
+      return NextResponse.json({ error: 'No se pudo verificar permisos.' }, { status: 403 });
+    }
+
+    if ((currentProfile?.role as string | null) !== 'super_admin') {
+      return NextResponse.json({ error: 'No autorizado.' }, { status: 403 });
+    }
+
     const body = await req.json().catch(() => ({}));
     const { academyId, invoiceId, periodYear, periodMonth, totalAmount, currency = 'PYG', dueFromDay = 5, dueToDay = 10 } = body || {};
+
+    console.log('[billing] invoice-issued:payload', { academyId, invoiceId, periodYear, periodMonth, totalAmount, currency });
 
     if (!academyId || typeof academyId !== 'string') {
       return NextResponse.json({ error: 'Falta academyId.' }, { status: 400 });
@@ -321,6 +333,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    console.log('[billing] invoice-issued:admin-email-results', {
+      academyId,
+      invoiceId,
+      emailedSent: results.filter((r) => r.status === 'sent').length,
+      emailedSkipped: results.filter((r) => r.status === 'skipped').length,
+      emailedError: results.filter((r) => r.status === 'error').length,
+    });
+
     // Email al vendedor/asesor asignado (best effort)
     try {
       const day = new Date().toISOString().slice(0, 10);
@@ -342,6 +362,14 @@ export async function POST(req: NextRequest) {
           academyName: acadNameSafe,
           bodyHtml: agentBody,
           ctaText: 'Abrir facturación',
+        });
+
+        console.log('[billing] invoice-issued:sales-agent-email', {
+          academyId,
+          invoiceId,
+          salesAgentId: agent.salesAgentId,
+          to: agent.salesAgentEmail,
+          commissionRate: agent.commissionRate,
         });
       }
     } catch (e) {
