@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { CalendarDays, Users, CreditCard, UserCog, BarChart3, Settings, MoreHorizontal, Building2, MapPin } from "lucide-react";
 import { usePathname } from "next/navigation";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 interface FooterNavProps {
   isAdmin: boolean;
@@ -19,6 +19,11 @@ interface FooterNavProps {
 
 export function FooterNav({ isAdmin, isSuperAdmin, isStudent, canSeeReports, canSeeFinance, canSeeSettings, studentsLabel, scheduleBadgeCount, rightSlot }: FooterNavProps) {
   const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const showReports = canSeeReports !== false;
   const showFinance = canSeeFinance !== false;
   const showSettings = canSeeSettings === true;
@@ -40,6 +45,20 @@ export function FooterNav({ isAdmin, isSuperAdmin, isStudent, canSeeReports, can
     (pathname === '/super-admin/academias' ||
       pathname === '/super-admin/asignaciones' ||
       pathname === '/super-admin/locations');
+
+  if (!mounted) {
+    return (
+      <nav
+        className="fixed bottom-0 inset-x-0 border-t bg-white/95 backdrop-blur-sm"
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}
+      >
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+          <div className="flex-1" />
+          {rightSlot}
+        </div>
+      </nav>
+    );
+  }
 
   return (
     <nav

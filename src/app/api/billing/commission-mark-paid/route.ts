@@ -83,17 +83,31 @@ async function sendEmail(params: {
 export async function POST(req: NextRequest) {
   try {
     const supabase = createClientServer();
-    const { data: authData, error: authErr } = await supabase.auth.getUser();
-    if (authErr || !authData.user) {
+    let userId: string | null = null;
+    {
+      const { data: authData, error: authErr } = await supabase.auth.getUser();
+      if (!authErr && authData.user) userId = authData.user.id;
+    }
+
+    if (!userId) {
+      const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
+      const token = String(authHeader ?? '').replace(/^Bearer\s+/i, '').trim();
+      if (token) {
+        const { data, error } = await supabaseAdmin.auth.getUser(token);
+        if (!error && data?.user?.id) userId = data.user.id;
+      }
+    }
+
+    if (!userId) {
       return NextResponse.json({ error: 'No autenticado.' }, { status: 401 });
     }
 
-    console.log('[billing] commission-mark-paid:start', { userId: authData.user.id });
+    console.log('[billing] commission-mark-paid:start', { userId });
 
     const { data: currentProfile, error: currentProfileErr } = await supabaseAdmin
       .from('profiles')
       .select('role')
-      .eq('id', authData.user.id)
+      .eq('id', userId)
       .maybeSingle();
 
     if (currentProfileErr) {
