@@ -50,7 +50,7 @@ export function FooterNav({ isAdmin, isSuperAdmin, isStudent, canSeeReports, can
   if (!mounted) {
     return (
       <nav
-        className="fixed bottom-0 inset-x-0 border-t bg-white/95 backdrop-blur-sm"
+        className="fixed bottom-0 inset-x-0 z-[60] border-t bg-white/95 backdrop-blur-sm"
         style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}
       >
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
@@ -63,7 +63,7 @@ export function FooterNav({ isAdmin, isSuperAdmin, isStudent, canSeeReports, can
 
   return (
     <nav
-      className="fixed bottom-0 inset-x-0 border-t bg-white/95 backdrop-blur-sm"
+      className="fixed bottom-0 inset-x-0 z-[80] border-t bg-white/95 backdrop-blur-sm"
       style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 10px)' }}
     >
       {showSuperAdminSubNav && (
@@ -112,6 +112,13 @@ export function FooterNav({ isAdmin, isSuperAdmin, isStudent, canSeeReports, can
               >
                 <Building2 className="w-5 h-5 text-[#3cadaf]" />
                 <span>Academias</span>
+              </Link>
+              <Link
+                href="/calendar"
+                className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
+              >
+                <CalendarClock className="w-5 h-5 text-[#3cadaf]" />
+                <span>Calendario</span>
               </Link>
               <Link
                 href="/super-admin/billing"
@@ -166,7 +173,7 @@ export function FooterNav({ isAdmin, isSuperAdmin, isStudent, canSeeReports, can
                   className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
                 >
                   <CalendarClock className="w-5 h-5 text-[#3cadaf]" />
-                  <span>Calendar</span>
+                  <span>Calendario</span>
                 </Link>
               )}
               <Link
@@ -218,6 +225,15 @@ export function FooterNav({ isAdmin, isSuperAdmin, isStudent, canSeeReports, can
                 </span>
                 <span>Agenda</span>
               </Link>
+              {(isAdmin || isCoach) && (
+                <Link
+                  href="/calendar"
+                  className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
+                >
+                  <CalendarClock className="w-5 h-5 text-[#3cadaf]" />
+                  <span>Calendario</span>
+                </Link>
+              )}
               <Link
                 href={isStudent ? "/finance" : "/students"}
                 className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
@@ -291,7 +307,7 @@ export function FooterNav({ isAdmin, isSuperAdmin, isStudent, canSeeReports, can
                 className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
               >
                 <CalendarClock className="w-5 h-5 text-[#3cadaf]" />
-                <span>Calendar</span>
+                <span>Calendario</span>
               </Link>
             )}
             <Link
@@ -369,7 +385,7 @@ export function FooterNav({ isAdmin, isSuperAdmin, isStudent, canSeeReports, can
                   className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                 >
                   <CalendarClock className="w-5 h-5 text-[#3cadaf]" />
-                  <span>Calendar</span>
+                  <span>Calendario</span>
                 </Link>
               )}
               {showSettings && (

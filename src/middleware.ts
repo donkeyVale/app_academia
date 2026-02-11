@@ -26,7 +26,11 @@ export default async function middleware(req: NextRequest) {
     const url = req.nextUrl.clone();
     url.pathname = '/login';
     const nextPath = req.nextUrl.pathname + req.nextUrl.search;
-    url.searchParams.set('next', nextPath);
+    // UX: el calendario es un módulo nuevo y suele abrirse por exploración; si la sesión expiró
+    // preferimos volver al Home luego de login, no forzar caer en /calendar.
+    if (!req.nextUrl.pathname.startsWith('/calendar')) {
+      url.searchParams.set('next', nextPath);
+    }
     return NextResponse.redirect(url);
   }
 

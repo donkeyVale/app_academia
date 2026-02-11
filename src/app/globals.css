@@ -3,6 +3,181 @@
 
 @custom-variant dark (&:is(.dark *));
 
+.agendo-calendar {
+  --fc-border-color: #e2e8f0;
+  --fc-page-bg-color: #ffffff;
+  --fc-neutral-bg-color: #ffffff;
+  --fc-today-bg-color: rgba(56, 174, 177, 0.08);
+  --fc-event-bg-color: #38aeb1;
+  --fc-event-border-color: #2d9a9c;
+  --fc-event-text-color: #ffffff;
+  --fc-button-bg-color: #314260;
+  --fc-button-border-color: #314260;
+  --fc-button-text-color: #ffffff;
+  --fc-button-hover-bg-color: #26354f;
+  --fc-button-hover-border-color: #26354f;
+  --fc-button-active-bg-color: #38aeb1;
+  --fc-button-active-border-color: #38aeb1;
+  --fc-now-indicator-color: #38aeb1;
+}
+
+.agendo-calendar .fc {
+  max-width: 100%;
+}
+
+.agendo-calendar .fc .fc-toolbar {
+  gap: 0.5rem;
+}
+
+.agendo-calendar .fc .fc-toolbar-title {
+  color: #314260;
+}
+
+.agendo-calendar .fc .agendo-fc-tapped {
+  box-shadow: 0 0 0 2px rgba(56, 174, 177, 0.55);
+  transform: translateZ(0);
+}
+
+@media (max-width: 640px) {
+  .agendo-calendar .fc .fc-toolbar {
+    flex-wrap: wrap;
+    align-items: stretch;
+    margin-bottom: 0.25rem;
+  }
+
+  .agendo-calendar .fc .fc-toolbar-chunk {
+    display: flex;
+    width: 100%;
+  }
+
+  .agendo-calendar .fc .fc-toolbar-chunk:first-child {
+    justify-content: space-between;
+  }
+
+  .agendo-calendar .fc .fc-toolbar-chunk:nth-child(2) {
+    justify-content: center;
+    order: 3;
+  }
+
+  .agendo-calendar .fc .fc-toolbar-chunk:last-child {
+    justify-content: flex-end;
+    order: 2;
+  }
+
+  .agendo-calendar .fc .fc-toolbar-title {
+    font-size: 1rem;
+    line-height: 1.25rem;
+    font-weight: 700;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .agendo-calendar .fc .fc-button {
+    padding: 0.5rem 0.65rem;
+    font-size: 0.75rem;
+    line-height: 1rem;
+    min-height: 38px;
+    border-radius: 12px;
+    font-weight: 600;
+  }
+
+  .agendo-calendar .fc .fc-button-group {
+    width: 100%;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+  }
+
+  .agendo-calendar .fc .fc-button-group .fc-button {
+    width: 100%;
+  }
+
+  .agendo-calendar .fc .fc-scrollgrid {
+    border-radius: 0.75rem;
+    overflow: hidden;
+  }
+
+  .agendo-calendar .fc .fc-timegrid-axis-cushion,
+  .agendo-calendar .fc .fc-timegrid-slot-label-cushion {
+    font-size: 0.7rem;
+  }
+
+  .agendo-calendar .fc .fc-event {
+    border-radius: 10px;
+  }
+
+  .agendo-calendar .fc .fc-timegrid-event {
+    margin: 1px 2px;
+  }
+
+  .agendo-calendar .fc .fc-timegrid-event .fc-event-main {
+    padding: 6px 8px;
+  }
+
+  .agendo-calendar .fc .fc-timegrid-event .fc-event-title {
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.05rem;
+    display: -webkit-box;
+    line-clamp: 2;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .agendo-calendar .fc .fc-timegrid-event .fc-event-time {
+    font-size: 0.72rem;
+    opacity: 0.9;
+  }
+
+  .agendo-calendar .fc .fc-timegrid-event-harness {
+    min-height: 34px;
+  }
+
+  /* Mes: mejorar clickability de eventos */
+  .agendo-calendar .fc .fc-daygrid-event {
+    padding: 3px 6px;
+    border-radius: 10px;
+  }
+
+  .agendo-calendar .fc .fc-daygrid-day-number {
+    font-size: 0.8rem;
+    font-weight: 600;
+    padding: 6px;
+  }
+
+  .agendo-calendar .fc .fc-col-header-cell-cushion {
+    padding: 8px 4px;
+  }
+
+  .agendo-calendar .fc .fc-daygrid-event .fc-event-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    line-height: 1rem;
+  }
+
+  .agendo-calendar .fc .fc-daygrid-event-dot {
+    width: 10px;
+    height: 10px;
+    margin: 0 6px 0 0;
+    border-width: 3px;
+  }
+
+  /* Semana: más “tap-friendly” */
+  .agendo-calendar .fc.fc-media-screen.fc-direction-ltr.fc-theme-standard.fc-view-harness .fc-timeGridWeek-view
+    .fc-timegrid-event .fc-event-main {
+    padding: 7px 9px;
+  }
+
+  /* Día: mantener un poco más de densidad */
+  .agendo-calendar .fc.fc-media-screen.fc-direction-ltr.fc-theme-standard.fc-view-harness .fc-timeGridDay-view
+    .fc-timegrid-event .fc-event-main {
+    padding: 5px 7px;
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

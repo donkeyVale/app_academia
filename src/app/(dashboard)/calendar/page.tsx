@@ -5,8 +5,13 @@ import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
+import esLocale from "@fullcalendar/core/locales/es";
+import { Calendar as CalendarIcon } from "lucide-react";
 import { createClientBrowser } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { AgendoLogo } from "@/components/agendo-logo";
 import {
   Dialog,
   DialogContent,
@@ -15,13 +20,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toast } from "sonner";
 
 type AppRole = "super_admin" | "admin" | "coach" | "student" | null;
@@ -31,9 +29,13 @@ type Academy = {
   name: string;
 };
 
+type Location = { id: string; name: string | null };
+
 type Court = { id: string; name: string; location_id: string | null };
 
 type Coach = { id: string; user_id: string | null; full_name?: string | null };
+
+type Student = { id: string; user_id: string | null; full_name?: string | null; notes?: string | null; level?: string | null };
 
 type ClassSession = {
   id: string;
@@ -50,6 +52,30 @@ type BookingRow = {
   id: string;
   class_id: string | null;
   student_id: string | null;
+};
+
+type CalendarManualEventRow = {
+  id: string;
+  academy_id: string;
+  title: string;
+  notes: string | null;
+  starts_at: string;
+  ends_at: string;
+  location_id: string | null;
+  court_id: string | null;
+  coach_id: string | null;
+};
+
+type CalendarBlockRow = {
+  id: string;
+  academy_id: string;
+  kind: string;
+  reason: string | null;
+  starts_at: string;
+  ends_at: string;
+  location_id: string | null;
+  court_id: string | null;
+  coach_id: string | null;
 };
 
 function toIsoSafe(d: Date): string {
@@ -69,6 +95,37 @@ function toYmd(date: Date): string {
 export default function CalendarPage() {
   const supabase = useMemo(() => createClientBrowser(), []);
 
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileView, setMobileView] = useState<"timeGridDay" | "timeGridWeek" | "dayGridMonth">(
+    "timeGridDay"
+  );
+  const calendarRef = useRef<FullCalendar | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const calc = () => setIsMobile(window.innerWidth < 640);
+    calc();
+    window.addEventListener("resize", calc);
+    return () => window.removeEventListener("resize", calc);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = window.localStorage.getItem("calendarMobileView");
+    if (stored === "timeGridDay" || stored === "timeGridWeek" || stored === "dayGridMonth") {
+      setMobileView(stored);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem("calendarMobileView", mobileView);
+    const api = calendarRef.current?.getApi?.();
+    if (api && isMobile) {
+      api.changeView(mobileView);
+    }
+  }, [mobileView, isMobile]);
+
   const [role, setRole] = useState<AppRole>(null);
   const [userId, setUserId] = useState<string | null>(null);
 
@@ -79,6 +136,36 @@ export default function CalendarPage() {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const canCreate = role === "admin" || role === "coach";
+
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [courts, setCourts] = useState<Court[]>([]);
+  const [coaches, setCoaches] = useState<Coach[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [coachSelfId, setCoachSelfId] = useState<string | null>(null);
+
+  // Create class modal state
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createLocationId, setCreateLocationId] = useState<string>("");
+  const [createCourtId, setCreateCourtId] = useState<string>("");
+  const [createDay, setCreateDay] = useState<string>("");
+  const [createTime, setCreateTime] = useState<string>("");
+  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
+  const [createCoachId, setCreateCoachId] = useState<string>("");
+  const [createSelectedStudents, setCreateSelectedStudents] = useState<string[]>([]);
+  const [studentsPopoverOpen, setStudentsPopoverOpen] = useState(false);
+  const [studentQuery, setStudentQuery] = useState("");
+  const [creating, setCreating] = useState(false);
+
+  const [remainingByStudent, setRemainingByStudent] = useState<Record<string, number>>({});
+  const [remainingLoading, setRemainingLoading] = useState(false);
+
+  const [pastWarningOpen, setPastWarningOpen] = useState(false);
+  const [pastWarningLabel, setPastWarningLabel] = useState<string>("");
+  const [pastWarningAllowPast, setPastWarningAllowPast] = useState(false);
+
+  const [tappedEventId, setTappedEventId] = useState<string | null>(null);
+
   const visibleRangeRef = useRef<{ start: Date; end: Date } | null>(null);
 
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -87,6 +174,36 @@ export default function CalendarPage() {
   const [rescheduleDay, setRescheduleDay] = useState<string>("");
   const [rescheduleTime, setRescheduleTime] = useState<string>("");
   const [rescheduling, setRescheduling] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingClass, setEditingClass] = useState<ClassSession | null>(null);
+  const [editLocationId, setEditLocationId] = useState<string>("");
+  const [editCourtId, setEditCourtId] = useState<string>("");
+  const [editDay, setEditDay] = useState<string>("");
+  const [editTime, setEditTime] = useState<string>("");
+  const [editAvailableTimes, setEditAvailableTimes] = useState<string[]>([]);
+  const [editCoachId, setEditCoachId] = useState<string>("");
+  const [editSelectedStudents, setEditSelectedStudents] = useState<string[]>([]);
+  const [editExistingStudents, setEditExistingStudents] = useState<string[]>([]);
+  const [editStudentQuery, setEditStudentQuery] = useState<string>("");
+  const [editStudentsPopoverOpen, setEditStudentsPopoverOpen] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
+  const [attendanceOpen, setAttendanceOpen] = useState(false);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [attendanceSaving, setAttendanceSaving] = useState(false);
+  const [attendanceList, setAttendanceList] = useState<{ student_id: string; present: boolean; label: string }[]>([]);
+
+  useEffect(() => {
+    const vr = visibleRangeRef.current;
+    if (!vr) return;
+    if (!selectedAcademyId) {
+      setEvents([]);
+      return;
+    }
+    void loadCalendarRange(vr.start, vr.end);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAcademyId]);
 
   useEffect(() => {
     (async () => {
@@ -106,12 +223,1048 @@ export default function CalendarPage() {
           .maybeSingle();
         const r = (profile?.role as AppRole) ?? null;
         setRole(r);
+
+        if (r === "coach") {
+          const { data: coachRow } = await supabase
+            .from("coaches")
+            .select("id")
+            .eq("user_id", uid)
+            .maybeSingle();
+          setCoachSelfId((coachRow as any)?.id ?? null);
+        } else {
+          setCoachSelfId(null);
+        }
       } catch {
         setUserId(null);
         setRole(null);
       }
     })();
   }, [supabase]);
+
+  useEffect(() => {
+    if (!selectedAcademyReady) return;
+    if (!selectedAcademyId) {
+      setLocations([]);
+      setCourts([]);
+      setCoaches([]);
+      setStudents([]);
+      return;
+    }
+
+    (async () => {
+      try {
+        const { data: alRows, error: alErr } = await supabase
+          .from("academy_locations")
+          .select("location_id")
+          .eq("academy_id", selectedAcademyId);
+        if (alErr) throw alErr;
+        const locationIds = Array.from(
+          new Set(
+            ((alRows as any[]) ?? [])
+              .map((r) => (r?.location_id as string | null) ?? null)
+              .filter((x): x is string => !!x)
+          )
+        );
+
+        const [{ data: locRows, error: locErr }, { data: courtRows, error: courtErr }] = await Promise.all([
+          supabase.from("locations").select("id,name").in("id", locationIds).order("name"),
+          supabase.from("courts").select("id,name,location_id").in("location_id", locationIds).order("name"),
+        ]);
+        if (locErr) throw locErr;
+        if (courtErr) throw courtErr;
+
+        setLocations(((locRows as Location[] | null) ?? []).map((l) => ({ id: l.id, name: l.name })));
+        setCourts(((courtRows as any[] | null) ?? []).map((c) => ({ id: c.id, name: c.name, location_id: c.location_id })));
+
+        // Coaches assigned to academy
+        const { data: uaRows, error: uaErr } = await supabase
+          .from("user_academies")
+          .select("user_id, role")
+          .eq("academy_id", selectedAcademyId);
+        if (uaErr) throw uaErr;
+        const rows = ((uaRows as any[]) ?? []) as { user_id: string | null; role: string }[];
+        const coachUserIds = Array.from(new Set(rows.filter((r) => r.role === "coach" && r.user_id).map((r) => r.user_id!)));
+        const studentUserIds = Array.from(
+          new Set(rows.filter((r) => r.role === "student" && r.user_id).map((r) => r.user_id!))
+        );
+
+        const [{ data: coachRows }, { data: profRows }, { data: studRows }, { data: studProfiles }] = await Promise.all([
+          coachUserIds.length
+            ? supabase.from("coaches").select("id,user_id").in("user_id", coachUserIds)
+            : supabase.from("coaches").select("id,user_id").limit(0),
+          coachUserIds.length
+            ? supabase.from("profiles").select("id,full_name").in("id", coachUserIds)
+            : supabase.from("profiles").select("id,full_name").limit(0),
+          studentUserIds.length
+            ? supabase.from("students").select("id,user_id,level,notes").in("user_id", studentUserIds)
+            : supabase.from("students").select("id,user_id,level,notes").limit(0),
+          studentUserIds.length
+            ? supabase.from("profiles").select("id,full_name").in("id", studentUserIds)
+            : supabase.from("profiles").select("id,full_name").limit(0),
+        ]);
+
+        const coachNameByUserId = ((profRows as any[]) ?? []).reduce<Record<string, string | null>>((acc, p: any) => {
+          acc[p.id] = (p.full_name as string | null) ?? null;
+          return acc;
+        }, {});
+        const finalCoaches = (((coachRows as any[]) ?? []) as { id: string; user_id: string | null }[]).map((c) => ({
+          id: c.id,
+          user_id: c.user_id,
+          full_name: c.user_id ? coachNameByUserId[c.user_id] ?? null : null,
+        }));
+        setCoaches(finalCoaches);
+
+        const studentNameByUserId = ((studProfiles as any[]) ?? []).reduce<Record<string, string | null>>((acc, p: any) => {
+          acc[p.id] = (p.full_name as string | null) ?? null;
+          return acc;
+        }, {});
+        const finalStudents = (((studRows as any[]) ?? []) as any[]).map((s) => ({
+          id: s.id,
+          user_id: s.user_id,
+          level: s.level ?? null,
+          notes: s.notes ?? null,
+          full_name: s.user_id ? studentNameByUserId[s.user_id] ?? null : null,
+        }));
+        setStudents(finalStudents);
+      } catch (e: any) {
+        setLocations([]);
+        setCourts([]);
+        setCoaches([]);
+        setStudents([]);
+        toast.error(e?.message ?? "No se pudieron cargar datos de la academia.");
+      }
+    })();
+  }, [selectedAcademyId, selectedAcademyReady, supabase]);
+
+  useEffect(() => {
+    if (!createCourtId || !createDay) {
+      setAvailableTimes([]);
+      setCreateTime("");
+      return;
+    }
+    (async () => {
+      // Candidate hours 06:00 - 23:00
+      const candidates: string[] = [];
+      for (let h = 6; h <= 23; h++) candidates.push(`${pad2(h)}:00`);
+      try {
+        const dayStart = new Date(`${createDay}T00:00:00`).toISOString();
+        const dayEnd = new Date(`${createDay}T23:59:59`).toISOString();
+        const { data: dayClasses, error } = await supabase
+          .from("class_sessions")
+          .select("id,date")
+          .eq("court_id", createCourtId)
+          .gte("date", dayStart)
+          .lte("date", dayEnd)
+          .neq("status", "cancelled");
+        if (error) throw error;
+        const occupied = new Set<string>();
+        (dayClasses ?? []).forEach((c: any) => {
+          const d = new Date(c.date);
+          occupied.add(`${pad2(d.getHours())}:00`);
+        });
+        const free = candidates.filter((t) => !occupied.has(t));
+        setAvailableTimes(free);
+        if (!free.includes(createTime)) setCreateTime(free[0] ?? "");
+      } catch {
+        setAvailableTimes(candidates);
+        if (!candidates.includes(createTime)) setCreateTime(candidates[0] ?? "");
+      }
+    })();
+  }, [supabase, createCourtId, createDay]);
+
+  useEffect(() => {
+    (async () => {
+      const shouldLoad = (studentsPopoverOpen || editStudentsPopoverOpen) && !!selectedAcademyId;
+      if (!shouldLoad) return;
+      if (remainingLoading) return;
+      setRemainingLoading(true);
+      try {
+        const { data, error } = await supabase.rpc("get_students_remaining_classes", {
+          p_academy_id: selectedAcademyId,
+        });
+        if (error) throw error;
+        const rows = (data ?? []) as any[];
+        const map: Record<string, number> = {};
+        for (const row of rows) {
+          const sid = row?.student_id as string | undefined;
+          const remaining = Number(row?.remaining ?? 0);
+          if (sid) map[sid] = Number.isFinite(remaining) ? remaining : 0;
+        }
+        // Si el RPC no devuelve un alumno, lo tratamos como 0 para mostrarlo en rojo (sin saldo)
+        for (const s of students) {
+          if (map[s.id] === undefined) map[s.id] = 0;
+        }
+        setRemainingByStudent(map);
+      } catch (e) {
+        console.error("Error cargando clases restantes por alumno", e);
+      } finally {
+        setRemainingLoading(false);
+      }
+    })();
+  }, [studentsPopoverOpen, editStudentsPopoverOpen, selectedAcademyId, supabase, remainingLoading, students]);
+
+  useEffect(() => {
+    if (!createOpen) return;
+    if (role !== "coach") return;
+    if (!coachSelfId) return;
+    setCreateCoachId(coachSelfId);
+  }, [createOpen, role, coachSelfId]);
+
+  const resetCreateForm = () => {
+    setCreateLocationId("");
+    setCreateCourtId("");
+    setCreateDay("");
+    setCreateTime("");
+    setCreateCoachId("");
+    setCreateSelectedStudents([]);
+    setStudentQuery("");
+    setStudentsPopoverOpen(false);
+  };
+
+  const resetEditForm = () => {
+    setEditOpen(false);
+    setEditingClass(null);
+    setEditLocationId("");
+    setEditCourtId("");
+    setEditDay("");
+    setEditTime("");
+    setEditAvailableTimes([]);
+    setEditCoachId("");
+    setEditSelectedStudents([]);
+    setEditExistingStudents([]);
+    setEditStudentQuery("");
+    setEditStudentsPopoverOpen(false);
+  };
+
+  const resetAttendance = () => {
+    setAttendanceOpen(false);
+    setAttendanceLoading(false);
+    setAttendanceSaving(false);
+    setAttendanceList([]);
+  };
+
+  const onConfirmCancel = async () => {
+    const p = (detailsEvent?.props ?? {}) as any;
+    if (p?.kind !== "class_session") return;
+    const cls = p.classSession as ClassSession | undefined;
+    if (!cls?.id) return;
+
+    if (!role || role === "super_admin" || role === "student") return;
+    if (role === "coach" && coachSelfId && cls.coach_id !== coachSelfId) {
+      toast.error("No tenés permisos para cancelar esta clase.");
+      return;
+    }
+
+    const startTs = new Date(cls.date).getTime();
+    if (startTs <= Date.now()) {
+      toast.error("No se puede cancelar una clase que ya comenzó.");
+      return;
+    }
+
+    if (!confirm("¿Cancelar esta clase? Se devolverán las clases a los planes y se avisará a los alumnos.")) return;
+
+    setCancelling(true);
+    try {
+      const { data: bRows, error: bErr } = await supabase
+        .from("bookings")
+        .select("student_id")
+        .eq("class_id", cls.id);
+      if (bErr) throw bErr;
+      const studentIds = Array.from(
+        new Set(
+          ((bRows as { student_id: string | null }[] | null) ?? [])
+            .map((r) => r.student_id)
+            .filter((x): x is string => !!x)
+        )
+      );
+
+      const { error: delUsageErr } = await supabase
+        .from("plan_usages")
+        .update({ status: "refunded", refunded_at: new Date().toISOString() })
+        .eq("class_id", cls.id)
+        .in("status", ["pending", "confirmed"]);
+      if (delUsageErr) throw delUsageErr;
+
+      const { error: delAttErr } = await supabase.from("attendance").delete().eq("class_id", cls.id);
+      if (delAttErr) throw delAttErr;
+
+      const { error: delBookErr } = await supabase.from("bookings").delete().eq("class_id", cls.id);
+      if (delBookErr) throw delBookErr;
+
+      const { error: delErr } = await supabase.from("class_sessions").update({ status: "cancelled" }).eq("id", cls.id);
+      if (delErr) throw delErr;
+
+      if (selectedAcademyId && userId && role) {
+        try {
+          await fetch("/api/push/class-cancelled", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              classId: cls.id,
+              studentIds,
+              dateIso: cls.date,
+              academyId: selectedAcademyId,
+              cancelledByRole: role,
+              cancelledByCoachId: role === "coach" ? cls.coach_id : null,
+              cancelledByUserId: userId,
+            }),
+          });
+        } catch (pushErr) {
+          console.error("Error enviando notificación de clase cancelada", pushErr);
+        }
+      }
+
+      toast.success("Clase cancelada correctamente y clases devueltas a los planes.");
+      setDetailsOpen(false);
+      setRescheduleOpen(false);
+
+      const vr = visibleRangeRef.current;
+      if (vr) await loadCalendarRange(vr.start, vr.end);
+    } catch (e: any) {
+      toast.error(e?.message ?? "No se pudo cancelar la clase.");
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const openAttendance = async () => {
+    const p = (detailsEvent?.props ?? {}) as any;
+    if (p?.kind !== "class_session") return;
+    const cls = p.classSession as ClassSession | undefined;
+    if (!cls?.id) return;
+
+    if (!role || role === "super_admin" || role === "student") return;
+    if (role === "coach" && coachSelfId && cls.coach_id !== coachSelfId) {
+      toast.error("No tenés permisos para marcar asistencia en esta clase.");
+      return;
+    }
+
+    setAttendanceOpen(true);
+    setAttendanceLoading(true);
+    try {
+      const [{ data: bRows, error: bErr }, { data: aRows, error: aErr }] = await Promise.all([
+        supabase.from("bookings").select("student_id").eq("class_id", cls.id),
+        supabase.from("attendance").select("student_id,present").eq("class_id", cls.id),
+      ]);
+      if (bErr) throw bErr;
+      if (aErr) throw aErr;
+
+      const bookingIds = Array.from(
+        new Set(
+          ((bRows as { student_id: string | null }[] | null) ?? [])
+            .map((r) => r.student_id)
+            .filter((x): x is string => !!x)
+        )
+      );
+      const attMap = new Map<string, boolean>(((aRows as any[]) ?? []).map((r: any) => [r.student_id as string, !!r.present]));
+
+      const list = bookingIds.map((sid) => {
+        const s = students.find((x) => x.id === sid);
+        const label = (s?.full_name || "") || (s?.notes || "") || (s?.level || "") || s?.id || sid;
+        return {
+          student_id: sid,
+          present: attMap.get(sid) ?? false,
+          label,
+        };
+      });
+      setAttendanceList(list);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Error cargando asistencia");
+      setAttendanceList([]);
+    } finally {
+      setAttendanceLoading(false);
+    }
+  };
+
+  const onSaveAttendance = async () => {
+    const p = (detailsEvent?.props ?? {}) as any;
+    if (p?.kind !== "class_session") return;
+    const cls = p.classSession as ClassSession | undefined;
+    if (!cls?.id) return;
+
+    if (!role || role === "super_admin" || role === "student") return;
+    if (role === "coach" && coachSelfId && cls.coach_id !== coachSelfId) {
+      toast.error("No tenés permisos para marcar asistencia en esta clase.");
+      return;
+    }
+    if (!userId) {
+      toast.error("No se pudo identificar el usuario actual.");
+      return;
+    }
+
+    setAttendanceSaving(true);
+    try {
+      const nowIso = new Date().toISOString();
+      const studentIds = attendanceList.map((r) => r.student_id).filter(Boolean);
+
+      // Limpiar asistencia de alumnos que ya no están en la clase
+      if (studentIds.length > 0) {
+        const { error: delOldErr } = await supabase
+          .from("attendance")
+          .delete()
+          .eq("class_id", cls.id)
+          .not("student_id", "in", `(${studentIds.join(",")})`);
+        if (delOldErr) throw delOldErr;
+      } else {
+        const { error: delAllErr } = await supabase.from("attendance").delete().eq("class_id", cls.id);
+        if (delAllErr) throw delAllErr;
+      }
+
+      if (attendanceList.length) {
+        const rows = attendanceList.map((row) => ({
+          class_id: cls.id,
+          student_id: row.student_id,
+          present: row.present,
+          marked_at: nowIso,
+          marked_by_user_id: userId,
+        }));
+
+        const { error: upsertErr } = await supabase.from("attendance").upsert(rows, { onConflict: "class_id,student_id" });
+        if (upsertErr) throw upsertErr;
+
+        // Confirmar consumo del plan (presente o ausente)
+        if (studentIds.length) {
+          const { error: confirmErr } = await supabase
+            .from("plan_usages")
+            .update({ status: "confirmed", confirmed_at: nowIso })
+            .eq("class_id", cls.id)
+            .in("student_id", studentIds)
+            .eq("status", "pending");
+          if (confirmErr) {
+            console.error("Error confirmando plan_usages por asistencia", confirmErr.message);
+          }
+        }
+
+        const { error: updPendingErr } = await supabase
+          .from("class_sessions")
+          .update({ attendance_pending: false })
+          .eq("id", cls.id);
+        if (updPendingErr) {
+          console.error("Error limpiando attendance_pending", updPendingErr.message);
+        }
+      }
+
+      toast.success("Asistencia guardada.");
+      resetAttendance();
+
+      const vr = visibleRangeRef.current;
+      if (vr) await loadCalendarRange(vr.start, vr.end);
+    } catch (e: any) {
+      toast.error(e?.message ?? "No se pudo guardar la asistencia.");
+    } finally {
+      setAttendanceSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!editOpen) return;
+    if (!editCourtId || !editDay) {
+      setEditAvailableTimes([]);
+      setEditTime("");
+      return;
+    }
+    (async () => {
+      const candidates: string[] = [];
+      for (let h = 6; h <= 23; h++) candidates.push(`${pad2(h)}:00`);
+      try {
+        const dayStart = new Date(`${editDay}T00:00:00`).toISOString();
+        const dayEnd = new Date(`${editDay}T23:59:59`).toISOString();
+        const { data: dayClasses, error } = await supabase
+          .from("class_sessions")
+          .select("id,date")
+          .eq("court_id", editCourtId)
+          .gte("date", dayStart)
+          .lte("date", dayEnd)
+          .neq("status", "cancelled");
+        if (error) throw error;
+        const occupied = new Set<string>();
+        (dayClasses ?? []).forEach((c: any) => {
+          if (editingClass?.id && c.id === editingClass.id) return;
+          const d = new Date(c.date);
+          occupied.add(`${pad2(d.getHours())}:00`);
+        });
+        const free = candidates.filter((t) => !occupied.has(t));
+        setEditAvailableTimes(free);
+        if (!free.includes(editTime)) setEditTime(free[0] ?? "");
+      } catch {
+        setEditAvailableTimes(candidates);
+        if (!candidates.includes(editTime)) setEditTime(candidates[0] ?? "");
+      }
+    })();
+  }, [supabase, editOpen, editCourtId, editDay, editTime, editingClass?.id]);
+
+  const onStartEdit = async () => {
+    const p = (detailsEvent?.props ?? {}) as any;
+    if (p?.kind !== "class_session") return;
+    const cls = p.classSession as ClassSession | undefined;
+    if (!cls?.id) return;
+
+    if (!role || role === "super_admin" || role === "student") return;
+    if (role === "coach" && coachSelfId && cls.coach_id !== coachSelfId) {
+      toast.error("No tenés permisos para modificar esta clase.");
+      return;
+    }
+
+    setEditingClass(cls);
+    setEditCourtId(cls.court_id ?? "");
+    setEditCoachId(cls.coach_id ?? "");
+
+    const startDt = cls.date ? new Date(cls.date) : null;
+    if (startDt) {
+      setEditDay(toYmd(startDt));
+      setEditTime(`${pad2(startDt.getHours())}:00`);
+    } else {
+      setEditDay("");
+      setEditTime("");
+    }
+
+    const court = cls.court_id ? courts.find((c) => c.id === cls.court_id) : null;
+    setEditLocationId(court?.location_id ?? "");
+
+    try {
+      const { data: bRows, error: bErr } = await supabase
+        .from("bookings")
+        .select("student_id")
+        .eq("class_id", cls.id);
+      if (bErr) throw bErr;
+      const sids = Array.from(
+        new Set(
+          ((bRows as { student_id: string | null }[] | null) ?? [])
+            .map((r) => r.student_id)
+            .filter((x): x is string => !!x)
+        )
+      );
+      setEditExistingStudents(sids);
+      setEditSelectedStudents(sids);
+    } catch {
+      setEditExistingStudents([]);
+      setEditSelectedStudents([]);
+    }
+
+    setEditOpen(true);
+    setRescheduleOpen(false);
+  };
+
+  const onSaveEdit = async () => {
+    const cls = editingClass;
+    if (!cls?.id) return;
+
+    if (!role || role === "super_admin" || role === "student") return;
+    if (role === "coach" && coachSelfId && cls.coach_id !== coachSelfId) {
+      toast.error("No tenés permisos para modificar esta clase.");
+      return;
+    }
+
+    if (!editCourtId || !editDay || !editTime) {
+      toast.error("Completa complejo/cancha, fecha y hora.");
+      return;
+    }
+    if (!editCoachId) {
+      toast.error("Selecciona un profesor.");
+      return;
+    }
+    if (editSelectedStudents.length < 1) {
+      toast.error("Selecciona al menos 1 alumno (máximo 4).");
+      return;
+    }
+    if (editSelectedStudents.length > 4) {
+      toast.error("Máximo 4 alumnos por clase.");
+      return;
+    }
+
+    const hour = Number(editTime.split(":")[0] ?? "NaN");
+    if (Number.isNaN(hour) || hour < 6 || hour > 23) {
+      toast.error("Horario inválido. Seleccioná una hora entre 06:00 y 23:00.");
+      return;
+    }
+
+    const newIso = new Date(`${editDay}T${editTime}:00`).toISOString();
+    {
+      const now = new Date();
+      const classStart = new Date(newIso);
+      if (classStart.getTime() <= now.getTime()) {
+        toast.error("No podés mover una clase a una fecha y hora que ya pasaron.");
+        return;
+      }
+    }
+
+    const addedStudents = editSelectedStudents.filter((id) => !editExistingStudents.includes(id));
+    const removedStudents = editExistingStudents.filter((id) => !editSelectedStudents.includes(id));
+
+    setSavingEdit(true);
+    try {
+      const oldDateIso = cls.date;
+      const oldCourtId = cls.court_id;
+      const oldCoachId = cls.coach_id;
+
+      // Conflicto de cancha
+      {
+        const { data: clash, error: clashErr } = await supabase
+          .from("class_sessions")
+          .select("id")
+          .eq("court_id", editCourtId)
+          .eq("date", newIso)
+          .neq("id", cls.id)
+          .neq("status", "cancelled")
+          .limit(1);
+        if (clashErr) throw clashErr;
+        if ((clash ?? []).length > 0) {
+          toast.error("Ese horario ya está ocupado en esa cancha. Elegí otra hora.");
+          return;
+        }
+      }
+
+      // Conflicto de profesor (warning)
+      if (editCoachId) {
+        const { data: coachClash, error: coachClashErr } = await supabase
+          .from("class_sessions")
+          .select("id")
+          .eq("coach_id", editCoachId)
+          .eq("date", newIso)
+          .neq("status", "cancelled")
+          .neq("id", cls.id)
+          .limit(1);
+        if (coachClashErr) {
+          toast.error("No se pudo verificar la disponibilidad del profesor. Intenta nuevamente.");
+          return;
+        }
+        if ((coachClash ?? []).length > 0) {
+          toast.warning("El profesor ya tiene una clase en ese horario.");
+        }
+      }
+
+      // Conflicto alumnos
+      {
+        const { data: conflictsFiltered, error: conflictsStatusErr } = await supabase
+          .from("bookings")
+          .select("student_id, class_sessions!inner(id,date,status)")
+          .in("student_id", editSelectedStudents)
+          .eq("class_sessions.date", newIso)
+          .neq("class_sessions.status", "cancelled");
+        if (conflictsStatusErr) throw conflictsStatusErr;
+        const realConflicts = (conflictsFiltered ?? []).filter((r: any) => (r as any)?.class_sessions?.id !== cls.id);
+        if (realConflicts.length > 0) {
+          toast.error("Uno o más alumnos ya tienen una clase en ese horario.");
+          return;
+        }
+      }
+
+      // Validación de planes solo para alumnos agregados
+      const planForStudent: Record<string, string> = {};
+      for (const sid of addedStudents) {
+        const { data: plans, error: planErr } = await supabase
+          .from("student_plans")
+          .select("id, remaining_classes, purchased_at")
+          .eq("student_id", sid)
+          .eq("is_active", true)
+          .order("purchased_at", { ascending: true });
+        if (planErr) throw planErr;
+        if (!plans || plans.length === 0) {
+          const label = students.find((s) => s.id === sid)?.full_name ?? "(sin nombre)";
+          toast.error(`${label} no tiene un plan activo con clases disponibles.`);
+          return;
+        }
+
+        let chosenPlan: any = null;
+        for (const p of plans as any[]) {
+          const { count: usedCount, error: usageCountErr } = await supabase
+            .from("plan_usages")
+            .select("id", { count: "exact", head: true })
+            .eq("student_plan_id", p.id)
+            .eq("student_id", sid)
+            .in("status", ["pending", "confirmed"]);
+          if (usageCountErr) throw usageCountErr;
+          const used = Number(usedCount ?? 0);
+          const remaining = Number((p.remaining_classes as number) ?? 0);
+          if (remaining - used > 0) {
+            chosenPlan = p;
+            break;
+          }
+        }
+        if (!chosenPlan) {
+          const label = students.find((s) => s.id === sid)?.full_name ?? "(sin nombre)";
+          toast.error(`${label} no tiene saldo disponible en sus planes.`);
+          return;
+        }
+
+        const totalFromPlan = Number((chosenPlan.remaining_classes as number) ?? 0);
+        if (totalFromPlan > 0) {
+          const nowIso = new Date().toISOString();
+          const { data: futureBookings, error: futureErr } = await supabase
+            .from("bookings")
+            .select("id, class_sessions!inner(id,date)")
+            .eq("student_id", sid)
+            .gt("class_sessions.date", nowIso);
+          if (futureErr) throw new Error("No se pudo verificar las clases futuras del alumno. Intenta nuevamente.");
+          const futureCount = (futureBookings ?? []).length;
+          if (futureCount >= totalFromPlan) {
+            const label = students.find((s) => s.id === sid)?.full_name ?? "(sin nombre)";
+            toast.error(`${label} ya tiene reservadas todas sus clases del plan.`);
+            return;
+          }
+        }
+
+        planForStudent[sid] = chosenPlan.id as string;
+      }
+
+      const capacity = editSelectedStudents.length;
+      const typeForSession = capacity === 1 ? "individual" : "grupal";
+
+      const { error: updErr } = await supabase
+        .from("class_sessions")
+        .update({
+          date: newIso,
+          court_id: editCourtId,
+          coach_id: editCoachId,
+          capacity,
+          type: typeForSession,
+        })
+        .eq("id", cls.id);
+      if (updErr) throw updErr;
+
+      // Remover bookings y devolver usos
+      if (removedStudents.length > 0) {
+        const { error: delBookErr } = await supabase
+          .from("bookings")
+          .delete()
+          .eq("class_id", cls.id)
+          .in("student_id", removedStudents);
+        if (delBookErr) throw delBookErr;
+
+        const { error: refundErr } = await supabase
+          .from("plan_usages")
+          .update({ status: "refunded", refunded_at: new Date().toISOString() })
+          .eq("class_id", cls.id)
+          .in("student_id", removedStudents)
+          .in("status", ["pending", "confirmed"]);
+        if (refundErr) throw refundErr;
+      }
+
+      // Agregar bookings
+      if (addedStudents.length > 0) {
+        const bookingRows = addedStudents.map((sid) => ({
+          class_id: cls.id,
+          student_id: sid,
+          status: "reserved",
+        }));
+        const { error: insBookErr } = await supabase.from("bookings").insert(bookingRows);
+        if (insBookErr) throw insBookErr;
+
+        for (const sid of addedStudents) {
+          const planId = planForStudent[sid];
+          if (!planId) continue;
+          const { error: usageUpsertErr } = await supabase.from("plan_usages").upsert(
+            {
+              student_plan_id: planId,
+              class_id: cls.id,
+              student_id: sid,
+              status: "pending",
+            },
+            { onConflict: "student_id,class_id" }
+          );
+          if (usageUpsertErr) {
+            console.error("Error registrando plan_usages en Calendar (edit)", usageUpsertErr.message);
+          }
+        }
+      }
+
+      // Push: removidos (class-cancelled)
+      if (removedStudents.length > 0 && selectedAcademyId && userId && role) {
+        try {
+          const res = await fetch("/api/push/class-cancelled", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              classId: cls.id,
+              coachId: editCoachId,
+              studentIds: removedStudents,
+              dateIso: newIso,
+              academyId: selectedAcademyId,
+              cancelledByRole: role,
+              cancelledByUserId: userId,
+            }),
+          });
+          if (!res.ok) {
+            const txt = await res.text().catch(() => "");
+            console.error("Push class-cancelled respondió con error", res.status, txt);
+          }
+        } catch (pushErr) {
+          console.error("Error enviando push de alumnos removidos", pushErr);
+        }
+      }
+
+      // Push: reprogramación si cambió algo
+      const isRescheduled = oldDateIso !== newIso || oldCourtId !== editCourtId || oldCoachId !== editCoachId;
+      if (isRescheduled && selectedAcademyId && userId && role) {
+        try {
+          const res = await fetch("/api/push/class-rescheduled", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              classId: cls.id,
+              academyId: selectedAcademyId,
+              studentIds: editSelectedStudents,
+              coachId: editCoachId,
+              oldDateIso,
+              newDateIso: newIso,
+              oldCourtId,
+              newCourtId: editCourtId,
+              oldCoachId,
+              newCoachId: editCoachId,
+              rescheduledByRole: role,
+              rescheduledByUserId: userId,
+            }),
+          });
+          if (!res.ok) {
+            const txt = await res.text().catch(() => "");
+            console.error("Push class-rescheduled respondió con error", res.status, txt);
+          }
+        } catch (pushErr) {
+          console.error("Error enviando push de clase reprogramada", pushErr);
+        }
+      }
+
+      toast.success("Cambios guardados.");
+      setDetailsOpen(false);
+      resetEditForm();
+
+      const vr = visibleRangeRef.current;
+      if (vr) await loadCalendarRange(vr.start, vr.end);
+    } catch (e: any) {
+      toast.error(e?.message ?? "No se pudo guardar.");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const openCreate = (prefill?: { day?: string; time?: string }) => {
+    if (!canCreate) return;
+    setCreateOpen(true);
+    if (prefill?.day) setCreateDay(prefill.day);
+    if (prefill?.time) setCreateTime(prefill.time);
+  };
+
+  const onConfirmCreate = async () => {
+    return onConfirmCreateInternal(false);
+  };
+
+  const onConfirmCreateInternal = async (allowPast: boolean) => {
+    if (!selectedAcademyId) {
+      toast.error("Seleccioná una academia en Configuración.");
+      return;
+    }
+    if (role === "super_admin" || role === "student") return;
+    if (!createCourtId || !createDay) {
+      toast.error("Completa cancha y fecha.");
+      return;
+    }
+    const coachIdToUse = role === "coach" ? coachSelfId : createCoachId;
+    if (!coachIdToUse) {
+      toast.error("Seleccioná un profesor.");
+      return;
+    }
+    if (!createTime) {
+      toast.error("Seleccioná una hora.");
+      return;
+    }
+    const hour = Number(createTime.split(":")[0] ?? "NaN");
+    if (Number.isNaN(hour) || hour < 6 || hour > 23) {
+      toast.error("Horario inválido. Seleccioná una hora entre 06:00 y 23:00.");
+      return;
+    }
+    if (createSelectedStudents.length < 1) {
+      toast.error("Selecciona al menos 1 alumno (máximo 4).");
+      return;
+    }
+    if (createSelectedStudents.length > 4) {
+      toast.error("Máximo 4 alumnos por clase.");
+      return;
+    }
+
+    const iso = new Date(`${createDay}T${createTime}:00`).toISOString();
+    {
+      const now = new Date();
+      if (!allowPast && new Date(iso).getTime() <= now.getTime()) {
+        setPastWarningLabel(`${createDay} ${createTime}`);
+        setPastWarningAllowPast(true);
+        setPastWarningOpen(true);
+        return;
+      }
+    }
+
+    setCreating(true);
+    try {
+      // Validar planes y saldo real (como /schedule) + elegir plan por alumno
+      const planForStudent: Record<string, string> = {};
+      for (const sid of createSelectedStudents) {
+        const { data: plans, error: planErr } = await supabase
+          .from("student_plans")
+          .select("id, remaining_classes, purchased_at")
+          .eq("student_id", sid)
+          .order("purchased_at", { ascending: true });
+        if (planErr) throw new Error("No se pudo verificar el plan del alumno. Intenta nuevamente.");
+
+        if (!plans || plans.length === 0) {
+          const label = students.find((s) => s.id === sid)?.full_name ?? "(sin nombre)";
+          toast.error(`El alumno ${label} no tiene un plan con clases disponibles.`);
+          return;
+        }
+
+        let chosenPlan: any = null;
+        for (const p of plans as any[]) {
+          const { count: usedCount, error: usageCountErr } = await supabase
+            .from("plan_usages")
+            .select("id", { count: "exact", head: true })
+            .eq("student_plan_id", p.id)
+            .eq("student_id", sid)
+            .in("status", ["pending", "confirmed"]);
+          if (usageCountErr) throw new Error("No se pudo verificar el uso de clases del plan.");
+
+          const used = usedCount ?? 0;
+          const totalFromPlan = Number((p.remaining_classes as number) ?? 0);
+          const remaining = Math.max(0, totalFromPlan - used);
+          if (remaining > 0) {
+            chosenPlan = p;
+            break;
+          }
+        }
+
+        if (!chosenPlan) {
+          const label = students.find((s) => s.id === sid)?.full_name ?? "(sin nombre)";
+          toast.error(`El alumno ${label} ya no tiene clases disponibles en su plan.`);
+          return;
+        }
+
+        // Limitar cantidad de clases futuras reservadas al total de clases del plan
+        {
+          const totalFromPlan = Number((chosenPlan.remaining_classes as number) ?? 0);
+          if (totalFromPlan > 0) {
+            const nowIso = new Date().toISOString();
+            const { data: futureBookings, error: futureErr } = await supabase
+              .from("bookings")
+              .select("id, class_sessions!inner(id,date)")
+              .eq("student_id", sid)
+              .gt("class_sessions.date", nowIso);
+            if (futureErr) throw new Error("No se pudo verificar las clases futuras del alumno. Intenta nuevamente.");
+
+            const futureCount = (futureBookings ?? []).length;
+            if (futureCount >= totalFromPlan) {
+              const label = students.find((s) => s.id === sid)?.full_name ?? "(sin nombre)";
+              toast.error(
+                `El alumno ${label} ya tiene ${futureCount} clases futuras reservadas, que es el máximo permitido por su plan.`
+              );
+              return;
+            }
+          }
+        }
+
+        planForStudent[sid] = chosenPlan.id as string;
+      }
+
+      // Anti-race: misma cancha y misma hora
+      {
+        const { data: clash, error: clashErr } = await supabase
+          .from("class_sessions")
+          .select("id")
+          .eq("court_id", createCourtId)
+          .eq("date", iso)
+          .neq("status", "cancelled")
+          .limit(1);
+        if (clashErr) throw clashErr;
+        if ((clash ?? []).length > 0) {
+          toast.error("Ese horario ya está ocupado en esa cancha. Elegí otra hora.");
+          return;
+        }
+      }
+
+      // Conflicto: alumnos con clase en mismo horario
+      {
+        const { data: conflictsFiltered, error: conflictsStatusErr } = await supabase
+          .from("bookings")
+          .select("student_id, class_sessions!inner(id,date,status)")
+          .in("student_id", createSelectedStudents)
+          .eq("class_sessions.date", iso)
+          .neq("class_sessions.status", "cancelled");
+        if (conflictsStatusErr) throw conflictsStatusErr;
+        if ((conflictsFiltered ?? []).length > 0) {
+          toast.error("Uno o más alumnos ya tienen una clase en ese horario.");
+          return;
+        }
+      }
+
+      const capacity = createSelectedStudents.length;
+      const typeForSession = capacity === 1 ? "individual" : "grupal";
+
+      const { data: inserted, error: insErr } = await supabase
+        .from("class_sessions")
+        .insert({
+          date: iso,
+          court_id: createCourtId,
+          coach_id: coachIdToUse,
+          capacity,
+          type: typeForSession,
+          attendance_pending: false,
+        })
+        .select("*")
+        .maybeSingle();
+      if (insErr) throw insErr;
+      if (!inserted) throw new Error("No se pudo crear la clase.");
+
+      const createdClassId = (inserted as any).id as string;
+      const bookingRows = createSelectedStudents.map((sid) => ({
+        class_id: createdClassId,
+        student_id: sid,
+        status: "reserved",
+      }));
+      const { error: bookingsErr } = await supabase.from("bookings").insert(bookingRows);
+      if (bookingsErr) throw bookingsErr;
+
+      // plan_usages (consumo pendiente)
+      for (const sid of createSelectedStudents) {
+        const planId = planForStudent[sid];
+        if (!planId) continue;
+        const { error: usageUpsertErr } = await supabase.from("plan_usages").upsert(
+          {
+            student_plan_id: planId,
+            class_id: createdClassId,
+            student_id: sid,
+            status: "pending",
+          },
+          { onConflict: "student_id,class_id" }
+        );
+        if (usageUpsertErr) {
+          console.error("Error registrando plan_usages en Calendar (create)", usageUpsertErr.message);
+        }
+      }
+
+      try {
+        await fetch("/api/push/class-created", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            classId: createdClassId,
+            coachId: coachIdToUse,
+            studentIds: [...createSelectedStudents],
+            dateIso: iso,
+            academyId: selectedAcademyId,
+          }),
+        });
+      } catch {
+        // no bloquear UI por push
+      }
+
+      toast.success("Clase creada correctamente.");
+      setCreateOpen(false);
+      resetCreateForm();
+
+      const vr = visibleRangeRef.current;
+      if (vr) void loadCalendarRange(vr.start, vr.end);
+    } catch (e: any) {
+      toast.error(e?.message ?? "No se pudo crear la clase.");
+    } finally {
+      setCreating(false);
+    }
+  };
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -159,13 +1312,6 @@ export default function CalendarPage() {
 
         const list = ((aRows as Academy[] | null) ?? []).filter((a) => a?.id);
         setAcademies(list);
-
-        if (!selectedAcademyId && list.length > 0 && typeof window !== "undefined") {
-          const first = list[0].id;
-          window.localStorage.setItem("selectedAcademyId", first);
-          window.dispatchEvent(new CustomEvent("selectedAcademyIdChanged", { detail: { academyId: first } }));
-          setSelectedAcademyId(first);
-        }
       } catch (e: any) {
         toast.error(e?.message ?? "No se pudieron cargar academias.");
         setAcademies([]);
@@ -306,8 +1452,8 @@ export default function CalendarPage() {
             title: titleParts.length ? titleParts.join(" · ") : "Clase",
             start: startDt,
             end: endDt,
-            backgroundColor: cls.attendance_pending ? "#f59e0b" : "#3cadaf",
-            borderColor: cls.attendance_pending ? "#d97706" : "#279aa0",
+            backgroundColor: cls.attendance_pending ? "#f59e0b" : "#38AEB1",
+            borderColor: cls.attendance_pending ? "#d97706" : "#2D9A9C",
             textColor: "#0f172a",
             extendedProps: {
               kind: "class_session",
@@ -320,7 +1466,69 @@ export default function CalendarPage() {
         })
         .filter(Boolean);
 
-      setEvents(nextEvents);
+      // Manual events + blocks (por academia y rango; condición de solapamiento)
+      const [manualRes, blocksRes] = await Promise.all([
+        supabase
+          .from("calendar_manual_events")
+          .select("id,academy_id,title,notes,starts_at,ends_at,location_id,court_id,coach_id")
+          .eq("academy_id", selectedAcademyId)
+          .lt("starts_at", toIso)
+          .gt("ends_at", fromIso)
+          .order("starts_at", { ascending: true }),
+        supabase
+          .from("calendar_blocks")
+          .select("id,academy_id,kind,reason,starts_at,ends_at,location_id,court_id,coach_id")
+          .eq("academy_id", selectedAcademyId)
+          .lt("starts_at", toIso)
+          .gt("ends_at", fromIso)
+          .order("starts_at", { ascending: true }),
+      ]);
+
+      if (manualRes.error) throw manualRes.error;
+      if (blocksRes.error) throw blocksRes.error;
+
+      const manualRows = (manualRes.data as CalendarManualEventRow[] | null) ?? [];
+      const blockRows = (blocksRes.data as CalendarBlockRow[] | null) ?? [];
+
+      const manualEvents = manualRows.map((r) => {
+        const startDt = new Date(r.starts_at);
+        const endDt = new Date(r.ends_at);
+        return {
+          id: `manual:${r.id}`,
+          title: r.title,
+          start: startDt,
+          end: endDt,
+          backgroundColor: "#314260",
+          borderColor: "#314260",
+          textColor: "#ffffff",
+          extendedProps: {
+            kind: "manual_event",
+            manualEvent: r,
+          },
+        };
+      });
+
+      const blockEvents = blockRows.map((r) => {
+        const startDt = new Date(r.starts_at);
+        const endDt = new Date(r.ends_at);
+        const isHoliday = String(r.kind ?? "").toLowerCase() === "holiday";
+        return {
+          id: `block:${r.id}`,
+          title: isHoliday ? "Feriado" : r.reason ? `Bloqueo · ${r.reason}` : "Bloqueo",
+          start: startDt,
+          end: endDt,
+          display: "block",
+          backgroundColor: isHoliday ? "rgba(49,66,96,0.12)" : "rgba(148,163,184,0.35)",
+          borderColor: isHoliday ? "rgba(49,66,96,0.25)" : "rgba(148,163,184,0.55)",
+          textColor: "#314260",
+          extendedProps: {
+            kind: "block",
+            block: r,
+          },
+        };
+      });
+
+      setEvents([...blockEvents, ...manualEvents, ...nextEvents]);
     } catch (e: any) {
       toast.error(e?.message ?? "No se pudo cargar el calendario.");
       setEvents([]);
@@ -357,6 +1565,13 @@ export default function CalendarPage() {
     const cls = p.classSession as ClassSession | undefined;
     if (!cls?.id) return;
 
+    // Permisos: admin puede; coach solo su clase
+    if (!role || role === "super_admin" || role === "student") return;
+    if (role === "coach" && coachSelfId && cls.coach_id !== coachSelfId) {
+      toast.error("No tenés permisos para modificar esta clase.");
+      return;
+    }
+
     if (!rescheduleDay || !rescheduleTime) {
       toast.error("Completa fecha y hora.");
       return;
@@ -385,6 +1600,10 @@ export default function CalendarPage() {
 
     setRescheduling(true);
     try {
+      const oldDateIso = cls.date;
+      const oldCourtId = cls.court_id;
+      const oldCoachId = cls.coach_id;
+
       const { data: clash, error: clashErr } = await supabase
         .from("class_sessions")
         .select("id")
@@ -426,6 +1645,52 @@ export default function CalendarPage() {
       if (updErr) throw updErr;
       if (!upd) throw new Error("No se pudo reprogramar la clase.");
 
+      // Notificación (igual que /schedule)
+      if (selectedAcademyId && userId && role) {
+        try {
+          const { data: bRows, error: bErr } = await supabase
+            .from("bookings")
+            .select("student_id")
+            .eq("class_id", cls.id);
+          if (bErr) throw bErr;
+          const studentIds = Array.from(
+            new Set(
+              ((bRows as { student_id: string | null }[] | null) ?? [])
+                .map((r) => r.student_id)
+                .filter((x): x is string => !!x)
+            )
+          );
+
+          const isRescheduled = oldDateIso !== iso;
+          if (isRescheduled) {
+            const res = await fetch("/api/push/class-rescheduled", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                classId: cls.id,
+                academyId: selectedAcademyId,
+                studentIds,
+                coachId: cls.coach_id,
+                oldDateIso,
+                newDateIso: iso,
+                oldCourtId,
+                newCourtId: oldCourtId,
+                oldCoachId,
+                newCoachId: oldCoachId,
+                rescheduledByRole: role,
+                rescheduledByUserId: userId,
+              }),
+            });
+            if (!res.ok) {
+              const txt = await res.text().catch(() => "");
+              console.error("Push class-rescheduled respondió con error", res.status, txt);
+            }
+          }
+        } catch (pushErr) {
+          console.error("Error enviando push de clase reprogramada", pushErr);
+        }
+      }
+
       toast.success("Clase reprogramada.");
       setDetailsOpen(false);
       setRescheduleOpen(false);
@@ -440,98 +1705,154 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 pb-28 pt-6">
-      <div className="flex items-start justify-between gap-3 flex-wrap">
+    <div className="agendo-calendar max-w-5xl mx-auto px-3 sm:px-4 pb-44 pt-4 sm:pt-6 relative z-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-[#0f172a]">Calendario</h1>
-          <p className="text-sm text-slate-600 mt-1">Vista mensual/semanal/diaria. Duración fija: 60 minutos.</p>
-        </div>
-
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="min-w-[240px]">
-            <Select
-              value={selectedAcademyId ?? ""}
-              onValueChange={(val) => {
-                const next = val && val.trim() ? val : null;
-                setSelectedAcademyId(next);
-                if (typeof window !== "undefined") {
-                  if (next) window.localStorage.setItem("selectedAcademyId", next);
-                  else window.localStorage.removeItem("selectedAcademyId");
-                  window.dispatchEvent(new CustomEvent("selectedAcademyIdChanged", { detail: { academyId: next } }));
-                }
-
-                const vr = visibleRangeRef.current;
-                if (vr) void loadCalendarRange(vr.start, vr.end);
-              }}
-              disabled={academies.length <= 1}
-            >
-              <SelectTrigger className="h-11 bg-white">
-                <SelectValue placeholder="Selecciona academia" />
-              </SelectTrigger>
-              <SelectContent>
-                {academies.map((a) => (
-                  <SelectItem key={a.id} value={a.id}>
-                    {a.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex items-center gap-3">
+            <CalendarIcon className="h-5 w-5 text-[#38AEB1]" />
+            <h1 className="text-2xl font-semibold text-[#314260]">Calendario</h1>
           </div>
-
-          <Button
-            type="button"
-            variant="outline"
-            disabled={loading || !visibleRangeRef.current}
-            onClick={() => {
-              const vr = visibleRangeRef.current;
-              if (!vr) return;
-              void loadCalendarRange(vr.start, vr.end);
-            }}
-          >
-            {loading ? "Cargando..." : "Actualizar"}
-          </Button>
+        </div>
+        <div className="flex items-center justify-end">
+          <AgendoLogo className="h-16 w-32" />
         </div>
       </div>
 
+      {!selectedAcademyId && (
+        <div className="mt-4 text-[11px] text-amber-700">
+          Seleccioná una academia en Configuración para ver el calendario.
+        </div>
+      )}
+
+      <div className="mt-3 h-6 flex items-center text-xs text-slate-500">{loading ? "Cargando..." : ""}</div>
+
+      {canCreate && (
+        <div className="mt-3">
+          <Button type="button" className="h-9" onClick={() => openCreate()} disabled={!selectedAcademyId}>
+            + Nueva clase
+          </Button>
+        </div>
+      )}
+
       <div className="mt-4 rounded-xl border bg-white shadow-sm overflow-hidden">
-        <div className="p-3 border-b bg-slate-50 flex items-center justify-between">
-          <div className="text-sm font-semibold text-slate-800">Agenda</div>
-          <div className="text-xs text-slate-500">
-            {role ? `Rol: ${role}` : ""}
-          </div>
+        <div className="p-3 border-b bg-white flex items-center justify-between">
+          <div className="text-sm font-semibold text-slate-800">Calendario</div>
+          <div className="text-xs text-slate-500">{role ? `Rol: ${role}` : ""}</div>
         </div>
 
-        <div className="p-3">
+        {isMobile && (
+          <div className="p-2 border-b bg-white">
+            <div className="grid grid-cols-3 gap-2">
+              <Button
+                type="button"
+                variant={mobileView === "timeGridDay" ? "default" : "outline"}
+                className="h-9 text-xs"
+                onClick={() => setMobileView("timeGridDay")}
+              >
+                Día
+              </Button>
+              <Button
+                type="button"
+                variant={mobileView === "timeGridWeek" ? "default" : "outline"}
+                className="h-9 text-xs"
+                onClick={() => setMobileView("timeGridWeek")}
+              >
+                Semana
+              </Button>
+              <Button
+                type="button"
+                variant={mobileView === "dayGridMonth" ? "default" : "outline"}
+                className="h-9 text-xs"
+                onClick={() => setMobileView("dayGridMonth")}
+              >
+                Mes
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <div className="p-2 sm:p-3">
           <FullCalendar
+            key={isMobile ? "mobile" : "desktop"}
+            ref={calendarRef as any}
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView="timeGridWeek"
+            initialView={isMobile ? mobileView : "timeGridWeek"}
             height="auto"
-            locale="es"
+            expandRows
+            locale={esLocale as any}
             firstDay={1}
             nowIndicator
             weekends
+            allDaySlot={!isMobile}
             selectable
             selectMirror
-            eventTimeFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
-            headerToolbar={{
-              left: "prev,next today",
-              center: "title",
-              right: "dayGridMonth,timeGridWeek,timeGridDay",
+            buttonText={{
+              today: "Hoy",
+              month: "Mes",
+              week: "Semana",
+              day: "Día",
+              list: "Lista",
             }}
+            allDayText="Todo el día"
+            noEventsText="No hay eventos para mostrar"
+            eventTimeFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
+            headerToolbar={
+              isMobile
+                ? { left: "prev,next", center: "title", right: "today" }
+                : {
+                    left: "prev,next today",
+                    center: "title",
+                    right: "dayGridMonth,timeGridWeek,timeGridDay",
+                  }
+            }
+            views={
+              isMobile
+                ? {
+                    timeGridDay: {
+                      titleFormat: { year: "numeric", month: "short", day: "numeric" },
+                    },
+                    timeGridWeek: {
+                      titleFormat: { year: "numeric", month: "short", day: "numeric" },
+                    },
+                    dayGridMonth: {
+                      titleFormat: { year: "numeric", month: "long" },
+                    },
+                  }
+                : undefined
+            }
+            dayHeaderFormat={isMobile ? { weekday: "short" } : undefined}
+            slotMinTime="06:00:00"
+            slotMaxTime="23:00:00"
+            slotLabelFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
+            slotLabelInterval={{ hours: 1 }}
             events={events}
+            eventClassNames={(arg) => {
+              const classes: string[] = [];
+              if (tappedEventId && arg.event.id === tappedEventId) classes.push("agendo-fc-tapped");
+              return classes;
+            }}
             datesSet={(arg) => {
               visibleRangeRef.current = { start: arg.start, end: arg.end };
               void loadCalendarRange(arg.start, arg.end);
             }}
+            dateClick={(arg) => {
+              if (!canCreate) return;
+              if (!arg?.date) return;
+              if ((arg as any).allDay) {
+                openCreate({ day: toYmd(arg.date) });
+                return;
+              }
+              const d = arg.date;
+              const hh = pad2(d.getHours());
+              openCreate({ day: toYmd(d), time: `${hh}:00` });
+            }}
             eventClick={(info) => {
+              setTappedEventId(info.event.id);
+              window.setTimeout(() => setTappedEventId((cur) => (cur === info.event.id ? null : cur)), 300);
               onOpenDetails(info.event);
             }}
           />
         </div>
-      </div>
-
-      <div className="mt-3 text-xs text-slate-500">
-        Este módulo está listo para sumar eventos manuales, bloqueos y feriados. (V1: se muestran clases + conteo de reservas)
       </div>
 
       <Dialog
@@ -540,11 +1861,13 @@ export default function CalendarPage() {
           setDetailsOpen(open);
           if (!open) {
             setRescheduleOpen(false);
+            resetEditForm();
+            resetAttendance();
             setDetailsEvent(null);
           }
         }}
       >
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto pb-28">
           <DialogHeader>
             <DialogTitle className="text-[#0f172a]">Detalle</DialogTitle>
             <DialogDescription>
@@ -579,39 +1902,238 @@ export default function CalendarPage() {
                 </div>
               </div>
 
-              {rescheduleOpen && (
+              {editOpen && (
                 <div className="rounded-lg border p-3">
-                  <div className="text-sm font-semibold text-slate-800">Reprogramar</div>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div className="text-sm font-semibold text-slate-800">Editar</div>
+
+                  <div className="mt-3 grid gap-3">
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-700">Fecha</label>
-                      <input
-                        type="date"
-                        value={rescheduleDay}
-                        onChange={(e) => setRescheduleDay(e.target.value)}
-                        className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#3cadaf]/40"
-                      />
+                      <label className="mb-1 block text-xs font-medium text-slate-700">Complejo</label>
+                      <select
+                        value={editLocationId}
+                        onChange={(e) => {
+                          setEditLocationId(e.target.value);
+                          setEditCourtId("");
+                        }}
+                        className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#38AEB1]/40"
+                      >
+                        <option value="">Selecciona un complejo</option>
+                        {locations.map((l) => (
+                          <option key={l.id} value={l.id}>
+                            {l.name ?? l.id}
+                          </option>
+                        ))}
+                      </select>
                     </div>
+
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-700">Hora</label>
-                      <Select value={rescheduleTime} onValueChange={setRescheduleTime}>
-                        <SelectTrigger className="h-10 bg-white">
-                          <SelectValue placeholder="Selecciona una hora" />
-                        </SelectTrigger>
-                        <SelectContent className="max-h-60 overflow-y-auto">
-                          {Array.from({ length: 18 }).map((_, idx) => {
-                            const h = 6 + idx;
-                            const t = `${pad2(h)}:00`;
-                            return (
-                              <SelectItem key={t} value={t}>
-                                {t}
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
-                      <div className="mt-1 text-[11px] text-slate-500">Rango permitido: 06:00 a 23:00</div>
+                      <label className="mb-1 block text-xs font-medium text-slate-700">Cancha</label>
+                      <select
+                        value={editCourtId}
+                        onChange={(e) => setEditCourtId(e.target.value)}
+                        disabled={!editLocationId}
+                        className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#38AEB1]/40 disabled:opacity-50"
+                      >
+                        <option value="">
+                          {editLocationId ? "Selecciona una cancha" : "Selecciona un complejo primero"}
+                        </option>
+                        {(editLocationId ? courts.filter((c) => c.location_id === editLocationId) : courts).map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name}
+                          </option>
+                        ))}
+                      </select>
                     </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-700">Fecha</label>
+                        <input
+                          type="date"
+                          value={editDay}
+                          onChange={(e) => setEditDay(e.target.value)}
+                          className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#38AEB1]/40"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-700">Hora disponible</label>
+                        <select
+                          value={editTime}
+                          onChange={(e) => setEditTime(e.target.value)}
+                          disabled={!editCourtId || !editDay || editAvailableTimes.length === 0}
+                          className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#38AEB1]/40 disabled:opacity-50"
+                        >
+                          <option value="">
+                            {!editCourtId
+                              ? "Selecciona una cancha"
+                              : !editDay
+                              ? "Selecciona una fecha"
+                              : editAvailableTimes.length
+                              ? "Selecciona una hora"
+                              : "Sin horarios"}
+                          </option>
+                          {editAvailableTimes.map((t) => (
+                            <option key={t} value={t}>
+                              {t}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="mt-1 text-[11px] text-slate-500">Rango permitido: 06:00 a 23:00</div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-700">Profesor</label>
+                      <select
+                        value={editCoachId}
+                        onChange={(e) => setEditCoachId(e.target.value)}
+                        className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#38AEB1]/40"
+                      >
+                        <option value="">Selecciona un profesor</option>
+                        {coaches.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.full_name ?? c.id}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-700">Alumnos (1 a 4)</label>
+                      <Popover open={editStudentsPopoverOpen} onOpenChange={setEditStudentsPopoverOpen}>
+                        <PopoverTrigger asChild>
+                          <Button type="button" variant="outline" className="w-full justify-between text-sm font-normal">
+                            <span className="truncate mr-2">
+                              {editSelectedStudents.length === 0
+                                ? "Selecciona hasta 4 alumnos"
+                                : editSelectedStudents.length === 1
+                                ? "1 alumno seleccionado"
+                                : `${editSelectedStudents.length} alumnos seleccionados`}
+                            </span>
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-80 p-3" align="start">
+                          <div className="space-y-2">
+                            <Input
+                              type="text"
+                              placeholder="Buscar alumnos..."
+                              value={editStudentQuery}
+                              onChange={(e) => setEditStudentQuery(e.target.value)}
+                              className="h-11 text-base"
+                            />
+                            <div className="max-h-52 overflow-auto border rounded-md divide-y">
+                              {(() => {
+                                const filtered = students.filter((s) => {
+                                  const t = (editStudentQuery || "").toLowerCase();
+                                  if (!t) return true;
+                                  const label = `${s.full_name ?? ""} ${s.notes ?? ""} ${s.level ?? ""} ${s.id}`;
+                                  return label.toLowerCase().includes(t);
+                                });
+                                const limited = filtered.slice(0, 50);
+                                if (students.length === 0) {
+                                  return <div className="px-2 py-1.5 text-xs text-gray-500">No hay alumnos.</div>;
+                                }
+                                if (filtered.length === 0) {
+                                  return (
+                                    <div className="px-2 py-1.5 text-xs text-gray-500">
+                                      No se encontraron alumnos con ese criterio.
+                                    </div>
+                                  );
+                                }
+                                return (
+                                  <>
+                                    {limited.map((s) => {
+                                      const id = s.id;
+                                      const checked = editSelectedStudents.includes(id);
+                                      const remaining = remainingByStudent[id];
+                                      const toggle = () => {
+                                        if (!checked && editSelectedStudents.length >= 4) {
+                                          toast.error("Máximo 4 alumnos por clase");
+                                          return;
+                                        }
+                                        setEditSelectedStudents((prev) => (checked ? prev.filter((x) => x !== id) : [...prev, id]));
+                                      };
+                                      return (
+                                        <button
+                                          key={id}
+                                          type="button"
+                                          onClick={toggle}
+                                          className="w-full flex items-center justify-between px-2 py-1.5 text-sm hover:bg-slate-50"
+                                        >
+                                          <span className="truncate mr-2">
+                                            {s.full_name ?? s.notes ?? s.level ?? s.id}
+                                            <span
+                                              className={
+                                                "ml-1 tabular-nums " +
+                                                (remaining === undefined
+                                                  ? "text-gray-400"
+                                                  : remaining > 0
+                                                  ? "text-emerald-600"
+                                                  : "text-red-600")
+                                              }
+                                            >
+                                              ({remaining === undefined ? (remainingLoading ? "…" : "…") : remaining})
+                                            </span>
+                                          </span>
+                                          <input
+                                            type="checkbox"
+                                            readOnly
+                                            checked={checked}
+                                            className="h-3.5 w-3.5 rounded border-gray-300"
+                                          />
+                                        </button>
+                                      );
+                                    })}
+                                    {filtered.length > limited.length && (
+                                      <div className="px-2 py-1.5 text-[11px] text-gray-500 bg-slate-50">
+                                        Mostrando los primeros {limited.length} alumnos.
+                                      </div>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                            <p className="text-[11px] text-gray-500">Se actualizarán las reservas según los alumnos seleccionados.</p>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {attendanceOpen && (
+                <div className="rounded-lg border p-3">
+                  <div className="text-sm font-semibold text-slate-800">Asistencia</div>
+                  <div className="mt-3 space-y-2">
+                    {attendanceLoading ? (
+                      <div className="text-xs text-slate-500">Cargando...</div>
+                    ) : attendanceList.length === 0 ? (
+                      <div className="text-xs text-slate-500">No hay alumnos para marcar.</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {attendanceList.map((r) => (
+                          <button
+                            key={r.student_id}
+                            type="button"
+                            onClick={() =>
+                              setAttendanceList((prev) =>
+                                prev.map((x) => (x.student_id === r.student_id ? { ...x, present: !x.present } : x))
+                              )
+                            }
+                            className="w-full flex items-center justify-between rounded-md border px-3 py-2 text-sm hover:bg-slate-50"
+                          >
+                            <span className="truncate mr-2">{r.label}</span>
+                            <input
+                              type="checkbox"
+                              readOnly
+                              checked={r.present}
+                              className="h-4 w-4 rounded border-gray-300"
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -634,22 +2156,319 @@ export default function CalendarPage() {
 
               {detailsEvent?.props?.kind === "class_session" && (
                 <div className="flex items-center gap-2">
+                  {(role === "admin" ||
+                    (role === "coach" &&
+                      coachSelfId &&
+                      (detailsEvent?.props?.classSession?.coach_id as string | null | undefined) === coachSelfId)) && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-red-200 text-red-600 hover:bg-red-50"
+                      onClick={onConfirmCancel}
+                      disabled={cancelling || rescheduling}
+                    >
+                      {cancelling ? "Cancelando..." : "Cancelar"}
+                    </Button>
+                  )}
+
                   <Button
                     type="button"
-                    variant="outline"
-                    onClick={() => setRescheduleOpen((p) => !p)}
-                    disabled={rescheduling}
+                    variant={editOpen ? "default" : "outline"}
+                    onClick={() => {
+                      if (editOpen) resetEditForm();
+                      else void onStartEdit();
+                    }}
+                    disabled={savingEdit || cancelling || role === "super_admin" || role === "student"}
                   >
-                    {rescheduleOpen ? "Ocultar" : "Reprogramar"}
+                    Editar
                   </Button>
-                  {rescheduleOpen && (
-                    <Button type="button" onClick={onConfirmReschedule} disabled={rescheduling}>
-                      {rescheduling ? "Guardando..." : "Guardar"}
+                  {editOpen && (
+                    <Button type="button" onClick={onSaveEdit} disabled={savingEdit || cancelling}>
+                      {savingEdit ? "Guardando..." : "Guardar"}
+                    </Button>
+                  )}
+
+                  <Button
+                    type="button"
+                    variant={attendanceOpen ? "default" : "outline"}
+                    onClick={() => {
+                      if (attendanceOpen) resetAttendance();
+                      else void openAttendance();
+                    }}
+                    disabled={attendanceSaving || attendanceLoading || role === "super_admin" || role === "student"}
+                  >
+                    Asistencia
+                  </Button>
+                  {attendanceOpen && (
+                    <Button type="button" onClick={onSaveAttendance} disabled={attendanceSaving || attendanceLoading || cancelling}>
+                      {attendanceSaving ? "Guardando..." : "Guardar asistencia"}
                     </Button>
                   )}
                 </div>
               )}
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={pastWarningOpen}
+        onOpenChange={(open) => {
+          setPastWarningOpen(open);
+          if (!open) {
+            setPastWarningLabel("");
+            setPastWarningAllowPast(false);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-[#0f172a]">Clase en el pasado</DialogTitle>
+            <DialogDescription>
+              Estás por crear una clase para <strong>{pastWarningLabel || "(fecha/hora)"}</strong>. ¿Querés continuar?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={() => setPastWarningOpen(false)} disabled={creating}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={async () => {
+                setPastWarningOpen(false);
+                if (pastWarningAllowPast) await onConfirmCreateInternal(true);
+              }}
+              disabled={creating}
+            >
+              Continuar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={createOpen}
+        onOpenChange={(open) => {
+          setCreateOpen(open);
+          if (!open) resetCreateForm();
+        }}
+      >
+        <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-[#0f172a]">Nueva clase</DialogTitle>
+            <DialogDescription>Duración fija: 60 minutos</DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-3">
+            <div>
+              <label className="block text-sm mb-1">Complejo</label>
+              <select
+                value={createLocationId}
+                onChange={(e) => {
+                  setCreateLocationId(e.target.value);
+                  setCreateCourtId("");
+                }}
+                className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#38AEB1]/40"
+              >
+                <option value="">Selecciona un complejo</option>
+                {locations.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name ?? l.id}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm mb-1">Cancha</label>
+              <select
+                value={createCourtId}
+                onChange={(e) => setCreateCourtId(e.target.value)}
+                disabled={!createLocationId}
+                className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#38AEB1]/40 disabled:opacity-50"
+              >
+                <option value="">
+                  {createLocationId ? "Selecciona una cancha" : "Selecciona un complejo primero"}
+                </option>
+                {(createLocationId ? courts.filter((c) => c.location_id === createLocationId) : courts).map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="block text-sm mb-1">Fecha</label>
+                <input
+                  type="date"
+                  value={createDay}
+                  onChange={(e) => setCreateDay(e.target.value)}
+                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#38AEB1]/40"
+                />
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Hora disponible</label>
+                <select
+                  value={createTime}
+                  onChange={(e) => setCreateTime(e.target.value)}
+                  disabled={!createCourtId || !createDay || availableTimes.length === 0}
+                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#38AEB1]/40 disabled:opacity-50"
+                >
+                  <option value="">
+                    {!createCourtId
+                      ? "Selecciona una cancha"
+                      : !createDay
+                      ? "Selecciona una fecha"
+                      : availableTimes.length
+                      ? "Selecciona una hora"
+                      : "Sin horarios"}
+                  </option>
+                  {availableTimes.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm mb-1">Profesor</label>
+              {role === "coach" ? (
+                <div className="h-10 w-full rounded-md border border-slate-200 bg-slate-50 px-3 flex items-center text-sm text-slate-700">
+                  {coaches.find((c) => c.id === coachSelfId)?.full_name ?? "Tu cuenta"}
+                </div>
+              ) : (
+                <select
+                  value={createCoachId}
+                  onChange={(e) => setCreateCoachId(e.target.value)}
+                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#38AEB1]/40"
+                >
+                  <option value="">Selecciona un profesor</option>
+                  {coaches.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.full_name ?? c.id}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm mb-1">Alumnos (1 a 4)</label>
+              <Popover open={studentsPopoverOpen} onOpenChange={setStudentsPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button type="button" variant="outline" className="w-full justify-between text-sm font-normal">
+                    <span className="truncate mr-2">
+                      {createSelectedStudents.length === 0
+                        ? "Selecciona hasta 4 alumnos"
+                        : createSelectedStudents.length === 1
+                        ? "1 alumno seleccionado"
+                        : `${createSelectedStudents.length} alumnos seleccionados`}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-3" align="start">
+                  <div className="space-y-2">
+                    <Input
+                      type="text"
+                      placeholder="Buscar alumnos..."
+                      value={studentQuery}
+                      onChange={(e) => setStudentQuery(e.target.value)}
+                      className="h-11 text-base"
+                    />
+                    <div className="max-h-52 overflow-auto border rounded-md divide-y">
+                      {(() => {
+                        const filtered = students.filter((s) => {
+                          const t = (studentQuery || "").toLowerCase();
+                          if (!t) return true;
+                          const label = `${s.full_name ?? ""} ${s.notes ?? ""} ${s.level ?? ""} ${s.id}`;
+                          return label.toLowerCase().includes(t);
+                        });
+                        const limited = filtered.slice(0, 50);
+                        if (students.length === 0) {
+                          return <div className="px-2 py-1.5 text-xs text-gray-500">No hay alumnos.</div>;
+                        }
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="px-2 py-1.5 text-xs text-gray-500">
+                              No se encontraron alumnos con ese criterio.
+                            </div>
+                          );
+                        }
+                        return (
+                          <>
+                            {limited.map((s) => {
+                              const id = s.id;
+                              const checked = createSelectedStudents.includes(id);
+                              const remaining = remainingByStudent[id];
+                              const toggle = () => {
+                                if (!checked && createSelectedStudents.length >= 4) {
+                                  toast.error("Máximo 4 alumnos por clase");
+                                  return;
+                                }
+                                setCreateSelectedStudents((prev) =>
+                                  checked ? prev.filter((x) => x !== id) : [...prev, id]
+                                );
+                              };
+                              return (
+                                <button
+                                  key={id}
+                                  type="button"
+                                  onClick={toggle}
+                                  className="w-full flex items-center justify-between px-2 py-1.5 text-sm hover:bg-slate-50"
+                                >
+                                  <span className="truncate mr-2">
+                                    {s.full_name ?? s.notes ?? s.level ?? s.id}
+                                    <span
+                                      className={
+                                        "ml-1 tabular-nums " +
+                                        (remaining === undefined
+                                          ? "text-gray-400"
+                                          : remaining > 0
+                                          ? "text-emerald-600"
+                                          : "text-red-600")
+                                      }
+                                    >
+                                      ({remaining === undefined ? (remainingLoading ? "…" : "…") : remaining})
+                                    </span>
+                                  </span>
+                                  <input
+                                    type="checkbox"
+                                    readOnly
+                                    checked={checked}
+                                    className="h-3.5 w-3.5 rounded border-gray-300"
+                                  />
+                                </button>
+                              );
+                            })}
+                            {filtered.length > limited.length && (
+                              <div className="px-2 py-1.5 text-[11px] text-gray-500 bg-slate-50">
+                                Mostrando los primeros {limited.length} alumnos.
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
+                    <p className="text-[11px] text-gray-500">
+                      Se crearán reservas para los alumnos seleccionados.
+                    </p>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={onConfirmCreate} disabled={creating}>
+              {creating ? "Creando..." : "Crear clase"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
