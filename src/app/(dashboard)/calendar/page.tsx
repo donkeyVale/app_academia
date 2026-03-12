@@ -998,6 +998,8 @@ export default function CalendarPage() {
               class_id: cls.id,
               student_id: sid,
               status: "pending",
+              confirmed_at: null,
+              refunded_at: null,
             },
             { onConflict: "student_id,class_id" }
           );
@@ -1296,6 +1298,8 @@ export default function CalendarPage() {
             class_id: createdClassId,
             student_id: sid,
             status: "pending",
+            confirmed_at: null,
+            refunded_at: null,
           },
           { onConflict: "student_id,class_id" }
         );
