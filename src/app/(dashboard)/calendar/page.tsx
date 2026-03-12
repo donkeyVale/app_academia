@@ -932,6 +932,16 @@ export default function CalendarPage() {
           .in("student_id", removedStudents);
         if (delBookErr) throw delBookErr;
 
+        const { data: stillBooked, error: stillBookedErr } = await supabase
+          .from("bookings")
+          .select("student_id")
+          .eq("class_id", cls.id)
+          .in("student_id", removedStudents);
+        if (stillBookedErr) throw stillBookedErr;
+        if ((stillBooked ?? []).length > 0) {
+          throw new Error("No se pudieron eliminar algunas reservas de alumnos removidos. Intenta nuevamente.");
+        }
+
         const { error: refundErr } = await supabase
           .from("plan_usages")
           .update({ status: "refunded", refunded_at: new Date().toISOString() })
