@@ -853,15 +853,43 @@ export default function CalendarPage() {
       // Validación de planes solo para alumnos agregados
       const planForStudent: Record<string, string> = {};
       for (const sid of addedStudents) {
-        const { data: plans, error: planErr } = await supabase
-          .from("student_plans")
-          .select("id, remaining_classes, purchased_at")
-          .eq("student_id", sid)
-          .eq("is_active", true)
-          .order("purchased_at", { ascending: true });
-        if (planErr) throw planErr;
+        const label = students.find((s) => s.id === sid)?.full_name ?? "(sin nombre)";
+
+        let plans: any[] | null = null;
+        {
+          const { data, error } = await supabase
+            .from("student_plans")
+            .select("id, remaining_classes, purchased_at")
+            .eq("student_id", sid)
+            .eq("is_active", true)
+            .order("purchased_at", { ascending: true });
+
+          if (!error) {
+            plans = (data as any[]) ?? [];
+          } else {
+            const msg = String((error as any)?.message ?? "");
+            const isMissingIsActive = msg.toLowerCase().includes("is_active") && msg.toLowerCase().includes("column");
+            if (isMissingIsActive) {
+              const { data: data2, error: error2 } = await supabase
+                .from("student_plans")
+                .select("id, remaining_classes, purchased_at")
+                .eq("student_id", sid)
+                .order("purchased_at", { ascending: true });
+              if (error2) {
+                console.error("Error verificando student_plans (fallback) en Calendar (edit)", sid, label, (error2 as any)?.message);
+                toast.error(`No se pudo verificar el plan de ${label}. Intenta nuevamente.`);
+                return;
+              }
+              plans = (data2 as any[]) ?? [];
+            } else {
+              console.error("Error verificando student_plans en Calendar (edit)", sid, label, (error as any)?.message);
+              toast.error(`No se pudo verificar el plan de ${label}. ${msg || "Intenta nuevamente."}`);
+              return;
+            }
+          }
+        }
+
         if (!plans || plans.length === 0) {
-          const label = students.find((s) => s.id === sid)?.full_name ?? "(sin nombre)";
           toast.error(`${label} no tiene un plan activo con clases disponibles.`);
           return;
         }
