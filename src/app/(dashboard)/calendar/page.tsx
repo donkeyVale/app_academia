@@ -501,6 +501,7 @@ export default function CalendarPage() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               classId: cls.id,
+              coachId: cls.coach_id,
               studentIds,
               dateIso: cls.date,
               academyId: selectedAcademyId,
@@ -1101,6 +1102,7 @@ export default function CalendarPage() {
           .from("student_plans")
           .select("id, remaining_classes, purchased_at")
           .eq("student_id", sid)
+          .eq("is_active", true)
           .order("purchased_at", { ascending: true });
         if (planErr) throw new Error("No se pudo verificar el plan del alumno. Intenta nuevamente.");
 
