@@ -11,20 +11,22 @@ type BeforeInstallPromptEvent = Event & {
 const HIDE_IOS_INSTALL_BANNER_KEY = 'hide_ios_install_banner';
 
 export function PwaInstallPrompt() {
+  const [mounted, setMounted] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
-  const [dismissed, setDismissed] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    try {
-      return window.localStorage.getItem(HIDE_IOS_INSTALL_BANNER_KEY) === 'true';
-    } catch {
-      return false;
-    }
-  });
+  const [dismissed, setDismissed] = useState(false);
   const [iosHelpOpen, setIosHelpOpen] = useState(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+
+    setMounted(true);
+
+    try {
+      setDismissed(window.localStorage.getItem(HIDE_IOS_INSTALL_BANNER_KEY) === 'true');
+    } catch {
+      setDismissed(false);
+    }
 
     const updateInstalled = () => {
       const standalone =
@@ -61,18 +63,19 @@ export function PwaInstallPrompt() {
   }, []);
 
   const isIosSafari = useMemo(() => {
-    if (typeof window === 'undefined') return false;
+    if (!mounted) return false;
     const ua = window.navigator.userAgent;
     const isIOS = /iPad|iPhone|iPod/i.test(ua);
     const isWebKit = /WebKit/i.test(ua);
     const isCriOS = /CriOS/i.test(ua);
     const isFxiOS = /FxiOS/i.test(ua);
     return isIOS && isWebKit && !isCriOS && !isFxiOS;
-  }, []);
+  }, [mounted]);
 
   // UX: este banner se usa solo para iOS Safari (en Android ya existe el prompt/botón nativo).
   const showInstall = !installed && !dismissed && isIosSafari;
 
+  if (!mounted) return null;
   if (!showInstall) return null;
 
   return (

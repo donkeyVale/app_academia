@@ -855,38 +855,15 @@ export default function CalendarPage() {
       for (const sid of addedStudents) {
         const label = students.find((s) => s.id === sid)?.full_name ?? "(sin nombre)";
 
-        let plans: any[] | null = null;
-        {
-          const { data, error } = await supabase
-            .from("student_plans")
-            .select("id, remaining_classes, purchased_at")
-            .eq("student_id", sid)
-            .eq("is_active", true)
-            .order("purchased_at", { ascending: true });
-
-          if (!error) {
-            plans = (data as any[]) ?? [];
-          } else {
-            const msg = String((error as any)?.message ?? "");
-            const isMissingIsActive = msg.toLowerCase().includes("is_active") && msg.toLowerCase().includes("column");
-            if (isMissingIsActive) {
-              const { data: data2, error: error2 } = await supabase
-                .from("student_plans")
-                .select("id, remaining_classes, purchased_at")
-                .eq("student_id", sid)
-                .order("purchased_at", { ascending: true });
-              if (error2) {
-                console.error("Error verificando student_plans (fallback) en Calendar (edit)", sid, label, (error2 as any)?.message);
-                toast.error(`No se pudo verificar el plan de ${label}. Intenta nuevamente.`);
-                return;
-              }
-              plans = (data2 as any[]) ?? [];
-            } else {
-              console.error("Error verificando student_plans en Calendar (edit)", sid, label, (error as any)?.message);
-              toast.error(`No se pudo verificar el plan de ${label}. ${msg || "Intenta nuevamente."}`);
-              return;
-            }
-          }
+        const { data: plans, error: planErr } = await supabase
+          .from("student_plans")
+          .select("id, remaining_classes, purchased_at")
+          .eq("student_id", sid)
+          .order("purchased_at", { ascending: true });
+        if (planErr) {
+          console.error("Error verificando student_plans en Calendar (edit)", sid, label, (planErr as any)?.message);
+          toast.error(`No se pudo verificar el plan de ${label}. Intenta nuevamente.`);
+          return;
         }
 
         if (!plans || plans.length === 0) {
@@ -1140,38 +1117,15 @@ export default function CalendarPage() {
       for (const sid of createSelectedStudents) {
         const label = students.find((s) => s.id === sid)?.full_name ?? "(sin nombre)";
 
-        let plans: any[] | null = null;
-        {
-          const { data, error } = await supabase
-            .from("student_plans")
-            .select("id, remaining_classes, purchased_at")
-            .eq("student_id", sid)
-            .eq("is_active", true)
-            .order("purchased_at", { ascending: true });
-
-          if (!error) {
-            plans = (data as any[]) ?? [];
-          } else {
-            const msg = String((error as any)?.message ?? "");
-            const isMissingIsActive = msg.toLowerCase().includes("is_active") && msg.toLowerCase().includes("column");
-            if (isMissingIsActive) {
-              const { data: data2, error: error2 } = await supabase
-                .from("student_plans")
-                .select("id, remaining_classes, purchased_at")
-                .eq("student_id", sid)
-                .order("purchased_at", { ascending: true });
-              if (error2) {
-                console.error("Error verificando student_plans (fallback) en Calendar (create)", sid, label, (error2 as any)?.message);
-                toast.error(`No se pudo verificar el plan de ${label}. Intenta nuevamente.`);
-                return;
-              }
-              plans = (data2 as any[]) ?? [];
-            } else {
-              console.error("Error verificando student_plans en Calendar (create)", sid, label, (error as any)?.message);
-              toast.error(`No se pudo verificar el plan de ${label}. ${msg || "Intenta nuevamente."}`);
-              return;
-            }
-          }
+        const { data: plans, error: planErr } = await supabase
+          .from("student_plans")
+          .select("id, remaining_classes, purchased_at")
+          .eq("student_id", sid)
+          .order("purchased_at", { ascending: true });
+        if (planErr) {
+          console.error("Error verificando student_plans en Calendar (create)", sid, label, (planErr as any)?.message);
+          toast.error(`No se pudo verificar el plan de ${label}. Intenta nuevamente.`);
+          return;
         }
 
         if (!plans || plans.length === 0) {
@@ -1309,7 +1263,7 @@ export default function CalendarPage() {
       }
 
       try {
-        await fetch("/api/push/class-created", {
+        const res = await fetch("/api/push/class-created", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1320,6 +1274,16 @@ export default function CalendarPage() {
             academyId: selectedAcademyId,
           }),
         });
+
+        if (!res.ok) {
+          let txt = "";
+          try {
+            txt = await res.text();
+          } catch {
+            txt = "";
+          }
+          console.warn("Push class-created failed", res.status, txt);
+        }
       } catch {
         // no bloquear UI por push
       }
