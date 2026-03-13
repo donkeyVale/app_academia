@@ -2072,9 +2072,20 @@ export default function CalendarPage() {
               return classes;
             }}
             datesSet={(arg) => {
+              const viewType = String((arg.view as any)?.type ?? "");
               visibleRangeRef.current = { start: arg.start, end: arg.end };
-              setCurrentViewType(String((arg.view as any)?.type ?? ""));
-              void loadCalendarRange(arg.start, arg.end);
+
+              const run = () => {
+                setCurrentViewType(viewType);
+                void loadCalendarRange(arg.start, arg.end);
+              };
+
+              try {
+                if (typeof queueMicrotask === "function") queueMicrotask(run);
+                else window.setTimeout(run, 0);
+              } catch {
+                window.setTimeout(run, 0);
+              }
             }}
             dateClick={(arg) => {
               if (!canCreate) return;
