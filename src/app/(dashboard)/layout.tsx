@@ -115,38 +115,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const avatarButtonRef = useRef<HTMLButtonElement>(null);
   const avatarMenuPanelRef = useRef<HTMLDivElement | null>(null);
 
+  const [mounted, setMounted] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [avatarOffsetX, setAvatarOffsetX] = useState(0);
   const [avatarOffsetY, setAvatarOffsetY] = useState(0);
   const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
-  const [role, setRole] = useState<AppRole>(() => {
-    if (typeof window === 'undefined') return null;
-    const v = window.localStorage.getItem('currentUserRole');
-    if (v === 'super_admin' || v === 'admin' || v === 'coach' || v === 'student') return v;
-    return null;
-  });
-  const [isAdmin, setIsAdmin] = useState(() => {
-    const r = (typeof window !== 'undefined' ? window.localStorage.getItem('currentUserRole') : null) as AppRole;
-    return r === 'admin' || r === 'super_admin';
-  });
+  const [role, setRole] = useState<AppRole>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [academyOptions, setAcademyOptions] = useState<{ id: string; name: string }[]>([]);
   const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(null);
-  const [impersonateAcademyId, setImpersonateAcademyId] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null;
-    const v = window.localStorage.getItem(IMPERSONATE_KEY);
-    return v && v.trim() ? v : null;
-  });
-  const [impersonateAcademyName, setImpersonateAcademyName] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null;
-    const v = window.localStorage.getItem(LS_NAME_KEY);
-    return v && v.trim() ? v : null;
-  });
+  const [impersonateAcademyId, setImpersonateAcademyId] = useState<string | null>(null);
+  const [impersonateAcademyName, setImpersonateAcademyName] = useState<string | null>(null);
 
   const [userId, setUserId] = useState<string | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [scheduleBadgeCount, setScheduleBadgeCount] = useState(0);
-  const [scheduleBadgeTick, setScheduleBadgeTick] = useState<number>(() => Date.now());
+  const [scheduleBadgeTick, setScheduleBadgeTick] = useState<number>(0);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const v = window.localStorage.getItem('currentUserRole');
+    const r: AppRole = (v === 'super_admin' || v === 'admin' || v === 'coach' || v === 'student' ? v : null) as any;
+    setRole(r);
+    setIsAdmin(r === 'admin' || r === 'super_admin');
+  }, []);
 
   useEffect(() => {
     // Al iniciar sesión, Supabase puede hidratar la sesión async; esto asegura que
@@ -170,6 +167,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [unreadCount]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    setScheduleBadgeTick(Date.now());
     const id = window.setInterval(() => setScheduleBadgeTick(Date.now()), 60 * 1000);
     return () => window.clearInterval(id);
   }, []);
@@ -737,7 +736,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       className="min-h-dvh bg-gray-50"
       style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 140px)' }}
     >
-      {role === 'super_admin' && impersonateAcademyId && (
+      {mounted && role === 'super_admin' && impersonateAcademyId && (
         <div className="sticky top-0 z-30 bg-amber-50 border-b border-amber-200">
           <div className="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between gap-3">
             <div className="text-xs text-amber-900 truncate">
