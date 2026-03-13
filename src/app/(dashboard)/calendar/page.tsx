@@ -1740,7 +1740,7 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="agendo-calendar max-w-5xl mx-auto px-3 sm:px-4 pb-44 pt-4 sm:pt-6 relative z-0">
+    <div className="agendo-calendar max-w-5xl mx-auto px-3 sm:px-4 pb-28 sm:pb-44 pt-4 sm:pt-6 relative z-0">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-3">
@@ -1902,7 +1902,7 @@ export default function CalendarPage() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto pb-28">
+        <DialogContent className="sm:max-w-xl w-[calc(100vw-1.5rem)] sm:w-full max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto pb-28">
           <DialogHeader>
             <DialogTitle className="text-[#0f172a]">Detalle</DialogTitle>
             <DialogDescription>
@@ -2256,7 +2256,7 @@ export default function CalendarPage() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md w-[calc(100vw-1.5rem)] sm:w-full max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-[#0f172a]">Clase en el pasado</DialogTitle>
             <DialogDescription>
@@ -2288,7 +2288,7 @@ export default function CalendarPage() {
           if (!open) resetCreateForm();
         }}
       >
-        <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-xl w-[calc(100vw-1.5rem)] sm:w-full max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-[#0f172a]">Nueva clase</DialogTitle>
             <DialogDescription>Duración fija: 60 minutos</DialogDescription>
