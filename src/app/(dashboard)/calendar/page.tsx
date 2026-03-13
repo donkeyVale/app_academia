@@ -92,6 +92,12 @@ function toYmd(date: Date): string {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
 }
 
+function shortenName(name: string, max = 18): string {
+  const t = (name || "").trim();
+  if (t.length <= max) return t;
+  return t.slice(0, Math.max(0, max - 1)).trimEnd() + "…";
+}
+
 export default function CalendarPage() {
   const supabase = useMemo(() => createClientBrowser(), []);
 
@@ -1849,6 +1855,8 @@ export default function CalendarPage() {
             weekends
             allDaySlot={!isMobile}
             eventDisplay="block"
+            dayMaxEvents={isMobile && mobileView === "dayGridMonth" ? 3 : undefined}
+            moreLinkText={(n) => `+${n} más`}
             selectable
             selectMirror
             buttonText={{
@@ -1892,6 +1900,52 @@ export default function CalendarPage() {
             slotLabelFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
             slotLabelInterval={{ hours: 1 }}
             events={events}
+            eventOrder={(a: any, b: any) => {
+              const aStart = a?.start ? new Date(a.start as any).getTime() : 0;
+              const bStart = b?.start ? new Date(b.start as any).getTime() : 0;
+              if (aStart !== bStart) return aStart - bStart;
+              const ac = String((a?.extendedProps as any)?.courtName ?? "").toLowerCase();
+              const bc = String((b?.extendedProps as any)?.courtName ?? "").toLowerCase();
+              if (ac !== bc) return ac.localeCompare(bc);
+              return String(a?.title ?? "").localeCompare(String(b?.title ?? ""));
+            }}
+            eventContent={(arg) => {
+              const kind = String((arg.event.extendedProps as any)?.kind ?? "");
+              const viewType = String((arg.view as any)?.type ?? "");
+              if (viewType !== "dayGridMonth") return undefined as any;
+
+              if (kind === "block") {
+                return (
+                  <div className="px-1.5 py-0.5">
+                    <div className="text-[11px] font-semibold leading-4 truncate">{shortenName(arg.event.title, 22) || "Bloqueo"}</div>
+                  </div>
+                );
+              }
+              if (kind === "manual_event") {
+                return (
+                  <div className="px-1.5 py-0.5">
+                    <div className="text-[11px] font-semibold leading-4 truncate">{shortenName(arg.event.title, 22) || "Evento"}</div>
+                  </div>
+                );
+              }
+
+              const courtName = (arg.event.extendedProps as any)?.courtName as string | null | undefined;
+              const coachName = (arg.event.extendedProps as any)?.coachName as string | null | undefined;
+              const n = (arg.event.extendedProps as any)?.bookingsCount as number | null | undefined;
+
+              const top = `${arg.timeText ? arg.timeText + " · " : ""}${courtName ? shortenName(courtName, 16) : "Clase"}`;
+              const metaParts: string[] = [];
+              if (coachName) metaParts.push(shortenName(coachName, 16));
+              if (typeof n === "number" && n > 0) metaParts.push(`${n}`);
+              const meta = metaParts.join(" · ");
+
+              return (
+                <div className="px-1.5 py-0.5">
+                  <div className="text-[11px] font-semibold leading-4 truncate">{top}</div>
+                  {meta ? <div className="text-[10px] leading-3 opacity-90 truncate">{meta}</div> : null}
+                </div>
+              );
+            }}
             eventClassNames={(arg) => {
               const classes: string[] = [];
               if (tappedEventId && arg.event.id === tappedEventId) classes.push("agendo-fc-tapped");
