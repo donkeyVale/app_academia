@@ -3,8 +3,16 @@
 ## Contexto
 - **Objetivo:** llevar el módulo `/calendar` a paridad funcional con `/schedule` (gestión de clases), con UX mejorada y permisos por rol.
 - **Rama:** `feature/calendar-v1`
-- **Último commit:** `1eb3683` — `calendar: edit + attendance + allow past create + remaining classes + UI tweaks`
+- **Último commit:** `310dacb` — `calendar: avoid flushSync warning on datesSet`
 - **Estado:** cambios commiteados y pusheados a `origin/feature/calendar-v1`.
+
+### Commits relevantes recientes (para troubleshooting)
+- `310dacb` — `calendar: avoid flushSync warning on datesSet`
+- `50a1249` — `calendar: availability mode for finding free slots`
+- `2237fdc` — `calendar: improve month view readability`
+- `2bb975c` — `layout: fix hydration mismatch for impersonation banner`
+- `cdb6998` — `calendar: improve mobile UX (height, toolbar, sticky actions)`
+- `e3eb883` — `calendar: fix hydration + remove student_plans is_active filter`
 
 ---
 
@@ -31,6 +39,21 @@
   - **Eventos manuales (`calendar_manual_events`)**
 - Paleta y estilos scoped dentro de `.agendo-calendar`.
 
+#### Vista Mes (legibilidad)
+- Render custom solo para `dayGridMonth`:
+  - Línea principal: `hora · cancha`
+  - Línea secundaria: `profe · n` (n = alumnos)
+- Orden en mes: por hora y luego por cancha (evita mezcla/confusión cuando hay varias canchas a la misma hora).
+- En mobile: límite de eventos visibles por día + `+X más`.
+
+#### Modo “Huecos” / Disponibilidad (semana/día)
+- Disponible como botón **`Huecos`** (solo en `timeGridDay` y `timeGridWeek`, para roles que pueden crear).
+- Pinta el calendario con **eventos de fondo** (background) por slot horario de 60 minutos:
+  - Verde: muchas canchas libres
+  - Amarillo: pocas libres
+  - Rojo: 0 libres
+- Objetivo: identificar rápidamente horarios con capacidad para crear/reagendar.
+
 ### 2) Detalle de clase (modal)
 - Modal de detalle al click en evento.
 - Muestra cancha, profesor, reservas, duración.
@@ -53,6 +76,11 @@
   - Upsert `plan_usages` como `pending`.
 - Push:
   - `/api/push/class-created`.
+
+#### Crear con “Huecos” activo (ayuda visual)
+- Con `Huecos` activo y con `fecha/hora` seleccionadas:
+  - En el selector de **cancha** se deshabilitan canchas ocupadas para ese slot (aparecen con sufijo `(ocupada)`).
+  - Se muestra un hint: `Libres: X/Y`.
 
 ### 4) Crear clases en el pasado (paridad UX con `/schedule`)
 - Ahora está habilitado: si se intenta crear en pasado, aparece **modal de advertencia** y permite continuar.
@@ -106,6 +134,16 @@
 - Ajuste de padding en el modal de detalle (`pb-28`) para que el contenido no quede tapado por el footer nav.
 - Botones `Editar` y `Asistencia` ya no cambian a “Ocultar …”; ahora usan estado activo (variant default) y el texto queda fijo.
 
+### 10) Mejoras mobile (calendario + modales)
+- FullCalendar en mobile usa altura calculada para una experiencia “app-like” (evita doble scroll raro).
+- Toolbar mobile más compacta.
+- Footers sticky en modales (Detalle / Advertencia / Crear) para que los botones estén siempre accesibles.
+- Popover de alumnos full-width en mobile.
+
+### 11) Fixes de estabilidad (debugging)
+- Fix hydration mismatch por banner sticky de impersonación en `DashboardLayout`.
+- Fix warning `flushSync was called...` difiriendo actualizaciones disparadas en `datesSet`.
+
 ---
 
 ## Cambios de navegación / layout
@@ -128,6 +166,17 @@
 - [ ] Probar choque de alumno: alumno con clase en ese horario -> debe bloquear.
 - [ ] Probar alumno sin saldo: debe verse `(0)` en rojo y debe bloquear al confirmar.
 
+### A2) Crear clase usando “Huecos” (disponibilidad)
+> Recomendado hacerlo en `Semana` y `Día`.
+- [ ] En `Semana` o `Día`, activar botón `Huecos`.
+- [ ] Verificar colores:
+  - [ ] Un slot con muchas canchas libres se ve verde.
+  - [ ] Un slot sin canchas libres se ve rojo.
+- [ ] Tocar un horario libre (verde/amarillo) y crear clase.
+- [ ] En el modal, seleccionar complejo y revisar el selector de canchas:
+  - [ ] Las canchas ocupadas para ese horario aparecen deshabilitadas con `(ocupada)`.
+  - [ ] Se muestra `Libres: X/Y`.
+
 ### B) Crear clase en el pasado
 - [ ] Seleccionar fecha/hora pasada -> aparece advertencia -> continuar -> se crea.
 
@@ -138,6 +187,12 @@
 - [ ] Agregar alumno (booking insert + plan_usages pending upsert).
 - [ ] Quitar alumno (booking delete + plan_usages refunded + push cancelled a removidos).
 - [ ] Verificar `capacity/type` (individual vs grupal) se actualiza según cantidad.
+
+### C2) Editar/Reagendar usando “Huecos” (manual)
+> Por ahora `Huecos` es una guía visual; el flujo de reagendar sigue siendo el formulario `Editar`.
+- [ ] Abrir una clase y entrar a `Editar`.
+- [ ] Activar `Huecos` en el calendario (vista `Día` o `Semana`).
+- [ ] Buscar un slot con disponibilidad (verde/amarillo) y reprogramar manualmente en el formulario.
 
 ### D) Asistencia
 - [ ] Abrir asistencia en clase con alumnos.
@@ -152,12 +207,30 @@
 - [ ] `coach` puede editar/cancelar/asistencia solo si `class_sessions.coach_id === coachSelfId`.
 - [ ] `super_admin` no puede crear/editar/cancelar.
 
+### F) Push (Web Push)
+- [ ] Crear clase -> llega push `class-created`.
+- [ ] Editar moviendo fecha/hora -> llega push `class-rescheduled`.
+- [ ] Editar quitando alumno -> llega push `class-cancelled` (solo al alumno removido).
+- [ ] Cancelar clase completa -> llega push `class-cancelled`.
+
+### G) Mobile UX
+- [ ] En mobile, el calendario no debería tener “doble scroll” raro; la altura se adapta.
+- [ ] Toolbar mobile se ve compacta.
+- [ ] En modales, los botones (footer) quedan sticky y siempre accesibles.
+- [ ] Popover de alumnos no se corta (full-width).
+
+### H) Vista Mes (legibilidad)
+- [ ] En `Mes`, con varias clases a la misma hora en distintas canchas:
+  - [ ] Debe verse `hora · cancha` de forma clara.
+  - [ ] Debe verse un meta corto `profe · n`.
+  - [ ] El orden debe ser consistente (hora + cancha).
+
 ---
 
 ## Pendientes (qué falta para paridad completa)
 
 ### 1) QA formal del flujo de edición (alto)
-- Pendiente ejecutar QA completo de `Editar` (ver checklist C) y confirmar:
+- Ejecutar QA completo de `Editar` (ver checklist C) y confirmar:
   - consistencia de `plan_usages`
   - pushes en escenarios reales
   - edge cases (sin alumnos, cambios múltiples, etc.)
@@ -169,8 +242,11 @@
 - Crear clases recurrentes desde `/calendar` (paridad con `/schedule`).
 
 ### 4) Mejoras mobile (alto)
-- Ajustes adicionales de UX mobile:
-  - comportamiento de modales, scroll, densidad, etc.
+- Iterar UX mobile según feedback real (en especial vista Mes y el modo Huecos).
+
+### 5) Disponibilidad (alto)
+- **Mes (pendiente):** agregar indicador de densidad/capacidad por día (macro) para ver “días con huecos” sin entrar a semana.
+- **Reagendar asistido (pendiente):** permitir que en modo `Huecos` un tap en slot prellene `Editar` (fecha/hora) o abra selector de canchas libres.
 
 ### 5) Permisos UX (alto)
 - Confirmar/ajustar que `super_admin` sea 100% read-only en `/calendar`.
@@ -189,7 +265,8 @@
 ---
 
 ## Dónde retomar en la próxima interacción
-1) Ejecutar QA de `Editar` (pendiente #139) y corregir inconsistencias si aparecen.
-2) Implementar Histórico (#136).
-3) Implementar Recurrencia (#137).
-4) Iterar mejoras mobile (#120).
+1) Ejecutar QA de `Editar` (ver checklist C) y corregir inconsistencias si aparecen.
+2) Implementar disponibilidad macro en `Mes` (densidad/capacidad por día).
+3) Implementar reagendar asistido usando `Huecos` (tap para prellenar).
+4) Implementar Histórico (#136).
+5) Implementar Recurrencia (#137).
