@@ -201,6 +201,11 @@ export default function CalendarPage() {
 
   const [tappedEventId, setTappedEventId] = useState<string | null>(null);
 
+  const [availabilityMode, setAvailabilityMode] = useState(false);
+  const [currentViewType, setCurrentViewType] = useState<string>("timeGridWeek");
+  const [occupiedCourtsBySlot, setOccupiedCourtsBySlot] = useState<Record<string, string[]>>({});
+  const [availabilityEvents, setAvailabilityEvents] = useState<any[]>([]);
+
   const visibleRangeRef = useRef<{ start: Date; end: Date } | null>(null);
 
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -228,6 +233,21 @@ export default function CalendarPage() {
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [attendanceSaving, setAttendanceSaving] = useState(false);
   const [attendanceList, setAttendanceList] = useState<{ student_id: string; present: boolean; label: string }[]>([]);
+
+  const allCourtIds = useMemo(() => {
+    return Array.from(new Set((courts ?? []).map((c) => c.id).filter(Boolean)));
+  }, [courts]);
+
+  const getSlotKey = (day: string, time: string) => {
+    const hh = (time || "").split(":")[0] ?? "";
+    return `${day}:${hh}`;
+  };
+
+  const getFreeCourtIdsForSlot = (day: string, time: string) => {
+    const key = getSlotKey(day, time);
+    const occupied = new Set((occupiedCourtsBySlot[key] ?? []).filter(Boolean));
+    return allCourtIds.filter((id) => !occupied.has(id));
+  };
 
   useEffect(() => {
     const vr = visibleRangeRef.current;
@@ -1451,6 +1471,23 @@ export default function CalendarPage() {
       const classes = (classRows as ClassSession[] | null) ?? [];
       const classIds = classes.map((c) => c.id);
 
+      // Ocupación por slot (día+hora) para modo disponibilidad
+      {
+        const next: Record<string, string[]> = {};
+        for (const cls of classes) {
+          if (!cls?.date) continue;
+          if (!cls?.court_id) continue;
+          const d = new Date(cls.date);
+          const day = toYmd(d);
+          const hh = pad2(d.getHours());
+          const key = `${day}:${hh}`;
+          const prev = next[key] ?? [];
+          if (!prev.includes(cls.court_id)) prev.push(cls.court_id);
+          next[key] = prev;
+        }
+        setOccupiedCourtsBySlot(next);
+      }
+
       let bookingsCountByClassId: Record<string, number> = {};
       if (classIds.length > 0) {
         const { data: bRows, error: bErr } = await supabase
@@ -1602,10 +1639,81 @@ export default function CalendarPage() {
     } catch (e: any) {
       toast.error(e?.message ?? "No se pudo cargar el calendario.");
       setEvents([]);
+      setOccupiedCourtsBySlot({});
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!availabilityMode) {
+      setAvailabilityEvents([]);
+      return;
+    }
+
+    const vr = visibleRangeRef.current;
+    if (!vr) {
+      setAvailabilityEvents([]);
+      return;
+    }
+
+    if (currentViewType !== "timeGridDay" && currentViewType !== "timeGridWeek") {
+      setAvailabilityEvents([]);
+      return;
+    }
+
+    const total = allCourtIds.length;
+    if (!total) {
+      setAvailabilityEvents([]);
+      return;
+    }
+
+    const start = new Date(vr.start);
+    const end = new Date(vr.end);
+    const next: any[] = [];
+
+    for (let d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
+      const day = toYmd(d);
+      for (let h = 6; h <= 23; h++) {
+        const hh = pad2(h);
+        const key = `${day}:${hh}`;
+        const occupied = new Set((occupiedCourtsBySlot[key] ?? []).filter(Boolean));
+        const occupiedCount = occupied.size;
+        const free = Math.max(0, total - occupiedCount);
+        const ratio = total ? free / total : 0;
+
+        let bg = "rgba(148,163,184,0.08)";
+        if (free === 0) {
+          bg = "rgba(239,68,68,0.10)";
+        } else if (ratio >= 0.75) {
+          bg = "rgba(34,197,94,0.12)";
+        } else if (ratio >= 0.4) {
+          bg = "rgba(34,197,94,0.08)";
+        } else {
+          bg = "rgba(245,158,11,0.08)";
+        }
+
+        const slotStart = new Date(`${day}T${hh}:00:00`);
+        const slotEnd = new Date(slotStart.getTime() + 60 * 60 * 1000);
+        next.push({
+          id: `availability:${key}`,
+          start: slotStart,
+          end: slotEnd,
+          display: "background",
+          backgroundColor: bg,
+          extendedProps: {
+            kind: "availability",
+            freeCount: free,
+            totalCount: total,
+            day,
+            hour: hh,
+          },
+        });
+      }
+    }
+
+    setAvailabilityEvents(next);
+  }, [availabilityMode, occupiedCourtsBySlot, allCourtIds, currentViewType]);
 
   const onOpenDetails = (eventApi: any) => {
     const p = (eventApi?.extendedProps ?? {}) as any;
@@ -1807,7 +1915,19 @@ export default function CalendarPage() {
       <div ref={calendarCardRef} className="mt-4 rounded-xl border bg-white shadow-sm overflow-hidden">
         <div className="p-3 border-b bg-white flex items-center justify-between">
           <div className="text-sm font-semibold text-slate-800">Calendario</div>
-          <div className="text-xs text-slate-500">{role ? `Rol: ${role}` : ""}</div>
+          <div className="flex items-center gap-2">
+            {canCreate && (currentViewType === "timeGridDay" || currentViewType === "timeGridWeek") && (
+              <Button
+                type="button"
+                variant={availabilityMode ? "default" : "outline"}
+                className="h-8 px-2.5 text-xs"
+                onClick={() => setAvailabilityMode((v) => !v)}
+              >
+                Huecos
+              </Button>
+            )}
+            <div className="text-xs text-slate-500">{role ? `Rol: ${role}` : ""}</div>
+          </div>
         </div>
 
         {isMobile && (
@@ -1899,7 +2019,7 @@ export default function CalendarPage() {
             scrollTime={isMobile ? mobileScrollTime : undefined}
             slotLabelFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
             slotLabelInterval={{ hours: 1 }}
-            events={events}
+            events={availabilityMode ? [...availabilityEvents, ...events] : events}
             eventOrder={(a: any, b: any) => {
               const aStart = a?.start ? new Date(a.start as any).getTime() : 0;
               const bStart = b?.start ? new Date(b.start as any).getTime() : 0;
@@ -1953,6 +2073,7 @@ export default function CalendarPage() {
             }}
             datesSet={(arg) => {
               visibleRangeRef.current = { start: arg.start, end: arg.end };
+              setCurrentViewType(String((arg.view as any)?.type ?? ""));
               void loadCalendarRange(arg.start, arg.end);
             }}
             dateClick={(arg) => {
@@ -2410,12 +2531,26 @@ export default function CalendarPage() {
                 <option value="">
                   {createLocationId ? "Selecciona una cancha" : "Selecciona un complejo primero"}
                 </option>
-                {(createLocationId ? courts.filter((c) => c.location_id === createLocationId) : courts).map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
+                {(() => {
+                  const list = (createLocationId ? courts.filter((c) => c.location_id === createLocationId) : courts) ?? [];
+                  const dayOk = !!createDay;
+                  const timeOk = !!createTime;
+                  const free = dayOk && timeOk ? new Set(getFreeCourtIdsForSlot(createDay, createTime)) : null;
+                  return list.map((c) => {
+                    const isFree = !free || free.has(c.id);
+                    return (
+                      <option key={c.id} value={c.id} disabled={!isFree}>
+                        {c.name}{!isFree ? " (ocupada)" : ""}
+                      </option>
+                    );
+                  });
+                })()}
               </select>
+              {availabilityMode && createDay && createTime && (
+                <div className="mt-1 text-[11px] text-slate-500">
+                  Libres: {getFreeCourtIdsForSlot(createDay, createTime).length}/{allCourtIds.length}
+                </div>
+              )}
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
