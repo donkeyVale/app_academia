@@ -96,10 +96,18 @@ export default function CalendarPage() {
   const supabase = useMemo(() => createClientBrowser(), []);
 
   const [isMobile, setIsMobile] = useState(false);
+  const calendarCardRef = useRef<HTMLDivElement | null>(null);
+  const [mobileCalendarHeight, setMobileCalendarHeight] = useState<number | null>(null);
   const [mobileView, setMobileView] = useState<"timeGridDay" | "timeGridWeek" | "dayGridMonth">(
     "timeGridDay"
   );
   const calendarRef = useRef<FullCalendar | null>(null);
+
+  const mobileScrollTime = useMemo(() => {
+    const h = new Date().getHours();
+    const clamped = Math.min(22, Math.max(6, h - 1));
+    return `${pad2(clamped)}:00:00`;
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -108,6 +116,27 @@ export default function CalendarPage() {
     window.addEventListener("resize", calc);
     return () => window.removeEventListener("resize", calc);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!isMobile) {
+      setMobileCalendarHeight(null);
+      return;
+    }
+
+    const recalc = () => {
+      const card = calendarCardRef.current;
+      if (!card) return;
+      const rect = card.getBoundingClientRect();
+      const marginBottom = 16;
+      const h = Math.floor(window.innerHeight - rect.top - marginBottom);
+      setMobileCalendarHeight(h > 320 ? h : 320);
+    };
+
+    recalc();
+    window.addEventListener("resize", recalc);
+    return () => window.removeEventListener("resize", recalc);
+  }, [isMobile]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -1769,7 +1798,7 @@ export default function CalendarPage() {
         </div>
       )}
 
-      <div className="mt-4 rounded-xl border bg-white shadow-sm overflow-hidden">
+      <div ref={calendarCardRef} className="mt-4 rounded-xl border bg-white shadow-sm overflow-hidden">
         <div className="p-3 border-b bg-white flex items-center justify-between">
           <div className="text-sm font-semibold text-slate-800">Calendario</div>
           <div className="text-xs text-slate-500">{role ? `Rol: ${role}` : ""}</div>
@@ -1812,13 +1841,14 @@ export default function CalendarPage() {
             ref={calendarRef as any}
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
             initialView={isMobile ? mobileView : "timeGridWeek"}
-            height="auto"
-            expandRows
+            height={isMobile ? mobileCalendarHeight ?? 520 : "auto"}
+            expandRows={!isMobile}
             locale={esLocale as any}
             firstDay={1}
             nowIndicator
             weekends
             allDaySlot={!isMobile}
+            eventDisplay="block"
             selectable
             selectMirror
             buttonText={{
@@ -1833,7 +1863,7 @@ export default function CalendarPage() {
             eventTimeFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
             headerToolbar={
               isMobile
-                ? { left: "prev,next", center: "title", right: "today" }
+                ? { left: "prev,next today", center: "title", right: "" }
                 : {
                     left: "prev,next today",
                     center: "title",
@@ -1858,6 +1888,7 @@ export default function CalendarPage() {
             dayHeaderFormat={isMobile ? { weekday: "short" } : undefined}
             slotMinTime="06:00:00"
             slotMaxTime="23:00:00"
+            scrollTime={isMobile ? mobileScrollTime : undefined}
             slotLabelFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
             slotLabelInterval={{ hours: 1 }}
             events={events}
@@ -1902,7 +1933,7 @@ export default function CalendarPage() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-xl w-[calc(100vw-1.5rem)] sm:w-full max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto pb-28">
+        <DialogContent className="sm:max-w-xl w-[calc(100vw-1.5rem)] sm:w-full max-h-[90dvh] sm:max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-[#0f172a]">Detalle</DialogTitle>
             <DialogDescription>
@@ -2177,7 +2208,7 @@ export default function CalendarPage() {
             <div className="text-sm text-slate-600">Sin detalles.</div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="sticky bottom-0 bg-white border-t pt-3 pb-4">
             <div className="flex w-full items-center justify-between gap-2">
               <Button
                 type="button"
@@ -2263,7 +2294,7 @@ export default function CalendarPage() {
               Estás por crear una clase para <strong>{pastWarningLabel || "(fecha/hora)"}</strong>. ¿Querés continuar?
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2">
+          <DialogFooter className="sticky bottom-0 bg-white border-t pt-3 pb-4 gap-2">
             <Button type="button" variant="outline" onClick={() => setPastWarningOpen(false)} disabled={creating}>
               Cancelar
             </Button>
@@ -2405,7 +2436,7 @@ export default function CalendarPage() {
                     </span>
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-80 p-3" align="start">
+                <PopoverContent className="w-[calc(100vw-2rem)] sm:w-80 p-3" align="start">
                   <div className="space-y-2">
                     <Input
                       type="text"
@@ -2497,7 +2528,7 @@ export default function CalendarPage() {
             </div>
           </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="sticky bottom-0 bg-white border-t pt-3 pb-4 gap-2">
             <Button type="button" variant="outline" onClick={() => setCreateOpen(false)} disabled={creating}>
               Cancelar
             </Button>

@@ -39,6 +39,19 @@
 }
 
 @media (max-width: 640px) {
+  .agendo-calendar {
+    overscroll-behavior: contain;
+  }
+
+  .agendo-calendar .fc {
+    touch-action: manipulation;
+  }
+
+  .agendo-calendar .fc .fc-scroller {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
   .agendo-calendar .fc .fc-toolbar {
     flex-wrap: wrap;
     align-items: stretch;
@@ -114,6 +127,10 @@
 
   .agendo-calendar .fc .fc-timegrid-event .fc-event-main {
     padding: 6px 8px;
+  }
+
+  .agendo-calendar .fc .fc-timegrid-slot {
+    min-height: 28px;
   }
 
   .agendo-calendar .fc .fc-timegrid-event .fc-event-title {
