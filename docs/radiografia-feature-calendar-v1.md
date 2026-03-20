@@ -31,7 +31,7 @@
 ## Funcionalidades implementadas (qué ya existe)
 
 ### 1) Visualización de calendario
-- FullCalendar con vistas (desktop: week; mobile: day/week/month con toggle).
+- FullCalendar con vistas tengo tengo (desktop: week; mobile: day/week/month con toggle).
 - Carga automática por **rango visible** (`datesSet`) y por cambio de academia seleccionada.
 - Eventos combinados:
   - **Clases (`class_sessions`)**
