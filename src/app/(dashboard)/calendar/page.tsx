@@ -208,6 +208,13 @@ export default function CalendarPage() {
   const [availabilityEvents, setAvailabilityEvents] = useState<any[]>([]);
   const [availabilityLegend, setAvailabilityLegend] = useState<string>("");
 
+  const [availabilityPopupOpen, setAvailabilityPopupOpen] = useState(false);
+  const [availabilityPopupX, setAvailabilityPopupX] = useState(0);
+  const [availabilityPopupY, setAvailabilityPopupY] = useState(0);
+  const [availabilityPopupDay, setAvailabilityPopupDay] = useState<string>("");
+  const [availabilityPopupTime, setAvailabilityPopupTime] = useState<string>("");
+  const availabilityPopupRef = useRef<HTMLDivElement | null>(null);
+
   const visibleRangeRef = useRef<{ start: Date; end: Date } | null>(null);
 
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -250,6 +257,47 @@ export default function CalendarPage() {
     const occupied = new Set((occupiedCourtsBySlot[key] ?? []).filter(Boolean));
     return allCourtIds.filter((id) => !occupied.has(id));
   };
+
+  const openAvailabilityPopup = (params: { day: string; time: string; x: number; y: number }) => {
+    const vw = typeof window !== "undefined" ? window.innerWidth : 0;
+    const vh = typeof window !== "undefined" ? window.innerHeight : 0;
+    const width = 280;
+    const height = 220;
+    const x = Math.max(8, Math.min(params.x, Math.max(8, vw - width - 8)));
+    const y = Math.max(8, Math.min(params.y, Math.max(8, vh - height - 8)));
+
+    setAvailabilityPopupDay(params.day);
+    setAvailabilityPopupTime(params.time);
+    setAvailabilityPopupX(x);
+    setAvailabilityPopupY(y);
+    setAvailabilityPopupOpen(true);
+  };
+
+  const closeAvailabilityPopup = () => {
+    setAvailabilityPopupOpen(false);
+  };
+
+  useEffect(() => {
+    if (!availabilityPopupOpen) return;
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeAvailabilityPopup();
+    };
+
+    const onMouseDown = (e: MouseEvent) => {
+      const el = availabilityPopupRef.current;
+      if (!el) return;
+      if (el.contains(e.target as any)) return;
+      closeAvailabilityPopup();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("mousedown", onMouseDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("mousedown", onMouseDown);
+    };
+  }, [availabilityPopupOpen]);
 
   useEffect(() => {
     const vr = visibleRangeRef.current;
@@ -2156,15 +2204,27 @@ export default function CalendarPage() {
               }
             }}
             dateClick={(arg) => {
-              if (!canCreate) return;
               if (!arg?.date) return;
+              const viewType = String((arg.view as any)?.type ?? "");
               if ((arg as any).allDay) {
+                if (!canCreate) return;
                 openCreate({ day: toYmd(arg.date) });
                 return;
               }
               const d = arg.date;
               const hh = pad2(d.getHours());
-              openCreate({ day: toYmd(d), time: `${hh}:00` });
+              const day = toYmd(d);
+              const time = `${hh}:00`;
+
+              if (availabilityMode && (viewType === "timeGridDay" || viewType === "timeGridWeek")) {
+                const x = (arg as any)?.jsEvent?.clientX ?? 0;
+                const y = (arg as any)?.jsEvent?.clientY ?? 0;
+                openAvailabilityPopup({ day, time, x, y });
+                return;
+              }
+
+              if (!canCreate) return;
+              openCreate({ day, time });
             }}
             eventClick={(info) => {
               setTappedEventId(info.event.id);
@@ -2174,6 +2234,74 @@ export default function CalendarPage() {
           />
         </div>
       </div>
+
+      {availabilityPopupOpen && availabilityMode && (currentViewType === "timeGridDay" || currentViewType === "timeGridWeek") && (
+        <div
+          ref={availabilityPopupRef}
+          className="fixed z-[60] w-[280px] rounded-lg border bg-white shadow-lg p-3"
+          style={{ left: availabilityPopupX, top: availabilityPopupY }}
+        >
+          {(() => {
+            const freeIds = availabilityPopupDay && availabilityPopupTime ? getFreeCourtIdsForSlot(availabilityPopupDay, availabilityPopupTime) : [];
+            const total = allCourtIds.length;
+            const free = freeIds.length;
+            const freeNames = freeIds
+              .map((id) => courts.find((c) => c.id === id)?.name ?? null)
+              .filter((x): x is string => !!x);
+            const shown = freeNames.slice(0, 8);
+            const rest = Math.max(0, freeNames.length - shown.length);
+
+            return (
+              <div className="space-y-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-800">Huecos</div>
+                    <div className="text-[12px] text-slate-600">
+                      {availabilityPopupDay} · {availabilityPopupTime}
+                    </div>
+                  </div>
+                  <Button type="button" variant="ghost" className="h-7 px-2 text-xs" onClick={closeAvailabilityPopup}>
+                    Cerrar
+                  </Button>
+                </div>
+
+                <div className="text-sm text-slate-800">
+                  <span className="font-semibold">Libres:</span> {free}/{total}
+                </div>
+
+                <div className="text-[12px] text-slate-600">
+                  {shown.length > 0 ? (
+                    <div>
+                      <div className="font-medium text-slate-700">Canchas libres</div>
+                      <div className="mt-1">
+                        {shown.join(", ")}
+                        {rest > 0 ? ` (+${rest} más)` : ""}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="font-medium text-slate-700">No hay canchas libres en este horario.</div>
+                  )}
+                </div>
+
+                {canCreate && free > 0 && (
+                  <div className="pt-1">
+                    <Button
+                      type="button"
+                      className="h-9 w-full"
+                      onClick={() => {
+                        closeAvailabilityPopup();
+                        openCreate({ day: availabilityPopupDay, time: availabilityPopupTime });
+                      }}
+                    >
+                      Crear clase aquí
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      )}
 
       <Dialog
         open={detailsOpen}
