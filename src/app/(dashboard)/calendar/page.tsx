@@ -2304,6 +2304,10 @@ export default function CalendarPage() {
             const shown = freeNames.slice(0, 8);
             const rest = Math.max(0, freeNames.length - shown.length);
 
+            const canEditSelectedClassNow =
+              !!editingClass && (role === "admin" || (role === "coach" && !!coachSelfId && editingClass.coach_id === coachSelfId));
+            const canMoveHere = availabilityPopupDay && availabilityPopupTime && editOpen && canEditSelectedClassNow;
+
             return (
               <div className="space-y-2">
                 <div className="flex items-start justify-between gap-2">
@@ -2335,6 +2339,29 @@ export default function CalendarPage() {
                     <div className="font-medium text-slate-700">No hay canchas libres en este horario.</div>
                   )}
                 </div>
+
+                {canMoveHere && free > 0 && (
+                  <div className="pt-1">
+                    <Button
+                      type="button"
+                      className="h-9 w-full"
+                      onClick={() => {
+                        const freeCourtId = freeIds[0] ?? "";
+                        const court = freeCourtId ? courts.find((c) => c.id === freeCourtId) : null;
+                        closeAvailabilityPopup();
+                        setEditDay(availabilityPopupDay);
+                        setEditTime(availabilityPopupTime);
+                        if (court?.location_id) setEditLocationId(court.location_id);
+                        if (freeCourtId) setEditCourtId(freeCourtId);
+                      }}
+                    >
+                      Mover aquí
+                    </Button>
+                    <div className="mt-1 text-[11px] text-slate-500">
+                      Se selecciona una cancha libre automáticamente. Podés cambiarla en el formulario.
+                    </div>
+                  </div>
+                )}
 
                 {canCreate && free > 0 && (
                   <div className="pt-1">
