@@ -205,6 +205,7 @@ export default function CalendarPage() {
   const [currentViewType, setCurrentViewType] = useState<string>("timeGridWeek");
   const [occupiedCourtsBySlot, setOccupiedCourtsBySlot] = useState<Record<string, string[]>>({});
   const [availabilityEvents, setAvailabilityEvents] = useState<any[]>([]);
+  const [availabilityLegend, setAvailabilityLegend] = useState<string>("");
 
   const visibleRangeRef = useRef<{ start: Date; end: Date } | null>(null);
 
@@ -1665,8 +1666,11 @@ export default function CalendarPage() {
     const total = allCourtIds.length;
     if (!total) {
       setAvailabilityEvents([]);
+      setAvailabilityLegend("");
       return;
     }
+
+    setAvailabilityLegend(`Huecos: libres/total`);
 
     const start = new Date(vr.start);
     const end = new Date(vr.end);
@@ -1926,6 +1930,9 @@ export default function CalendarPage() {
                 Huecos
               </Button>
             )}
+            {availabilityMode && availabilityLegend ? (
+              <div className="hidden sm:block text-[11px] text-slate-500">{availabilityLegend}</div>
+            ) : null}
             <div className="text-xs text-slate-500">{role ? `Rol: ${role}` : ""}</div>
           </div>
         </div>
@@ -2092,6 +2099,44 @@ export default function CalendarPage() {
               const classes: string[] = [];
               if (tappedEventId && arg.event.id === tappedEventId) classes.push("agendo-fc-tapped");
               return classes;
+            }}
+            eventDidMount={(info) => {
+              const kind = String((info.event.extendedProps as any)?.kind ?? "");
+              if (!availabilityMode) return;
+              if (kind !== "availability") return;
+              const viewType = String((info.view as any)?.type ?? "");
+              if (viewType !== "timeGridDay" && viewType !== "timeGridWeek") return;
+
+              const free = (info.event.extendedProps as any)?.freeCount as number | undefined;
+              const total = (info.event.extendedProps as any)?.totalCount as number | undefined;
+              if (typeof free !== "number" || typeof total !== "number" || total <= 0) return;
+
+              const el = info.el as HTMLElement | null;
+              if (!el) return;
+
+              // Avoid duplicates
+              if (el.querySelector("[data-agendo-availability-label='1']")) return;
+
+              const label = document.createElement("div");
+              label.setAttribute("data-agendo-availability-label", "1");
+              label.textContent = `${free}/${total}`;
+              label.style.position = "absolute";
+              label.style.right = "6px";
+              label.style.top = "2px";
+              label.style.fontSize = "10px";
+              label.style.lineHeight = "12px";
+              label.style.fontWeight = "600";
+              label.style.color = "rgba(15, 23, 42, 0.55)";
+              label.style.pointerEvents = "none";
+              label.style.userSelect = "none";
+              label.style.textShadow = "0 1px 0 rgba(255,255,255,0.7)";
+
+              // Ensure container can position children
+              if (getComputedStyle(el).position === "static") {
+                el.style.position = "relative";
+              }
+
+              el.appendChild(label);
             }}
             datesSet={(arg) => {
               const viewType = String((arg.view as any)?.type ?? "");
