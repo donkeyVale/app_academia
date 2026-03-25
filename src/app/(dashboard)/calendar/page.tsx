@@ -1314,6 +1314,7 @@ export default function CalendarPage() {
     try {
       // Validar planes y saldo real (como /schedule) + elegir plan por alumno
       const planForStudent: Record<string, string> = {};
+      const remainingForStudent: Record<string, number> = {};
       for (const sid of createSelectedStudents) {
         const label = students.find((s) => s.id === sid)?.full_name ?? "(sin nombre)";
 
@@ -1334,6 +1335,7 @@ export default function CalendarPage() {
         }
 
         let chosenPlan: any = null;
+        let chosenPlanRemaining = 0;
         for (const p of plans as any[]) {
           const { count: usedCount, error: usageCountErr } = await supabase
             .from("plan_usages")
@@ -1348,6 +1350,7 @@ export default function CalendarPage() {
           const remaining = Math.max(0, totalFromPlan - used);
           if (remaining > 0) {
             chosenPlan = p;
+            chosenPlanRemaining = remaining;
             break;
           }
         }
@@ -1415,8 +1418,10 @@ export default function CalendarPage() {
         }
       }
 
-      const capacity = createSelectedStudents.length;
-      const typeForSession = capacity === 1 ? "individual" : "grupal";
+      const maxRemaining = Math.max(0, ...Object.values(remainingForStudent));
+      const desiredTotalSessions = recurringEnabled
+        ? Math.max(1, Math.min(24, Number(recurringTotalSessions) || 1, maxRemaining || 1))
+        : 1;
 
       const createdClassIds: string[] = [];
       const createdClassDates: string[] = [];
@@ -1424,7 +1429,10 @@ export default function CalendarPage() {
       let skippedCourt = 0;
       let skippedStudents = 0;
 
-      const createOneSession = async (sessionIso: string) => {
+      const createOneSession = async (sessionIso: string, sessionIndex: number) => {
+        const studentsToBook = createSelectedStudents.filter((sid) => (remainingForStudent[sid] ?? 0) >= sessionIndex + 1);
+        if (studentsToBook.length === 0) return;
+
         // Conflicto cancha
         {
           const { data: clash, error: clashErr } = await supabase
@@ -1445,7 +1453,7 @@ export default function CalendarPage() {
           const { data: conflictsFiltered, error: conflictsStatusErr } = await supabase
             .from("bookings")
             .select("student_id, class_sessions!inner(id,date,status)")
-            .in("student_id", createSelectedStudents)
+            .in("student_id", studentsToBook)
             .eq("class_sessions.date", sessionIso)
             .neq("class_sessions.status", "cancelled");
           if (conflictsStatusErr) throw conflictsStatusErr;
@@ -1455,13 +1463,16 @@ export default function CalendarPage() {
           }
         }
 
+        const capacityForSession = studentsToBook.length;
+        const typeForSession = capacityForSession === 1 ? "individual" : "grupal";
+
         const { data: inserted, error: insErr } = await supabase
           .from("class_sessions")
           .insert({
             date: sessionIso,
             court_id: createCourtId,
             coach_id: coachIdToUse,
-            capacity,
+            capacity: capacityForSession,
             type: typeForSession,
             attendance_pending: false,
           })
@@ -1474,7 +1485,7 @@ export default function CalendarPage() {
         createdClassIds.push(createdClassId);
         createdClassDates.push(sessionIso);
 
-        const bookingRows = createSelectedStudents.map((sid) => ({
+        const bookingRows = studentsToBook.map((sid) => ({
           class_id: createdClassId,
           student_id: sid,
           status: "reserved",
@@ -1482,12 +1493,12 @@ export default function CalendarPage() {
         const { error: bookingsErr } = await supabase.from("bookings").insert(bookingRows);
         if (bookingsErr) throw bookingsErr;
 
-        for (const sid of createSelectedStudents) {
+        for (const sid of studentsToBook) {
           createdBookingsByStudent[sid] = (createdBookingsByStudent[sid] ?? 0) + 1;
         }
 
         // plan_usages (consumo pendiente)
-        for (const sid of createSelectedStudents) {
+        for (const sid of studentsToBook) {
           const planId = planForStudent[sid];
           if (!planId) continue;
           const { error: usageUpsertErr } = await supabase.from("plan_usages").upsert(
@@ -1511,9 +1522,9 @@ export default function CalendarPage() {
             date: sessionIso,
             court_id: createCourtId,
             coach_id: coachIdToUse,
-            capacity,
+            capacity: capacityForSession,
             type: typeForSession,
-            students: [...createSelectedStudents],
+            students: [...studentsToBook],
             recurring_enabled: recurringEnabled,
           });
         } catch {
@@ -1522,7 +1533,7 @@ export default function CalendarPage() {
       };
 
       // Crear la primera
-      await createOneSession(iso);
+      await createOneSession(iso, 0);
 
       if (createdClassIds.length === 0) {
         toast.error("No se pudo crear la clase. Verificá disponibilidad y reintentá.");
@@ -1530,14 +1541,13 @@ export default function CalendarPage() {
       }
 
       // Crear recurrentes (semanal, mismo horario)
-      if (recurringEnabled) {
-        const targetTotal = Math.max(1, Math.min(24, Number(recurringTotalSessions) || 1));
+      if (recurringEnabled && desiredTotalSessions > 1) {
         let cursor = new Date(iso);
-        while (createdClassIds.length < targetTotal) {
+        while (createdClassIds.length < desiredTotalSessions) {
           cursor = new Date(cursor.getTime() + 7 * 24 * 60 * 60 * 1000);
-          await createOneSession(cursor.toISOString());
+          await createOneSession(cursor.toISOString(), createdClassIds.length);
           // escape hard
-          if (createdClassIds.length + skippedCourt + skippedStudents > targetTotal + 60) break;
+          if (createdClassIds.length + skippedCourt + skippedStudents > desiredTotalSessions + 60) break;
         }
       }
 
@@ -1579,7 +1589,17 @@ export default function CalendarPage() {
         if (skippedCourt > 0) skippedMsgParts.push(`${skippedCourt} por cancha ocupada`);
         if (skippedStudents > 0) skippedMsgParts.push(`${skippedStudents} por alumnos ocupados`);
         const skippedTxt = skippedMsgParts.length ? ` (omitidas: ${skippedMsgParts.join(", ")})` : "";
-        toast.success(`Se crearon ${createdClassIds.length} clases${skippedTxt}.`);
+
+        const perStudentTxt = createSelectedStudents
+          .map((sid) => {
+            const label = getStudentLabel(sid);
+            const count = createdBookingsByStudent[sid] ?? 0;
+            return count > 0 ? `${label}: ${count}` : null;
+          })
+          .filter((x): x is string => !!x)
+          .join(" | ");
+
+        toast.success(`Se crearon ${createdClassIds.length} clases${skippedTxt}.${perStudentTxt ? ` Reservas: ${perStudentTxt}.` : ""}`);
       } else {
         toast.success("Clase creada correctamente.");
       }
