@@ -215,6 +215,8 @@ export default function CalendarPage() {
   const [availabilityPopupTime, setAvailabilityPopupTime] = useState<string>("");
   const availabilityPopupRef = useRef<HTMLDivElement | null>(null);
 
+  const [dayTotalClasses, setDayTotalClasses] = useState<Record<string, number>>({});
+
   const visibleRangeRef = useRef<{ start: Date; end: Date } | null>(null);
 
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -1524,6 +1526,7 @@ export default function CalendarPage() {
       // Ocupación por slot (día+hora) para modo disponibilidad
       {
         const next: Record<string, string[]> = {};
+        const totals: Record<string, number> = {};
         for (const cls of classes) {
           if (!cls?.date) continue;
           if (!cls?.court_id) continue;
@@ -1534,8 +1537,11 @@ export default function CalendarPage() {
           const prev = next[key] ?? [];
           if (!prev.includes(cls.court_id)) prev.push(cls.court_id);
           next[key] = prev;
+
+          totals[day] = (totals[day] ?? 0) + 1;
         }
         setOccupiedCourtsBySlot(next);
+        setDayTotalClasses(totals);
       }
 
       let bookingsCountByClassId: Record<string, number> = {};
@@ -1690,10 +1696,28 @@ export default function CalendarPage() {
       toast.error(e?.message ?? "No se pudo cargar el calendario.");
       setEvents([]);
       setOccupiedCourtsBySlot({});
+      setDayTotalClasses({});
     } finally {
       setLoading(false);
     }
   };
+
+  const monthMacroByDay = useMemo(() => {
+    const totalCourts = allCourtIds.length;
+    const peakByDay: Record<string, number> = {};
+
+    for (const key of Object.keys(occupiedCourtsBySlot)) {
+      const [day] = key.split(":");
+      if (!day) continue;
+      const n = (occupiedCourtsBySlot[key] ?? []).length;
+      peakByDay[day] = Math.max(peakByDay[day] ?? 0, n);
+    }
+
+    return {
+      totalCourts,
+      peakByDay,
+    };
+  }, [occupiedCourtsBySlot, allCourtIds]);
 
   useEffect(() => {
     if (!availabilityMode) {
@@ -2076,6 +2100,25 @@ export default function CalendarPage() {
             slotLabelFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
             slotLabelInterval={{ hours: 1 }}
             events={availabilityMode ? [...availabilityEvents, ...events] : events}
+            dayCellContent={(arg) => {
+              const viewType = String((arg.view as any)?.type ?? "");
+              if (viewType !== "dayGridMonth") return undefined as any;
+
+              const day = toYmd(arg.date);
+              const total = dayTotalClasses[day] ?? 0;
+              const peak = monthMacroByDay.peakByDay[day] ?? 0;
+              const max = monthMacroByDay.totalCourts;
+
+              return (
+                <div className="flex items-start justify-between gap-1">
+                  <div className="fc-daygrid-day-number">{arg.dayNumberText}</div>
+                  <div className="text-[10px] leading-3 text-slate-600 text-right">
+                    <div>{total > 0 ? `clases: ${total}` : ""}</div>
+                    <div>{peak > 0 && max > 0 ? `pico ${peak}/${max}` : ""}</div>
+                  </div>
+                </div>
+              );
+            }}
             eventOrder={(a: any, b: any) => {
               const aStart = a?.start ? new Date(a.start as any).getTime() : 0;
               const bStart = b?.start ? new Date(b.start as any).getTime() : 0;
