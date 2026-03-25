@@ -1682,15 +1682,15 @@ export default function CalendarPage() {
         const free = Math.max(0, total - occupiedCount);
         const ratio = total ? free / total : 0;
 
-        let bg = "rgba(148,163,184,0.08)";
+        let bg = "rgba(148,163,184,0.04)";
         if (free === 0) {
-          bg = "rgba(239,68,68,0.10)";
+          bg = "rgba(239,68,68,0.06)";
         } else if (ratio >= 0.75) {
-          bg = "rgba(34,197,94,0.12)";
+          bg = "rgba(34,197,94,0.07)";
         } else if (ratio >= 0.4) {
-          bg = "rgba(34,197,94,0.08)";
+          bg = "rgba(34,197,94,0.05)";
         } else {
-          bg = "rgba(245,158,11,0.08)";
+          bg = "rgba(245,158,11,0.05)";
         }
 
         const slotStart = new Date(`${day}T${hh}:00:00`);
@@ -2032,39 +2032,61 @@ export default function CalendarPage() {
             eventContent={(arg) => {
               const kind = String((arg.event.extendedProps as any)?.kind ?? "");
               const viewType = String((arg.view as any)?.type ?? "");
-              if (viewType !== "dayGridMonth") return undefined as any;
+              if (viewType === "dayGridMonth") {
+                if (kind === "block") {
+                  return (
+                    <div className="px-1.5 py-0.5">
+                      <div className="text-[11px] font-semibold leading-4 truncate">{shortenName(arg.event.title, 22) || "Bloqueo"}</div>
+                    </div>
+                  );
+                }
+                if (kind === "manual_event") {
+                  return (
+                    <div className="px-1.5 py-0.5">
+                      <div className="text-[11px] font-semibold leading-4 truncate">{shortenName(arg.event.title, 22) || "Evento"}</div>
+                    </div>
+                  );
+                }
 
-              if (kind === "block") {
+                const courtName = (arg.event.extendedProps as any)?.courtName as string | null | undefined;
+                const coachName = (arg.event.extendedProps as any)?.coachName as string | null | undefined;
+                const n = (arg.event.extendedProps as any)?.bookingsCount as number | null | undefined;
+
+                const top = `${arg.timeText ? arg.timeText + " · " : ""}${courtName ? shortenName(courtName, 16) : "Clase"}`;
+                const metaParts: string[] = [];
+                if (coachName) metaParts.push(shortenName(coachName, 16));
+                if (typeof n === "number" && n > 0) metaParts.push(`${n}`);
+                const meta = metaParts.join(" · ");
+
                 return (
                   <div className="px-1.5 py-0.5">
-                    <div className="text-[11px] font-semibold leading-4 truncate">{shortenName(arg.event.title, 22) || "Bloqueo"}</div>
+                    <div className="text-[11px] font-semibold leading-4 truncate">{top}</div>
+                    {meta ? <div className="text-[10px] leading-3 opacity-90 truncate">{meta}</div> : null}
                   </div>
                 );
               }
-              if (kind === "manual_event") {
+
+              if (viewType === "timeGridDay" || viewType === "timeGridWeek") {
+                if (kind !== "class_session") return undefined as any;
+                const courtName = (arg.event.extendedProps as any)?.courtName as string | null | undefined;
+                const coachName = (arg.event.extendedProps as any)?.coachName as string | null | undefined;
+                const n = (arg.event.extendedProps as any)?.bookingsCount as number | null | undefined;
+
+                const top = courtName ? shortenName(courtName, 20) : "Clase";
+                const metaParts: string[] = [];
+                if (coachName) metaParts.push(shortenName(coachName, 20));
+                if (typeof n === "number" && n > 0) metaParts.push(`${n} alumno${n === 1 ? "" : "s"}`);
+                const meta = metaParts.join(" · ");
+
                 return (
-                  <div className="px-1.5 py-0.5">
-                    <div className="text-[11px] font-semibold leading-4 truncate">{shortenName(arg.event.title, 22) || "Evento"}</div>
+                  <div className="px-2 py-1">
+                    <div className="text-[12px] font-semibold leading-4 truncate">{top}</div>
+                    {meta ? <div className="text-[11px] leading-4 truncate">{meta}</div> : null}
                   </div>
                 );
               }
 
-              const courtName = (arg.event.extendedProps as any)?.courtName as string | null | undefined;
-              const coachName = (arg.event.extendedProps as any)?.coachName as string | null | undefined;
-              const n = (arg.event.extendedProps as any)?.bookingsCount as number | null | undefined;
-
-              const top = `${arg.timeText ? arg.timeText + " · " : ""}${courtName ? shortenName(courtName, 16) : "Clase"}`;
-              const metaParts: string[] = [];
-              if (coachName) metaParts.push(shortenName(coachName, 16));
-              if (typeof n === "number" && n > 0) metaParts.push(`${n}`);
-              const meta = metaParts.join(" · ");
-
-              return (
-                <div className="px-1.5 py-0.5">
-                  <div className="text-[11px] font-semibold leading-4 truncate">{top}</div>
-                  {meta ? <div className="text-[10px] leading-3 opacity-90 truncate">{meta}</div> : null}
-                </div>
-              );
+              return undefined as any;
             }}
             eventClassNames={(arg) => {
               const classes: string[] = [];
