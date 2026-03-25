@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AgendoLogo } from "@/components/agendo-logo";
+import { logAudit } from "@/lib/audit";
 import {
   Dialog,
   DialogContent,
@@ -52,6 +53,16 @@ type BookingRow = {
   id: string;
   class_id: string | null;
   student_id: string | null;
+};
+
+type AuditLogRow = {
+  id: string;
+  created_at: string;
+  user_id: string | null;
+  action: string;
+  entity: string;
+  entity_id: string | null;
+  payload: any;
 };
 
 type CalendarManualEventRow = {
@@ -189,6 +200,8 @@ export default function CalendarPage() {
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
   const [createCoachId, setCreateCoachId] = useState<string>("");
   const [createSelectedStudents, setCreateSelectedStudents] = useState<string[]>([]);
+  const [recurringEnabled, setRecurringEnabled] = useState(false);
+  const [recurringTotalSessions, setRecurringTotalSessions] = useState<number>(4);
   const [studentsPopoverOpen, setStudentsPopoverOpen] = useState(false);
   const [studentQuery, setStudentQuery] = useState("");
   const [creating, setCreating] = useState(false);
@@ -244,6 +257,11 @@ export default function CalendarPage() {
   const [attendanceLoading, setAttendanceLoading] = useState(false);
   const [attendanceSaving, setAttendanceSaving] = useState(false);
   const [attendanceList, setAttendanceList] = useState<{ student_id: string; present: boolean; label: string }[]>([]);
+
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyLogs, setHistoryLogs] = useState<AuditLogRow[]>([]);
 
   const allCourtIds = useMemo(() => {
     return Array.from(new Set((courts ?? []).map((c) => c.id).filter(Boolean)));
@@ -526,6 +544,8 @@ export default function CalendarPage() {
     setCreateSelectedStudents([]);
     setStudentQuery("");
     setStudentsPopoverOpen(false);
+    setRecurringEnabled(false);
+    setRecurringTotalSessions(4);
   };
 
   const resetEditForm = () => {
@@ -548,6 +568,45 @@ export default function CalendarPage() {
     setAttendanceLoading(false);
     setAttendanceSaving(false);
     setAttendanceList([]);
+  };
+
+  const resetHistory = () => {
+    setHistoryOpen(false);
+    setHistoryLoading(false);
+    setHistoryError(null);
+    setHistoryLogs([]);
+  };
+
+  const getStudentLabel = (sid: string) => {
+    const s = students.find((x) => x.id === sid);
+    if (s?.full_name) return s.full_name;
+    if (s?.notes) return s.notes;
+    if (s?.level) return s.level;
+    return sid;
+  };
+
+  const openHistory = async (cls: ClassSession) => {
+    setHistoryOpen(true);
+    setHistoryLoading(true);
+    setHistoryError(null);
+    setHistoryLogs([]);
+    try {
+      const { data, error } = await supabase
+        .from("audit_logs")
+        .select("id,created_at,user_id,action,entity,entity_id,payload")
+        .eq("entity", "class_session")
+        .eq("entity_id", cls.id)
+        .in("action", ["create", "update", "cancel", "attendance_update", "cancel_booking"])
+        .order("created_at", { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      setHistoryLogs((data ?? []) as any);
+    } catch (e: any) {
+      setHistoryError(e?.message ?? "Error cargando historial");
+      setHistoryLogs([]);
+    } finally {
+      setHistoryLoading(false);
+    }
   };
 
   const onConfirmCancel = async () => {
@@ -600,6 +659,17 @@ export default function CalendarPage() {
 
       const { error: delErr } = await supabase.from("class_sessions").update({ status: "cancelled" }).eq("id", cls.id);
       if (delErr) throw delErr;
+
+      try {
+        await logAudit("cancel", "class_session", cls.id, {
+          class_id: cls.id,
+          dateIso: cls.date,
+          cancelledByRole: role,
+          cancelledByUserId: userId,
+        });
+      } catch {
+        // no bloquear
+      }
 
       if (selectedAcademyId && userId && role) {
         try {
@@ -750,6 +820,14 @@ export default function CalendarPage() {
         if (updPendingErr) {
           console.error("Error limpiando attendance_pending", updPendingErr.message);
         }
+      }
+
+      try {
+        await logAudit("attendance_update", "class_session", cls.id, {
+          attendance: attendanceList.map((r) => ({ student_id: r.student_id, present: r.present })),
+        });
+      } catch {
+        // no bloquear
       }
 
       toast.success("Asistencia guardada.");
@@ -1120,6 +1198,21 @@ export default function CalendarPage() {
 
       // Push: reprogramación si cambió algo
       const isRescheduled = oldDateIso !== newIso || oldCourtId !== editCourtId || oldCoachId !== editCoachId;
+      try {
+        await logAudit("update", "class_session", cls.id, {
+          add_students: addedStudents,
+          remove_students: removedStudents,
+          isRescheduled,
+          oldDateIso,
+          newDateIso: newIso,
+          oldCourtId,
+          newCourtId: editCourtId,
+          oldCoachId,
+          newCoachId: editCoachId,
+        });
+      } catch {
+        // no bloquear
+      }
       if (isRescheduled && selectedAcademyId && userId && role) {
         try {
           const res = await fetch("/api/push/class-rescheduled", {
@@ -1325,77 +1418,172 @@ export default function CalendarPage() {
       const capacity = createSelectedStudents.length;
       const typeForSession = capacity === 1 ? "individual" : "grupal";
 
-      const { data: inserted, error: insErr } = await supabase
-        .from("class_sessions")
-        .insert({
-          date: iso,
-          court_id: createCourtId,
-          coach_id: coachIdToUse,
-          capacity,
-          type: typeForSession,
-          attendance_pending: false,
-        })
-        .select("*")
-        .maybeSingle();
-      if (insErr) throw insErr;
-      if (!inserted) throw new Error("No se pudo crear la clase.");
+      const createdClassIds: string[] = [];
+      const createdClassDates: string[] = [];
+      const createdBookingsByStudent: Record<string, number> = {};
+      let skippedCourt = 0;
+      let skippedStudents = 0;
 
-      const createdClassId = (inserted as any).id as string;
-      const bookingRows = createSelectedStudents.map((sid) => ({
-        class_id: createdClassId,
-        student_id: sid,
-        status: "reserved",
-      }));
-      const { error: bookingsErr } = await supabase.from("bookings").insert(bookingRows);
-      if (bookingsErr) throw bookingsErr;
+      const createOneSession = async (sessionIso: string) => {
+        // Conflicto cancha
+        {
+          const { data: clash, error: clashErr } = await supabase
+            .from("class_sessions")
+            .select("id")
+            .eq("court_id", createCourtId)
+            .eq("date", sessionIso)
+            .neq("status", "cancelled")
+            .limit(1);
+          if (clashErr) throw clashErr;
+          if ((clash ?? []).length > 0) {
+            skippedCourt += 1;
+            return;
+          }
+        }
+        // Conflicto alumnos
+        {
+          const { data: conflictsFiltered, error: conflictsStatusErr } = await supabase
+            .from("bookings")
+            .select("student_id, class_sessions!inner(id,date,status)")
+            .in("student_id", createSelectedStudents)
+            .eq("class_sessions.date", sessionIso)
+            .neq("class_sessions.status", "cancelled");
+          if (conflictsStatusErr) throw conflictsStatusErr;
+          if ((conflictsFiltered ?? []).length > 0) {
+            skippedStudents += 1;
+            return;
+          }
+        }
 
-      // plan_usages (consumo pendiente)
-      for (const sid of createSelectedStudents) {
-        const planId = planForStudent[sid];
-        if (!planId) continue;
-        const { error: usageUpsertErr } = await supabase.from("plan_usages").upsert(
-          {
-            student_plan_id: planId,
-            class_id: createdClassId,
-            student_id: sid,
-            status: "pending",
-            confirmed_at: null,
-            refunded_at: null,
-          },
-          { onConflict: "student_id,class_id" }
-        );
-        if (usageUpsertErr) {
-          console.error("Error registrando plan_usages en Calendar (create)", usageUpsertErr.message);
+        const { data: inserted, error: insErr } = await supabase
+          .from("class_sessions")
+          .insert({
+            date: sessionIso,
+            court_id: createCourtId,
+            coach_id: coachIdToUse,
+            capacity,
+            type: typeForSession,
+            attendance_pending: false,
+          })
+          .select("*")
+          .maybeSingle();
+        if (insErr) throw insErr;
+        if (!inserted) throw new Error("No se pudo crear la clase.");
+
+        const createdClassId = (inserted as any).id as string;
+        createdClassIds.push(createdClassId);
+        createdClassDates.push(sessionIso);
+
+        const bookingRows = createSelectedStudents.map((sid) => ({
+          class_id: createdClassId,
+          student_id: sid,
+          status: "reserved",
+        }));
+        const { error: bookingsErr } = await supabase.from("bookings").insert(bookingRows);
+        if (bookingsErr) throw bookingsErr;
+
+        for (const sid of createSelectedStudents) {
+          createdBookingsByStudent[sid] = (createdBookingsByStudent[sid] ?? 0) + 1;
+        }
+
+        // plan_usages (consumo pendiente)
+        for (const sid of createSelectedStudents) {
+          const planId = planForStudent[sid];
+          if (!planId) continue;
+          const { error: usageUpsertErr } = await supabase.from("plan_usages").upsert(
+            {
+              student_plan_id: planId,
+              class_id: createdClassId,
+              student_id: sid,
+              status: "pending",
+              confirmed_at: null,
+              refunded_at: null,
+            },
+            { onConflict: "student_id,class_id" }
+          );
+          if (usageUpsertErr) {
+            console.error("Error registrando plan_usages en Calendar (create)", usageUpsertErr.message);
+          }
+        }
+
+        try {
+          await logAudit("create", "class_session", createdClassId, {
+            date: sessionIso,
+            court_id: createCourtId,
+            coach_id: coachIdToUse,
+            capacity,
+            type: typeForSession,
+            students: [...createSelectedStudents],
+            recurring_enabled: recurringEnabled,
+          });
+        } catch {
+          // no bloquear
+        }
+      };
+
+      // Crear la primera
+      await createOneSession(iso);
+
+      if (createdClassIds.length === 0) {
+        toast.error("No se pudo crear la clase. Verificá disponibilidad y reintentá.");
+        return;
+      }
+
+      // Crear recurrentes (semanal, mismo horario)
+      if (recurringEnabled) {
+        const targetTotal = Math.max(1, Math.min(24, Number(recurringTotalSessions) || 1));
+        let cursor = new Date(iso);
+        while (createdClassIds.length < targetTotal) {
+          cursor = new Date(cursor.getTime() + 7 * 24 * 60 * 60 * 1000);
+          await createOneSession(cursor.toISOString());
+          // escape hard
+          if (createdClassIds.length + skippedCourt + skippedStudents > targetTotal + 60) break;
         }
       }
 
+      // Push: si es recurrente, mandamos resumen; si no, push normal
       try {
-        const res = await fetch("/api/push/class-created", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            classId: createdClassId,
-            coachId: coachIdToUse,
-            studentIds: [...createSelectedStudents],
-            dateIso: iso,
-            academyId: selectedAcademyId,
-          }),
-        });
-
-        if (!res.ok) {
-          let txt = "";
-          try {
-            txt = await res.text();
-          } catch {
-            txt = "";
-          }
-          console.warn("Push class-created failed", res.status, txt);
+        if (recurringEnabled && selectedAcademyId && createdClassIds.length > 0) {
+          await fetch("/api/push/class-created", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              academyId: selectedAcademyId,
+              coachId: coachIdToUse,
+              classId: createdClassIds[0],
+              dateIso: createdClassDates[0] ?? iso,
+              recurringSummary: true,
+              totalSessions: createdClassIds.length,
+              studentCounts: createdBookingsByStudent,
+            }),
+          });
+        } else if (selectedAcademyId) {
+          await fetch("/api/push/class-created", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              classId: createdClassIds[0],
+              coachId: coachIdToUse,
+              studentIds: [...createSelectedStudents],
+              dateIso: createdClassDates[0] ?? iso,
+              academyId: selectedAcademyId,
+            }),
+          });
         }
       } catch {
-        // no bloquear UI por push
+        // no bloquear
       }
 
-      toast.success("Clase creada correctamente.");
+      if (recurringEnabled) {
+        const skippedMsgParts: string[] = [];
+        if (skippedCourt > 0) skippedMsgParts.push(`${skippedCourt} por cancha ocupada`);
+        if (skippedStudents > 0) skippedMsgParts.push(`${skippedStudents} por alumnos ocupados`);
+        const skippedTxt = skippedMsgParts.length ? ` (omitidas: ${skippedMsgParts.join(", ")})` : "";
+        toast.success(`Se crearon ${createdClassIds.length} clases${skippedTxt}.`);
+      } else {
+        toast.success("Clase creada correctamente.");
+      }
+
       setCreateOpen(false);
       resetCreateForm();
 
@@ -2391,6 +2579,7 @@ export default function CalendarPage() {
             setRescheduleOpen(false);
             resetEditForm();
             resetAttendance();
+            resetHistory();
             setDetailsEvent(null);
           }
         }}
@@ -2630,6 +2819,101 @@ export default function CalendarPage() {
                 </div>
               )}
 
+              {historyOpen && (
+                <div className="rounded-lg border p-3">
+                  <div className="text-sm font-semibold text-slate-800">Histórico</div>
+                  <div className="mt-3 space-y-2">
+                    {historyLoading ? (
+                      <div className="text-xs text-slate-500">Cargando historial...</div>
+                    ) : historyError ? (
+                      <div className="text-xs text-red-600">{historyError}</div>
+                    ) : historyLogs.length === 0 ? (
+                      <div className="text-xs text-slate-500">No hay eventos registrados para esta clase.</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {historyLogs.map((log) => {
+                          const at = new Date(log.created_at);
+                          const atLabel = at.toLocaleString("es-ES", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          });
+
+                          let title = log.action;
+                          let detail: string | null = null;
+
+                          if (log.action === "create") {
+                            title = "Clase creada";
+                          }
+                          if (log.action === "cancel") {
+                            title = "Clase cancelada";
+                            const byRole = (log.payload?.cancelledByRole as string | undefined) ?? null;
+                            detail = byRole ? `Cancelada por: ${byRole}` : null;
+                          }
+                          if (log.action === "cancel_booking") {
+                            title = "Reserva cancelada";
+                            const sid = (log.payload?.student_id as string | undefined) ?? null;
+                            const who = sid ? getStudentLabel(sid) : "Alumno";
+                            const cancelledClass = !!log.payload?.cancelledClass;
+                            detail = cancelledClass ? `${who} (era el último, la clase quedó cancelada)` : who;
+                          }
+                          if (log.action === "update") {
+                            const isRescheduled = !!log.payload?.isRescheduled;
+                            if (isRescheduled) {
+                              title = "Clase re-agendada";
+                              const oldDateIso = (log.payload?.oldDateIso as string | undefined) ?? null;
+                              const newDateIso = (log.payload?.newDateIso as string | undefined) ?? null;
+                              if (oldDateIso && newDateIso) {
+                                const oldD = new Date(oldDateIso);
+                                const newD = new Date(newDateIso);
+                                const oldLabel = oldD.toLocaleString("es-ES", {
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                  year: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                });
+                                const newLabel = newD.toLocaleString("es-ES", {
+                                  day: "2-digit",
+                                  month: "2-digit",
+                                  year: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                });
+                                detail = `${oldLabel} → ${newLabel}`;
+                              }
+                            } else {
+                              title = "Clase editada";
+                            }
+                          }
+                          if (log.action === "attendance_update") {
+                            title = "Asistencia marcada";
+                            const rows = (log.payload?.attendance as any[]) ?? [];
+                            const present = rows.filter((r) => !!r?.present).length;
+                            const absent = rows.filter((r) => r?.present === false).length;
+                            detail = `Presentes: ${present} · Ausentes: ${absent}`;
+                          }
+
+                          return (
+                            <div key={log.id} className="rounded-md border border-slate-200 bg-white px-3 py-2">
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <div className="text-xs font-semibold text-slate-800">{title}</div>
+                                  {detail && <div className="text-xs text-slate-600 mt-0.5">{detail}</div>}
+                                </div>
+                                <div className="text-[11px] text-slate-500 whitespace-nowrap">{atLabel}</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {attendanceOpen && (
                 <div className="rounded-lg border p-3">
                   <div className="text-sm font-semibold text-slate-800">Asistencia</div>
@@ -2698,6 +2982,24 @@ export default function CalendarPage() {
                       {cancelling ? "Cancelando..." : "Cancelar"}
                     </Button>
                   )}
+
+                  <Button
+                    type="button"
+                    variant={historyOpen ? "default" : "outline"}
+                    onClick={() => {
+                      const p = (detailsEvent?.props ?? {}) as any;
+                      if (p?.kind !== "class_session") return;
+                      const cls = p.classSession as ClassSession | undefined;
+                      if (!cls?.id) return;
+                      if (historyOpen) {
+                        resetHistory();
+                      } else {
+                        void openHistory(cls);
+                      }
+                    }}
+                  >
+                    Histórico
+                  </Button>
 
                   <Button
                     type="button"
@@ -3001,6 +3303,50 @@ export default function CalendarPage() {
                   </div>
                 </PopoverContent>
               </Popover>
+            </div>
+
+            <div className="rounded-lg border p-3 bg-slate-50">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-slate-800">Recurrencia</div>
+                  <div className="text-[11px] text-slate-500">Repite semanalmente el mismo día y horario.</div>
+                </div>
+                <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={recurringEnabled}
+                    onChange={(e) => setRecurringEnabled(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                  Repetir
+                </label>
+              </div>
+
+              {recurringEnabled && (
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-sm mb-1">Cantidad de clases</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={24}
+                      value={recurringTotalSessions}
+                      onChange={(e) => {
+                        const n = Number(e.target.value);
+                        if (!Number.isFinite(n)) return;
+                        setRecurringTotalSessions(Math.max(1, Math.min(24, n)));
+                      }}
+                      className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#38AEB1]/40"
+                    />
+                    <div className="mt-1 text-[11px] text-slate-500">Máximo 24. Si hay conflictos se omiten algunas.</div>
+                  </div>
+                  <div className="flex items-end">
+                    <div className="text-[11px] text-slate-600">
+                      Se intentará crear la primera clase y luego las siguientes cada 7 días.
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
