@@ -172,6 +172,7 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(false);
 
   const canCreate = role === "admin" || role === "coach";
+  const canToggleAvailability = role === "admin" || role === "coach" || role === "super_admin";
 
   const [locations, setLocations] = useState<Location[]>([]);
   const [courts, setCourts] = useState<Court[]>([]);
@@ -1920,7 +1921,7 @@ export default function CalendarPage() {
         <div className="p-3 border-b bg-white flex items-center justify-between">
           <div className="text-sm font-semibold text-slate-800">Calendario</div>
           <div className="flex items-center gap-2">
-            {canCreate && (currentViewType === "timeGridDay" || currentViewType === "timeGridWeek") && (
+            {canToggleAvailability && (currentViewType === "timeGridDay" || currentViewType === "timeGridWeek") && (
               <Button
                 type="button"
                 variant={availabilityMode ? "default" : "outline"}
