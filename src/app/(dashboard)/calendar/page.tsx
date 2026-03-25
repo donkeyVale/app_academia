@@ -2109,12 +2109,22 @@ export default function CalendarPage() {
               const peak = monthMacroByDay.peakByDay[day] ?? 0;
               const max = monthMacroByDay.totalCourts;
 
+              const ratio = max > 0 ? peak / max : 0;
+              const peakClassName =
+                peak <= 0 || max <= 0
+                  ? ""
+                  : ratio >= 0.84
+                    ? "text-red-600"
+                    : ratio >= 0.5
+                      ? "text-amber-600"
+                      : "text-emerald-600";
+
               return (
                 <div className="flex items-start justify-between gap-1">
                   <div className="fc-daygrid-day-number">{arg.dayNumberText}</div>
                   <div className="text-[10px] leading-3 text-slate-600 text-right">
                     <div>{total > 0 ? `clases: ${total}` : ""}</div>
-                    <div>{peak > 0 && max > 0 ? `pico ${peak}/${max}` : ""}</div>
+                    <div className={peakClassName}>{peak > 0 && max > 0 ? `pico ${peak}/${max}` : ""}</div>
                   </div>
                 </div>
               );
