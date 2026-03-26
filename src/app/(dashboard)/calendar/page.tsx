@@ -2081,6 +2081,116 @@ export default function CalendarPage() {
     }
   };
 
+  useEffect(() => {
+    if (!detailsOpen) return;
+    const p = (detailsEvent?.props ?? {}) as any;
+    if (p?.kind !== "class_session") return;
+    const cls = p.classSession as ClassSession | undefined;
+    const classId = cls?.id ?? detailsEvent?.id ?? null;
+    if (!classId) return;
+
+    const existingNames = (p?.studentNames as string[] | undefined) ?? [];
+    if (existingNames.length > 0) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: bRows, error: bErr } = await supabase
+          .from("bookings")
+          .select("student_id")
+          .eq("class_id", classId);
+        if (bErr) throw bErr;
+
+        const studentIds = Array.from(
+          new Set(((bRows as { student_id: string | null }[] | null) ?? []).map((r) => r.student_id).filter((x): x is string => !!x))
+        );
+        if (studentIds.length === 0) {
+          if (cancelled) return;
+          setDetailsEvent((prev: any) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              props: {
+                ...(prev.props ?? {}),
+                studentNames: [],
+                studentSummary: null,
+              },
+            };
+          });
+          return;
+        }
+
+        const { data: studRows, error: studErr } = await supabase
+          .from("students")
+          .select("id,user_id")
+          .in("id", studentIds);
+        if (studErr) throw studErr;
+
+        const userIds = Array.from(
+          new Set(((studRows as { id: string; user_id: string | null }[] | null) ?? []).map((r) => r.user_id).filter((x): x is string => !!x))
+        );
+
+        let fullNameByUserId: Record<string, string | null> = {};
+        if (userIds.length > 0) {
+          const { data: profRows, error: profErr } = await supabase
+            .from("profiles")
+            .select("id,full_name")
+            .in("id", userIds);
+          if (profErr) throw profErr;
+          fullNameByUserId = ((profRows as { id: string; full_name: string | null }[] | null) ?? []).reduce<Record<string, string | null>>(
+            (acc, r) => {
+              acc[r.id] = r.full_name;
+              return acc;
+            },
+            {}
+          );
+        }
+
+        const userIdByStudentId = ((studRows as { id: string; user_id: string | null }[] | null) ?? []).reduce<Record<string, string | null>>(
+          (acc, r) => {
+            acc[r.id] = r.user_id;
+            return acc;
+          },
+          {}
+        );
+
+        const names = studentIds
+          .map((sid) => {
+            const uid = userIdByStudentId[sid];
+            return uid ? fullNameByUserId[uid] ?? null : null;
+          })
+          .filter((x): x is string => !!x);
+
+        const maxNamesInline = 3;
+        const studentSummary = names.length
+          ? names.slice(0, maxNamesInline).join(", ") + (names.length > maxNamesInline ? ` +${names.length - maxNamesInline}` : "")
+          : null;
+
+        if (cancelled) return;
+        setDetailsEvent((prev: any) => {
+          if (!prev) return prev;
+          const prevProps = (prev.props ?? {}) as any;
+          if (prevProps?.kind !== "class_session") return prev;
+          return {
+            ...prev,
+            props: {
+              ...prevProps,
+              studentNames: names,
+              studentSummary,
+              bookingsCount: typeof prevProps.bookingsCount === "number" ? prevProps.bookingsCount : studentIds.length,
+            },
+          };
+        });
+      } catch {
+        // no bloquear modal
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [detailsOpen, detailsEvent?.id, detailsEvent?.props, supabase]);
+
   const onConfirmReschedule = async () => {
     const p = (detailsEvent?.props ?? {}) as any;
     if (p?.kind !== "class_session") return;
