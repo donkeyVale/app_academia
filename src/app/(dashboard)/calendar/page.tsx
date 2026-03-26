@@ -109,6 +109,21 @@ function shortenName(name: string, max = 18): string {
   return t.slice(0, Math.max(0, max - 1)).trimEnd() + "…";
 }
 
+function chipClassFromText(text: string): string {
+  const palette = [
+    "border-emerald-200 bg-emerald-50 text-emerald-900",
+    "border-sky-200 bg-sky-50 text-sky-900",
+    "border-violet-200 bg-violet-50 text-violet-900",
+    "border-amber-200 bg-amber-50 text-amber-950",
+    "border-rose-200 bg-rose-50 text-rose-900",
+    "border-teal-200 bg-teal-50 text-teal-900",
+  ];
+
+  let h = 0;
+  for (let i = 0; i < text.length; i += 1) h = (h * 31 + text.charCodeAt(i)) >>> 0;
+  return palette[h % palette.length] ?? palette[0]!;
+}
+
 export default function CalendarPage() {
   const supabase = useMemo(() => createClientBrowser(), []);
 
@@ -2678,7 +2693,14 @@ export default function CalendarPage() {
                       return (
                         <div className="mt-1 flex flex-wrap gap-1.5">
                           {names.map((nm, idx) => (
-                            <span key={`${nm}-${idx}`} className="rounded-md border bg-white px-2 py-0.5 text-[11px]">
+                            <span
+                              key={`${nm}-${idx}`}
+                              className={
+                                "rounded-full border px-2 py-0.5 text-[11px] font-medium shadow-sm " +
+                                "ring-1 ring-inset ring-black/5 " +
+                                chipClassFromText(nm)
+                              }
+                            >
                               {nm}
                             </span>
                           ))}
