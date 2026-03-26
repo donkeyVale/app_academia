@@ -2668,6 +2668,29 @@ export default function CalendarPage() {
                     <div className="font-medium">60 min</div>
                   </div>
                 </div>
+
+                <div className="mt-3 text-xs text-slate-700">
+                  <div className="text-[11px] text-slate-500">Alumnos</div>
+                  {(() => {
+                    const names = (detailsEvent?.props?.studentNames as string[] | undefined) ?? [];
+                    const summary = (detailsEvent?.props?.studentSummary as string | null | undefined) ?? null;
+                    if (names.length > 0) {
+                      return (
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          {names.map((nm, idx) => (
+                            <span key={`${nm}-${idx}`} className="rounded-md border bg-white px-2 py-0.5 text-[11px]">
+                              {nm}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    }
+                    if (summary) {
+                      return <div className="mt-1 font-medium">{summary}</div>;
+                    }
+                    return <div className="mt-1 font-medium">-</div>;
+                  })()}
+                </div>
               </div>
 
               {editOpen && (
