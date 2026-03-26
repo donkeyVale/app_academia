@@ -1880,9 +1880,9 @@ export default function CalendarPage() {
             title: titleParts.length ? titleParts.join(" · ") : "Clase",
             start: startDt,
             end: endDt,
-            backgroundColor: cls.attendance_pending ? "#f59e0b" : "#4CC7C9",
-            borderColor: cls.attendance_pending ? "#d97706" : "#2AAFB1",
-            textColor: "#ffffff",
+            backgroundColor: cls.attendance_pending ? "#f59e0b" : "#7FE2E3",
+            borderColor: cls.attendance_pending ? "#d97706" : "#39C7C9",
+            textColor: "#0f172a",
             extendedProps: {
               kind: "class_session",
               classSession: cls,
