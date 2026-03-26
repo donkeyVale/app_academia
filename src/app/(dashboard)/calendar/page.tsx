@@ -111,17 +111,34 @@ function shortenName(name: string, max = 18): string {
 
 function chipClassFromText(text: string): string {
   const palette = [
-    "border-emerald-200 bg-emerald-50 text-emerald-900",
-    "border-sky-200 bg-sky-50 text-sky-900",
-    "border-violet-200 bg-violet-50 text-violet-900",
-    "border-amber-200 bg-amber-50 text-amber-950",
-    "border-rose-200 bg-rose-50 text-rose-900",
-    "border-teal-200 bg-teal-50 text-teal-900",
+    { chip: "border-emerald-200 bg-emerald-50 text-emerald-900", dot: "bg-emerald-500" },
+    { chip: "border-sky-200 bg-sky-50 text-sky-900", dot: "bg-sky-500" },
+    { chip: "border-violet-200 bg-violet-50 text-violet-900", dot: "bg-violet-500" },
+    { chip: "border-amber-200 bg-amber-50 text-amber-950", dot: "bg-amber-500" },
+    { chip: "border-rose-200 bg-rose-50 text-rose-900", dot: "bg-rose-500" },
+    { chip: "border-teal-200 bg-teal-50 text-teal-900", dot: "bg-teal-500" },
   ];
 
   let h = 0;
   for (let i = 0; i < text.length; i += 1) h = (h * 31 + text.charCodeAt(i)) >>> 0;
-  return palette[h % palette.length] ?? palette[0]!;
+  const idx = h % palette.length;
+  return palette[idx]?.chip ?? palette[0]!.chip;
+}
+
+function chipDotClassFromText(text: string): string {
+  const palette = [
+    { chip: "border-emerald-200 bg-emerald-50 text-emerald-900", dot: "bg-emerald-500" },
+    { chip: "border-sky-200 bg-sky-50 text-sky-900", dot: "bg-sky-500" },
+    { chip: "border-violet-200 bg-violet-50 text-violet-900", dot: "bg-violet-500" },
+    { chip: "border-amber-200 bg-amber-50 text-amber-950", dot: "bg-amber-500" },
+    { chip: "border-rose-200 bg-rose-50 text-rose-900", dot: "bg-rose-500" },
+    { chip: "border-teal-200 bg-teal-50 text-teal-900", dot: "bg-teal-500" },
+  ];
+
+  let h = 0;
+  for (let i = 0; i < text.length; i += 1) h = (h * 31 + text.charCodeAt(i)) >>> 0;
+  const idx = h % palette.length;
+  return palette[idx]?.dot ?? palette[0]!.dot;
 }
 
 export default function CalendarPage() {
@@ -2701,7 +2718,15 @@ export default function CalendarPage() {
                                 chipClassFromText(nm)
                               }
                             >
-                              {nm}
+                              <span className="inline-flex items-center gap-1.5">
+                                <span
+                                  className={
+                                    "h-1.5 w-1.5 rounded-full shadow-sm ring-1 ring-black/10 " +
+                                    chipDotClassFromText(nm)
+                                  }
+                                />
+                                <span>{nm}</span>
+                              </span>
                             </span>
                           ))}
                         </div>
