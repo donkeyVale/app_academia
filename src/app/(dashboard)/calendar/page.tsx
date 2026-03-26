@@ -1753,6 +1753,7 @@ export default function CalendarPage() {
       }
 
       let bookingsCountByClassId: Record<string, number> = {};
+      let studentIdsByClassId: Record<string, string[]> = {};
       if (classIds.length > 0) {
         const { data: bRows, error: bErr } = await supabase
           .from("bookings")
@@ -1765,8 +1766,23 @@ export default function CalendarPage() {
             acc[cid] = (acc[cid] ?? 0) + 1;
             return acc;
           }, {});
+
+          studentIdsByClassId = ((bRows as BookingRow[] | null) ?? []).reduce<Record<string, string[]>>((acc, b) => {
+            const cid = b.class_id;
+            const sid = b.student_id;
+            if (!cid || !sid) return acc;
+            const prev = acc[cid] ?? [];
+            if (!prev.includes(sid)) prev.push(sid);
+            acc[cid] = prev;
+            return acc;
+          }, {});
         }
       }
+
+      const studentNameByStudentId = ((students as Student[] | null) ?? []).reduce<Record<string, string | null>>((acc, s) => {
+        acc[s.id] = (s.full_name as string | null) ?? null;
+        return acc;
+      }, {});
 
       const coachIds = Array.from(
         new Set(classes.map((c) => c.coach_id).filter((id): id is string => !!id))
@@ -1812,6 +1828,15 @@ export default function CalendarPage() {
           const court = cls.court_id ? courtById[cls.court_id] : null;
           const coachName = cls.coach_id ? coachNameByCoachId[cls.coach_id] ?? null : null;
           const n = bookingsCountByClassId[cls.id] ?? 0;
+          const studentIds = studentIdsByClassId[cls.id] ?? [];
+          const studentNames = studentIds
+            .map((sid) => studentNameByStudentId[sid])
+            .filter((x): x is string => !!x);
+
+          const maxNamesInline = 3;
+          const studentSummary = studentNames.length
+            ? studentNames.slice(0, maxNamesInline).join(", ") + (studentNames.length > maxNamesInline ? ` +${studentNames.length - maxNamesInline}` : "")
+            : null;
 
           const titleParts: string[] = [];
           if (court?.name) titleParts.push(court.name);
@@ -1832,6 +1857,8 @@ export default function CalendarPage() {
               courtName: court?.name ?? null,
               coachName,
               bookingsCount: n,
+              studentNames,
+              studentSummary,
             },
           };
         })
@@ -2368,11 +2395,13 @@ export default function CalendarPage() {
                 const courtName = (arg.event.extendedProps as any)?.courtName as string | null | undefined;
                 const coachName = (arg.event.extendedProps as any)?.coachName as string | null | undefined;
                 const n = (arg.event.extendedProps as any)?.bookingsCount as number | null | undefined;
+                const studentSummary = (arg.event.extendedProps as any)?.studentSummary as string | null | undefined;
 
                 const top = `${arg.timeText ? arg.timeText + " · " : ""}${courtName ? shortenName(courtName, 16) : "Clase"}`;
                 const metaParts: string[] = [];
                 if (coachName) metaParts.push(shortenName(coachName, 16));
                 if (typeof n === "number" && n > 0) metaParts.push(`${n}`);
+                if (studentSummary) metaParts.push(shortenName(studentSummary, 28));
                 const meta = metaParts.join(" · ");
 
                 return (
@@ -2388,11 +2417,13 @@ export default function CalendarPage() {
                 const courtName = (arg.event.extendedProps as any)?.courtName as string | null | undefined;
                 const coachName = (arg.event.extendedProps as any)?.coachName as string | null | undefined;
                 const n = (arg.event.extendedProps as any)?.bookingsCount as number | null | undefined;
+                const studentSummary = (arg.event.extendedProps as any)?.studentSummary as string | null | undefined;
 
                 const top = courtName ? shortenName(courtName, 20) : "Clase";
                 const metaParts: string[] = [];
                 if (coachName) metaParts.push(shortenName(coachName, 20));
                 if (typeof n === "number" && n > 0) metaParts.push(`${n} alumno${n === 1 ? "" : "s"}`);
+                if (studentSummary) metaParts.push(shortenName(studentSummary, 36));
                 const meta = metaParts.join(" · ");
 
                 return (
