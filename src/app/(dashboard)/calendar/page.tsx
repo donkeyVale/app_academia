@@ -1498,6 +1498,24 @@ export default function CalendarPage() {
         }
       }
 
+      // Conflicto de profesor (warning): permite crear, pero avisa
+      {
+        const { data: coachClash, error: coachClashErr } = await supabase
+          .from("class_sessions")
+          .select("id")
+          .eq("coach_id", coachIdToUse)
+          .eq("date", iso)
+          .neq("status", "cancelled")
+          .limit(1);
+        if (coachClashErr) {
+          toast.error("No se pudo verificar la disponibilidad del profesor. Intenta nuevamente.");
+          return;
+        }
+        if ((coachClash ?? []).length > 0) {
+          toast.warning("El profesor ya tiene una clase en ese horario.");
+        }
+      }
+
       // Conflicto: alumnos con clase en mismo horario
       {
         const { data: conflictsFiltered, error: conflictsStatusErr } = await supabase
@@ -1523,6 +1541,7 @@ export default function CalendarPage() {
       const createdBookingsByStudent: Record<string, number> = {};
       let skippedCourt = 0;
       let skippedStudents = 0;
+      let warnedCoachClash = false;
 
       const createOneSession = async (sessionIso: string, sessionIndex: number) => {
         const studentsToBook = createSelectedStudents.filter((sid) => (remainingForStudent[sid] ?? 0) >= sessionIndex + 1);
@@ -1543,6 +1562,26 @@ export default function CalendarPage() {
             return;
           }
         }
+
+        // Conflicto profesor (warning): permite crear, pero avisa (solo una vez)
+        if (!warnedCoachClash) {
+          const { data: coachClash, error: coachClashErr } = await supabase
+            .from("class_sessions")
+            .select("id")
+            .eq("coach_id", coachIdToUse)
+            .eq("date", sessionIso)
+            .neq("status", "cancelled")
+            .limit(1);
+          if (coachClashErr) {
+            toast.error("No se pudo verificar la disponibilidad del profesor. Intenta nuevamente.");
+            return;
+          }
+          if ((coachClash ?? []).length > 0) {
+            warnedCoachClash = true;
+            toast.warning("El profesor ya tiene una clase en ese horario.");
+          }
+        }
+
         // Conflicto alumnos
         {
           const { data: conflictsFiltered, error: conflictsStatusErr } = await supabase
