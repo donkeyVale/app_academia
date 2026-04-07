@@ -10,6 +10,7 @@ import { Calendar as CalendarIcon } from "lucide-react";
 import { createClientBrowser } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AgendoLogo } from "@/components/agendo-logo";
 import { logAudit } from "@/lib/audit";
@@ -101,6 +102,61 @@ function pad2(n: number): string {
 
 function toYmd(date: Date): string {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function parseYmd(ymd: string): Date | null {
+  const t = (ymd || "").trim();
+  if (!t) return null;
+  const [y, m, d] = t.split("-").map((x) => Number(x));
+  if (!y || !m || !d) return null;
+  const dt = new Date(y, m - 1, d);
+  if (Number.isNaN(dt.getTime())) return null;
+  if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return null;
+  return dt;
+}
+
+function formatDatePickerLabel(date: Date | null): string {
+  if (!date) return "Selecciona una fecha";
+  return date.toLocaleDateString("es-ES", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+interface DatePickerFieldProps {
+  value: string;
+  onChange: (value: string) => void;
+}
+
+function DatePickerField({ value, onChange }: DatePickerFieldProps) {
+  const selectedDate = parseYmd(value);
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className="h-10 w-full justify-start text-left text-sm font-normal flex items-center gap-2"
+        >
+          <CalendarIcon className="h-4 w-4 text-gray-500" />
+          <span className={selectedDate ? "" : "text-gray-400"}>{formatDatePickerLabel(selectedDate)}</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={selectedDate ?? undefined}
+          onSelect={(date) => {
+            if (!date) return;
+            onChange(toYmd(date));
+          }}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
+  );
 }
 
 function shortenName(name: string, max = 18): string {
@@ -2481,110 +2537,118 @@ export default function CalendarPage() {
             slotMinTime="06:00:00"
             slotMaxTime="23:00:00"
             scrollTime={isMobile ? mobileScrollTime : undefined}
-            slotLabelFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
-            slotLabelInterval={{ hours: 1 }}
-            events={availabilityMode ? [...availabilityEvents, ...events] : events}
-            dayCellContent={(arg) => {
-              const viewType = String((arg.view as any)?.type ?? "");
-              if (viewType !== "dayGridMonth") return undefined as any;
+          slotLabelFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
+          slotLabelInterval={{ hours: 1 }}
+          events={availabilityMode ? [...availabilityEvents, ...events] : events}
+          dayHeaderContent={(arg) => {
+            const d = arg.date as Date;
+            const day = toYmd(d);
+            const total = dayTotalClasses?.[day] ?? 0;
+            const peak = monthMacroByDay?.peakByDay?.[day] ?? 0;
+            const max = monthMacroByDay?.totalCourts ?? 0;
+            const ratio = max > 0 ? peak / max : 0;
+            const peakClassName =
+              ratio >= 1
+                ? "text-rose-600"
+                : ratio >= 0.84
+                  ? "text-red-600"
+                  : ratio >= 0.5
+                    ? "text-amber-600"
+                    : "text-emerald-600";
 
-              const day = toYmd(arg.date);
-              const total = dayTotalClasses[day] ?? 0;
-              const peak = monthMacroByDay.peakByDay[day] ?? 0;
-              const max = monthMacroByDay.totalCourts;
-
-              const ratio = max > 0 ? peak / max : 0;
-              const peakClassName =
-                peak <= 0 || max <= 0
-                  ? ""
-                  : ratio >= 0.84
-                    ? "text-red-600"
-                    : ratio >= 0.5
-                      ? "text-amber-600"
-                      : "text-emerald-600";
-
-              return (
-                <div className="flex items-start justify-between gap-1">
-                  <div className="fc-daygrid-day-number">{arg.dayNumberText}</div>
+            return (
+              <div className="flex items-start justify-between gap-1">
+                <div className="fc-daygrid-day-number">{arg.dayNumberText}</div>
+                {availabilityMode ? (
                   <div className="text-[10px] leading-3 text-slate-600 text-right">
                     <div>{total > 0 ? `clases: ${total}` : ""}</div>
                     <div className={peakClassName}>{peak > 0 && max > 0 ? `pico ${peak}/${max}` : ""}</div>
                   </div>
-                </div>
-              );
-            }}
-            eventOrder={(a: any, b: any) => {
-              const aStart = a?.start ? new Date(a.start as any).getTime() : 0;
-              const bStart = b?.start ? new Date(b.start as any).getTime() : 0;
-              if (aStart !== bStart) return aStart - bStart;
-              const ac = String((a?.extendedProps as any)?.courtName ?? "").toLowerCase();
-              const bc = String((b?.extendedProps as any)?.courtName ?? "").toLowerCase();
-              if (ac !== bc) return ac.localeCompare(bc);
-              return String(a?.title ?? "").localeCompare(String(b?.title ?? ""));
-            }}
-            eventContent={(arg) => {
-              const kind = String((arg.event.extendedProps as any)?.kind ?? "");
-              const viewType = String((arg.view as any)?.type ?? "");
-              if (viewType === "dayGridMonth") {
-                if (kind === "block") {
-                  return (
-                    <div className="px-1.5 py-0.5">
-                      <div className="text-[11px] font-semibold leading-4 truncate">{shortenName(arg.event.title, 22) || "Bloqueo"}</div>
-                    </div>
-                  );
-                }
-                if (kind === "manual_event") {
-                  return (
-                    <div className="px-1.5 py-0.5">
-                      <div className="text-[11px] font-semibold leading-4 truncate">{shortenName(arg.event.title, 22) || "Evento"}</div>
-                    </div>
-                  );
-                }
+                ) : null}
+              </div>
+            );
+          }}
+          eventOrder={(a: any, b: any) => {
+            const aStart = a?.start ? new Date(a.start as any).getTime() : 0;
+            const bStart = b?.start ? new Date(b.start as any).getTime() : 0;
+            if (aStart !== bStart) return aStart - bStart;
+            const ac = String((a?.extendedProps as any)?.courtName ?? "").toLowerCase();
+            const bc = String((b?.extendedProps as any)?.courtName ?? "").toLowerCase();
+            if (ac !== bc) return ac.localeCompare(bc);
+            return String(a?.title ?? "").localeCompare(String(b?.title ?? ""));
+          }}
+          eventContent={(arg) => {
+            const kind = String((arg.event.extendedProps as any)?.kind ?? "");
+            const viewType = String((arg.view as any)?.type ?? "");
 
-                const courtName = (arg.event.extendedProps as any)?.courtName as string | null | undefined;
-                const coachName = (arg.event.extendedProps as any)?.coachName as string | null | undefined;
-                const n = (arg.event.extendedProps as any)?.bookingsCount as number | null | undefined;
-                const studentSummary = (arg.event.extendedProps as any)?.studentSummary as string | null | undefined;
-
-                const top = `${arg.timeText ? arg.timeText + " · " : ""}${courtName ? shortenName(courtName, 16) : "Clase"}`;
-                const metaParts: string[] = [];
-                if (coachName) metaParts.push(shortenName(coachName, 16));
-                if (typeof n === "number" && n > 0) metaParts.push(`${n}`);
-                if (studentSummary) metaParts.push(shortenName(studentSummary, 28));
-                const meta = metaParts.join(" · ");
-
+            if (viewType === "dayGridMonth") {
+              if (kind === "block") {
                 return (
                   <div className="px-1.5 py-0.5">
-                    <div className="text-[11px] font-semibold leading-4 truncate">{top}</div>
-                    {meta ? <div className="text-[10px] leading-3 opacity-90 truncate">{meta}</div> : null}
+                    <div className="text-[11px] font-semibold leading-4 truncate">
+                      {shortenName(arg.event.title, 22) || "Bloqueo"}
+                    </div>
                   </div>
                 );
               }
-
-              if (viewType === "timeGridDay" || viewType === "timeGridWeek") {
-                if (kind !== "class_session") return undefined as any;
-                const courtName = (arg.event.extendedProps as any)?.courtName as string | null | undefined;
-                const coachName = (arg.event.extendedProps as any)?.coachName as string | null | undefined;
-                const n = (arg.event.extendedProps as any)?.bookingsCount as number | null | undefined;
-                const studentSummary = (arg.event.extendedProps as any)?.studentSummary as string | null | undefined;
-
-                const top = courtName ? shortenName(courtName, 20) : "Clase";
-                const metaParts: string[] = [];
-                if (coachName) metaParts.push(shortenName(coachName, 20));
-                if (typeof n === "number" && n > 0) metaParts.push(`${n} alumno${n === 1 ? "" : "s"}`);
-                if (studentSummary) metaParts.push(shortenName(studentSummary, 36));
-                const meta = metaParts.join(" · ");
-
+              if (kind === "manual_event") {
                 return (
-                  <div className="px-2 py-1">
-                    <div className="text-[12px] font-semibold leading-4 truncate">{top}</div>
-                    {meta ? <div className="text-[11px] leading-4 truncate">{meta}</div> : null}
+                  <div className="px-1.5 py-0.5">
+                    <div className="text-[11px] font-semibold leading-4 truncate">
+                      {shortenName(arg.event.title, 22) || "Evento"}
+                    </div>
                   </div>
                 );
               }
 
-              return undefined as any;
-            }}
+              const courtName = (arg.event.extendedProps as any)?.courtName as string | null | undefined;
+              const coachName = (arg.event.extendedProps as any)?.coachName as string | null | undefined;
+              const n = (arg.event.extendedProps as any)?.bookingsCount as number | null | undefined;
+              const studentSummary = (arg.event.extendedProps as any)?.studentSummary as string | null | undefined;
+
+              const main =
+                studentSummary?.trim()
+                  ? shortenName(studentSummary, 22)
+                  : typeof n === "number" && n > 0
+                    ? `${n} alumno${n === 1 ? "" : "s"}`
+                    : coachName
+                      ? shortenName(coachName, 18)
+                      : courtName
+                        ? shortenName(courtName, 18)
+                        : "Clase";
+
+              const top = `${arg.timeText ? arg.timeText + " " : ""}${main}`;
+              return (
+                <div className="px-1.5 py-0.5">
+                  <div className="text-[11px] font-semibold leading-4 truncate">{top}</div>
+                </div>
+              );
+            }
+
+            if (viewType === "timeGridDay" || viewType === "timeGridWeek") {
+              if (kind !== "class_session") return undefined as any;
+              const courtName = (arg.event.extendedProps as any)?.courtName as string | null | undefined;
+              const coachName = (arg.event.extendedProps as any)?.coachName as string | null | undefined;
+              const n = (arg.event.extendedProps as any)?.bookingsCount as number | null | undefined;
+              const studentSummary = (arg.event.extendedProps as any)?.studentSummary as string | null | undefined;
+
+              const top = courtName ? shortenName(courtName, 20) : "Clase";
+              const metaParts: string[] = [];
+              if (coachName) metaParts.push(shortenName(coachName, 20));
+              if (typeof n === "number" && n > 0) metaParts.push(`${n} alumno${n === 1 ? "" : "s"}`);
+              if (studentSummary) metaParts.push(shortenName(studentSummary, 36));
+              const meta = metaParts.join(" · ");
+
+              return (
+                <div className="px-2 py-1">
+                  <div className="text-[12px] font-semibold leading-4 truncate">{top}</div>
+                  {meta ? <div className="text-[11px] leading-4 truncate">{meta}</div> : null}
+                </div>
+              );
+            }
+
+            return undefined as any;
+          }}
             eventClassNames={(arg) => {
               const classes: string[] = [];
               if (tappedEventId && arg.event.id === tappedEventId) classes.push("agendo-fc-tapped");
@@ -3402,12 +3466,7 @@ export default function CalendarPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
                 <label className="block text-sm mb-1">Fecha</label>
-                <input
-                  type="date"
-                  value={createDay}
-                  onChange={(e) => setCreateDay(e.target.value)}
-                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#38AEB1]/40"
-                />
+                <DatePickerField value={createDay} onChange={setCreateDay} />
               </div>
               <div>
                 <label className="block text-sm mb-1">Hora disponible</label>
