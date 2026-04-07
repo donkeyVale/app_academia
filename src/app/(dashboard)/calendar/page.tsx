@@ -215,7 +215,7 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(false);
 
   const canCreate = role === "admin" || role === "coach";
-  const canToggleAvailability = role === "admin" || role === "coach" || role === "super_admin";
+  const canToggleAvailability = role === "admin" || role === "coach";
 
   const [locations, setLocations] = useState<Location[]>([]);
   const [courts, setCourts] = useState<Court[]>([]);
@@ -252,6 +252,12 @@ export default function CalendarPage() {
   const [occupiedCourtsBySlot, setOccupiedCourtsBySlot] = useState<Record<string, string[]>>({});
   const [availabilityEvents, setAvailabilityEvents] = useState<any[]>([]);
   const [availabilityLegend, setAvailabilityLegend] = useState<string>("");
+
+  useEffect(() => {
+    if (role === "super_admin" || role === "student") {
+      setAvailabilityMode(false);
+    }
+  }, [role]);
 
   const [availabilityPopupOpen, setAvailabilityPopupOpen] = useState(false);
   const [availabilityPopupX, setAvailabilityPopupX] = useState(0);
@@ -3199,6 +3205,14 @@ export default function CalendarPage() {
 
               {detailsEvent?.props?.kind === "class_session" && (
                 <div className="flex items-center gap-2">
+                  {(() => {
+                    const canManageSelectedClass =
+                      role === "admin" ||
+                      (role === "coach" &&
+                        !!coachSelfId &&
+                        (detailsEvent?.props?.classSession?.coach_id as string | null | undefined) === coachSelfId);
+                    return (
+                      <>
                   {(role === "admin" ||
                     (role === "coach" &&
                       coachSelfId &&
@@ -3232,39 +3246,50 @@ export default function CalendarPage() {
                     Histórico
                   </Button>
 
-                  <Button
-                    type="button"
-                    variant={editOpen ? "default" : "outline"}
-                    onClick={() => {
-                      if (editOpen) resetEditForm();
-                      else void onStartEdit();
-                    }}
-                    disabled={savingEdit || cancelling || role === "super_admin" || role === "student"}
-                  >
-                    Editar
-                  </Button>
-                  {editOpen && (
-                    <Button type="button" onClick={onSaveEdit} disabled={savingEdit || cancelling}>
-                      {savingEdit ? "Guardando..." : "Guardar"}
-                    </Button>
-                  )}
+                  {canManageSelectedClass && (
+                    <>
+                      <Button
+                        type="button"
+                        variant={editOpen ? "default" : "outline"}
+                        onClick={() => {
+                          if (editOpen) resetEditForm();
+                          else void onStartEdit();
+                        }}
+                        disabled={savingEdit || cancelling}
+                      >
+                        Editar
+                      </Button>
+                      {editOpen && (
+                        <Button type="button" onClick={onSaveEdit} disabled={savingEdit || cancelling}>
+                          {savingEdit ? "Guardando..." : "Guardar"}
+                        </Button>
+                      )}
 
-                  <Button
-                    type="button"
-                    variant={attendanceOpen ? "default" : "outline"}
-                    onClick={() => {
-                      if (attendanceOpen) resetAttendance();
-                      else void openAttendance();
-                    }}
-                    disabled={attendanceSaving || attendanceLoading || role === "super_admin" || role === "student"}
-                  >
-                    Asistencia
-                  </Button>
-                  {attendanceOpen && (
-                    <Button type="button" onClick={onSaveAttendance} disabled={attendanceSaving || attendanceLoading || cancelling}>
-                      {attendanceSaving ? "Guardando..." : "Guardar asistencia"}
-                    </Button>
+                      <Button
+                        type="button"
+                        variant={attendanceOpen ? "default" : "outline"}
+                        onClick={() => {
+                          if (attendanceOpen) resetAttendance();
+                          else void openAttendance();
+                        }}
+                        disabled={attendanceSaving || attendanceLoading}
+                      >
+                        Asistencia
+                      </Button>
+                      {attendanceOpen && (
+                        <Button
+                          type="button"
+                          onClick={onSaveAttendance}
+                          disabled={attendanceSaving || attendanceLoading || cancelling}
+                        >
+                          {attendanceSaving ? "Guardando..." : "Guardar asistencia"}
+                        </Button>
+                      )}
+                    </>
                   )}
+                      </>
+                    );
+                  })()}
                 </div>
               )}
             </div>
