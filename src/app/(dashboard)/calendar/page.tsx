@@ -1423,6 +1423,7 @@ export default function CalendarPage() {
         }
 
         planForStudent[sid] = chosenPlan.id as string;
+        remainingForStudent[sid] = chosenPlanRemaining;
       }
 
       // Anti-race: misma cancha y misma hora
