@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { createClientBrowser } from "@/lib/supabase";
+import { Switch } from "@/components/ui/switch";
+import { toast } from "sonner";
 
 type AppRole = "super_admin" | "admin" | "coach" | "student" | null;
 
@@ -21,7 +23,10 @@ export default function AcademiesPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [academies, setAcademies] = useState<Academy[]>([]);
+  const [academyIsActive, setAcademyIsActive] = useState<Record<string, boolean>>({});
+  const [togglingAcademyId, setTogglingAcademyId] = useState<string | null>(null);
   const [name, setName] = useState("");
 
   useEffect(() => {
@@ -36,6 +41,8 @@ export default function AcademiesPage() {
         setLoadingUser(false);
         return;
       }
+
+      setCurrentUserId(user.id);
 
       try {
         const { data: profile, error: profErr } = await supabase
@@ -72,14 +79,34 @@ export default function AcademiesPage() {
       setLoading(true);
       setError(null);
       try {
-        const { data, error: acadErr } = await supabase
-          .from("academies")
-          .select("id, name, slug, created_at")
-          .order("created_at", { ascending: false });
+        const [{ data, error: acadErr }, { data: uaRows, error: uaErr }] = await Promise.all([
+          supabase.from("academies").select("id, name, slug, created_at").order("created_at", { ascending: false }),
+          supabase.from("user_academies").select("academy_id,is_active"),
+        ]);
 
         if (acadErr) throw acadErr;
+        if (uaErr) throw uaErr;
         if (!active) return;
-        setAcademies((data ?? []) as Academy[]);
+        const academyList = (data ?? []) as Academy[];
+        setAcademies(academyList);
+
+        const inactiveByAcademy: Record<string, number> = {};
+        const totalByAcademy: Record<string, number> = {};
+        for (const r of (uaRows ?? []) as any[]) {
+          const aid = r.academy_id as string | null;
+          if (!aid) continue;
+          totalByAcademy[aid] = (totalByAcademy[aid] ?? 0) + 1;
+          const isActive = (r.is_active as boolean | null) ?? true;
+          if (!isActive) inactiveByAcademy[aid] = (inactiveByAcademy[aid] ?? 0) + 1;
+        }
+
+        const nextActive: Record<string, boolean> = {};
+        for (const a of academyList) {
+          const total = totalByAcademy[a.id] ?? 0;
+          const inactive = inactiveByAcademy[a.id] ?? 0;
+          nextActive[a.id] = total === 0 ? true : inactive === 0;
+        }
+        setAcademyIsActive(nextActive);
       } catch (err: any) {
         if (!active) return;
         setError(err?.message ?? "Error cargando academias.");
@@ -117,6 +144,45 @@ export default function AcademiesPage() {
   };
 
   const isSuperAdmin = role === "super_admin";
+
+  const toggleAcademyUsersActive = async (academy: Academy, nextActive: boolean) => {
+    if (!currentUserId) {
+      toast.error("No se pudo identificar al usuario actual.");
+      return;
+    }
+
+    const label = academy.name ?? academy.id;
+    const ok = window.confirm(
+      nextActive
+        ? `¿Reactivar a TODOS los usuarios de ${label}?`
+        : `¿Desactivar a TODOS los usuarios de ${label}?`
+    );
+    if (!ok) return;
+
+    setTogglingAcademyId(academy.id);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/academy-users-active", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentUserId,
+          academyId: academy.id,
+          isActive: nextActive,
+        }),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error ?? "No se pudo actualizar el estado de los usuarios.");
+
+      setAcademyIsActive((prev) => ({ ...prev, [academy.id]: nextActive }));
+      toast.success(nextActive ? "Usuarios reactivados." : "Usuarios desactivados.");
+    } catch (err: any) {
+      toast.error(err?.message ?? "No se pudo actualizar el estado de los usuarios.");
+    } finally {
+      setTogglingAcademyId(null);
+    }
+  };
 
   return (
     <section className="mt-4 space-y-6 max-w-5xl mx-auto px-4">
@@ -209,6 +275,17 @@ export default function AcademiesPage() {
                         {a.slug && (
                           <p className="text-xs text-gray-500">{a.slug}</p>
                         )}
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <div className="text-xs text-gray-500">
+                          {academyIsActive[a.id] ? "Activa" : "Inactiva"}
+                        </div>
+                        <Switch
+                          checked={academyIsActive[a.id] ?? true}
+                          disabled={togglingAcademyId === a.id}
+                          onCheckedChange={(checked: boolean) => toggleAcademyUsersActive(a, checked)}
+                        />
                       </div>
                     </div>
                   ))}
