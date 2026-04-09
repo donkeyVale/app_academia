@@ -774,15 +774,37 @@ export default function Page() {
               setHasAcademies(true);
               const { data: acadRows, error: acadErr } = await supabase
                 .from('academies')
-                .select('id,name')
+                .select('id,name,is_suspended')
                 .in('id', academyIds)
                 .order('name');
 
               if (!acadErr && acadRows) {
-                const options = (acadRows as { id: string; name: string | null }[]).map((a) => ({
-                  id: a.id,
-                  name: a.name ?? a.id,
-                }));
+                const suspendedIds = new Set(
+                  (acadRows as any[])
+                    .filter((a) => (a?.is_suspended ?? false) === true)
+                    .map((a) => a.id as string)
+                );
+
+                const options = (acadRows as any[])
+                  .filter((a) => (a?.is_suspended ?? false) !== true)
+                  .map((a) => ({ id: a.id as string, name: (a.name as string | null) ?? (a.id as string) }));
+
+                if (options.length === 0) {
+                  try {
+                    await supabase.auth.signOut();
+                  } catch {
+                    // ignore
+                  }
+                  setHasAcademies(false);
+                  setAcademyOptions([]);
+                  setSelectedAcademyId(null);
+                  if (typeof window !== 'undefined') {
+                    window.localStorage.removeItem('selectedAcademyId');
+                    window.location.href = '/login?suspended=1';
+                  }
+                  return;
+                }
+
                 setAcademyOptions(options);
 
                 let stored: string | null = null;
@@ -802,11 +824,20 @@ export default function Page() {
                   initial = validIds[0] ?? null;
                 }
 
+                const storedWasSuspended = !!stored && suspendedIds.has(stored);
+
                 const shouldShowInactiveToast =
                   !!stored && stored !== initial && inactiveAcademyIds.has(stored);
 
-                if (shouldShowInactiveToast && typeof window !== 'undefined') {
-                  toast.error('Tu usuario está inactivo en la academia seleccionada. Te cambiamos a una academia activa.');
+                const shouldShowSuspendedToast = !!stored && stored !== initial && storedWasSuspended;
+
+                if (typeof window !== 'undefined') {
+                  if (shouldShowSuspendedToast) {
+                    toast.error('La academia seleccionada está bloqueada. Te cambiamos a una academia habilitada.');
+                  }
+                  if (shouldShowInactiveToast) {
+                    toast.error('Tu usuario está inactivo en la academia seleccionada. Te cambiamos a una academia activa.');
+                  }
                 }
 
                 setSelectedAcademyId(initial);

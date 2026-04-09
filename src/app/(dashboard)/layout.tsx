@@ -656,16 +656,24 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             if (academyIds.length > 0) {
               const { data: acadRows, error: acadErr } = await supabase
                 .from('academies')
-                .select('id,name')
+                .select('id,name,is_suspended')
                 .in('id', academyIds)
                 .order('name');
 
               if (!acadErr && acadRows) {
-                const options = (acadRows as { id: string; name: string | null }[]).map((a) => ({
-                  id: a.id,
-                  name: a.name ?? a.id,
-                }));
+                const options = (acadRows as any[])
+                  .filter((a) => (a?.is_suspended ?? false) !== true)
+                  .map((a) => ({ id: a.id as string, name: (a.name as string | null) ?? (a.id as string) }));
                 setAcademyOptions(options);
+
+                if (options.length === 0) {
+                  setSelectedAcademyId(null);
+                  if (typeof window !== 'undefined') {
+                    window.localStorage.removeItem('selectedAcademyId');
+                    window.dispatchEvent(new CustomEvent('selectedAcademyIdChanged', { detail: { academyId: null } }));
+                  }
+                  return;
+                }
 
                 // Determinar academia seleccionada (localStorage o primera)
                 let stored: string | null = null;
