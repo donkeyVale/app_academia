@@ -114,13 +114,6 @@ export function FooterNav({ isAdmin, isSuperAdmin, isStudent, canSeeReports, can
                 <span>Academias</span>
               </Link>
               <Link
-                href="/calendar"
-                className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
-              >
-                <CalendarClock className="w-5 h-5 text-[#3cadaf]" />
-                <span>Calendario</span>
-              </Link>
-              <Link
                 href="/super-admin/billing"
                 className="flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-md hover:bg-gray-50"
               >

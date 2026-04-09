@@ -315,6 +315,17 @@ export default function CalendarPage() {
     }
   }, [role]);
 
+  if (role === "super_admin") {
+    return (
+      <div className="max-w-5xl mx-auto px-4 py-10">
+        <h1 className="text-xl font-semibold text-slate-800">Calendario</h1>
+        <p className="mt-2 text-sm text-slate-600">
+          Este módulo está disponible para administradores y profesores.
+        </p>
+      </div>
+    );
+  }
+
   const [availabilityPopupOpen, setAvailabilityPopupOpen] = useState(false);
   const [availabilityPopupX, setAvailabilityPopupX] = useState(0);
   const [availabilityPopupY, setAvailabilityPopupY] = useState(0);
@@ -709,7 +720,7 @@ export default function CalendarPage() {
     const cls = p.classSession as ClassSession | undefined;
     if (!cls?.id) return;
 
-    if (!role || role === "super_admin" || role === "student") return;
+    if (!role || role === "student") return;
     if (role === "coach" && coachSelfId && cls.coach_id !== coachSelfId) {
       toast.error("No tenés permisos para cancelar esta clase.");
       return;
@@ -805,7 +816,7 @@ export default function CalendarPage() {
     const cls = p.classSession as ClassSession | undefined;
     if (!cls?.id) return;
 
-    if (!role || role === "super_admin" || role === "student") return;
+    if (!role || role === "student") return;
     if (role === "coach" && coachSelfId && cls.coach_id !== coachSelfId) {
       toast.error("No tenés permisos para marcar asistencia en esta clase.");
       return;
@@ -848,13 +859,13 @@ export default function CalendarPage() {
     }
   };
 
-  const onSaveAttendance = async () => {
+  const saveAttendance = async () => {
     const p = (detailsEvent?.props ?? {}) as any;
     if (p?.kind !== "class_session") return;
     const cls = p.classSession as ClassSession | undefined;
     if (!cls?.id) return;
 
-    if (!role || role === "super_admin" || role === "student") return;
+    if (!role || role === "student") return;
     if (role === "coach" && coachSelfId && cls.coach_id !== coachSelfId) {
       toast.error("No tenés permisos para marcar asistencia en esta clase.");
       return;
@@ -973,13 +984,13 @@ export default function CalendarPage() {
     })();
   }, [supabase, editOpen, editCourtId, editDay, editTime, editingClass?.id]);
 
-  const onStartEdit = async () => {
+  const onOpenEdit = async () => {
     const p = (detailsEvent?.props ?? {}) as any;
     if (p?.kind !== "class_session") return;
     const cls = p.classSession as ClassSession | undefined;
     if (!cls?.id) return;
 
-    if (!role || role === "super_admin" || role === "student") return;
+    if (!role || role === "student") return;
     if (role === "coach" && coachSelfId && cls.coach_id !== coachSelfId) {
       toast.error("No tenés permisos para modificar esta clase.");
       return;
@@ -1025,11 +1036,11 @@ export default function CalendarPage() {
     setRescheduleOpen(false);
   };
 
-  const onSaveEdit = async () => {
+  const onConfirmEdit = async () => {
     const cls = editingClass;
     if (!cls?.id) return;
 
-    if (!role || role === "super_admin" || role === "student") return;
+    if (!role || role === "student") return;
     if (role === "coach" && coachSelfId && cls.coach_id !== coachSelfId) {
       toast.error("No tenés permisos para modificar esta clase.");
       return;
@@ -1365,7 +1376,7 @@ export default function CalendarPage() {
       toast.error("Seleccioná una academia en Configuración.");
       return;
     }
-    if (role === "super_admin" || role === "student") return;
+    if (role === "student") return;
     if (!createCourtId || !createDay) {
       toast.error("Completa cancha y fecha.");
       return;
@@ -2300,7 +2311,7 @@ export default function CalendarPage() {
     if (!cls?.id) return;
 
     // Permisos: admin puede; coach solo su clase
-    if (!role || role === "super_admin" || role === "student") return;
+    if (!role || role === "student") return;
     if (role === "coach" && coachSelfId && cls.coach_id !== coachSelfId) {
       toast.error("No tenés permisos para modificar esta clase.");
       return;
@@ -3357,14 +3368,14 @@ export default function CalendarPage() {
                         variant={editOpen ? "default" : "outline"}
                         onClick={() => {
                           if (editOpen) resetEditForm();
-                          else void onStartEdit();
+                          else void onOpenEdit();
                         }}
                         disabled={savingEdit || cancelling}
                       >
                         Editar
                       </Button>
                       {editOpen && (
-                        <Button type="button" onClick={onSaveEdit} disabled={savingEdit || cancelling}>
+                        <Button type="button" onClick={onConfirmEdit} disabled={savingEdit || cancelling}>
                           {savingEdit ? "Guardando..." : "Guardar"}
                         </Button>
                       )}
@@ -3383,7 +3394,7 @@ export default function CalendarPage() {
                       {attendanceOpen && (
                         <Button
                           type="button"
-                          onClick={onSaveAttendance}
+                          onClick={saveAttendance}
                           disabled={attendanceSaving || attendanceLoading || cancelling}
                         >
                           {attendanceSaving ? "Guardando..." : "Guardar asistencia"}
