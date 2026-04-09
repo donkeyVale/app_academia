@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClientBrowser, createClientBrowserJs } from '@/lib/supabase';
 import { PasswordInput } from '@/components/ui/password-input';
 import { toast } from 'sonner';
+import Link from 'next/link';
 import { oneSignalLoginExternalUserId } from '@/lib/capacitor-onesignal';
 import {
   biometricAuthenticateDetailed,
@@ -361,21 +362,30 @@ export default function LoginPage() {
             />
           </div>
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
             <button
-              type="button"
-              onClick={onForgotPassword}
-              className="text-[11px] text-[#3cadaf] hover:text-[#31435d] underline-offset-2 hover:underline"
+              type="submit"
+              disabled={loading || cooldownActive}
+              className="w-full bg-[#3cadaf] hover:bg-[#31435d] text-white rounded px-4 py-2 disabled:opacity-50"
             >
-              ¿Olvidaste tu contraseña?
+              {loading ? 'Ingresando...' : 'Ingresar'}
             </button>
+
+            <Link
+              href="/register"
+              className="block w-full text-center border border-slate-200 hover:bg-slate-50 text-slate-800 rounded px-4 py-2 text-sm"
+            >
+              Registrarse
+            </Link>
           </div>
 
           {error && <p className="text-red-600 text-xs mt-1">{error}</p>}
           {info && !error && <p className="text-emerald-600 text-xs mt-1">{info}</p>}
 
           <button
-            className="w-full bg-[#3cadaf] hover:bg-[#31435d] text-white h-10 rounded-md text-base md:text-sm font-medium disabled:opacity-50 transition-colors"
+            type="button"
+            onClick={onForgotPassword}
+            className="text-[11px] text-[#3cadaf] hover:text-[#31435d] underline-offset-2 hover:underline"
             disabled={loading || cooldownActive}
           >
             {loading

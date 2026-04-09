@@ -18,6 +18,14 @@ import { toast } from "sonner";
 import { isBiometricEnabled } from "@/lib/capacitor-biometrics";
 import { oneSignalLogout } from '@/lib/capacitor-onesignal';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   Smartphone,
   Layers,
   Users,
@@ -152,6 +160,14 @@ export default function Page() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [scheduleBadgeCount, setScheduleBadgeCount] = useState(0);
   const [scheduleBadgeTick, setScheduleBadgeTick] = useState<number>(() => Date.now());
+
+  const [profileModalOpen, setProfileModalOpen] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileFirstName, setProfileFirstName] = useState('');
+  const [profileLastName, setProfileLastName] = useState('');
+  const [profileNationalId, setProfileNationalId] = useState('');
+  const [profilePhone, setProfilePhone] = useState('+595');
+  const [profileBirthDate, setProfileBirthDate] = useState('');
   const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
     return window.localStorage.getItem('selectedAcademyId');
@@ -175,6 +191,43 @@ export default function Page() {
   const [coachesCount, setCoachesCount] = useState(0);
   const [studentsCount, setStudentsCount] = useState(0);
   const [showInstallHelpOpen, setShowInstallHelpOpen] = useState(false);
+
+  const submitCompleteProfile = async () => {
+    if (profileSaving) return;
+    if (!profilePhone.trim() || !profileNationalId.trim() || !profileBirthDate.trim()) {
+      toast.error('Completá teléfono, cédula y fecha de nacimiento.');
+      return;
+    }
+
+    setProfileSaving(true);
+    try {
+      const res = await fetch('/api/auth/complete-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: profileFirstName,
+          lastName: profileLastName,
+          nationalId: profileNationalId,
+          phone: profilePhone,
+          birthDate: profileBirthDate,
+        }),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(json?.error ?? 'No se pudo completar el perfil.');
+        return;
+      }
+
+      setProfileModalOpen(false);
+      toast.success('Datos guardados.');
+      window.location.reload();
+    } catch (err: any) {
+      toast.error(err?.message ?? 'No se pudo completar el perfil.');
+    } finally {
+      setProfileSaving(false);
+    }
+  };
 
   // métricas específicas para coach
   const [coachTodayClasses, setCoachTodayClasses] = useState(0);
@@ -645,6 +698,24 @@ export default function Page() {
       const user = data.user;
       const userId = user?.id;
       setUserId((userId as string | undefined) ?? null);
+
+      const meta = (user?.user_metadata ?? {}) as any;
+
+      // Perfil incompleto: para login social / link mágico pedimos datos obligatorios.
+      if (role !== 'super_admin') {
+        const missingPhone = !String(meta?.phone ?? '').trim();
+        const missingNationalId = !String(meta?.national_id ?? '').trim();
+        const missingBirthDate = !String(meta?.birth_date ?? '').trim();
+        const isMissingRequired = missingPhone || missingNationalId || missingBirthDate;
+        if (isMissingRequired) {
+          setProfileFirstName(String(meta?.first_name ?? ''));
+          setProfileLastName(String(meta?.last_name ?? ''));
+          setProfileNationalId(String(meta?.national_id ?? ''));
+          setProfilePhone(String(meta?.phone ?? '+595') || '+595');
+          setProfileBirthDate(String(meta?.birth_date ?? ''));
+          setProfileModalOpen(true);
+        }
+      }
 
       // nombre del usuario: intentamos en este orden
       // 1) profiles.full_name
@@ -1335,6 +1406,77 @@ export default function Page() {
       <>
         <SuperAdminHomeClient userEmail={userName ?? ''} />
 
+        <Dialog open={profileModalOpen} onOpenChange={() => {}}>
+          <DialogContent className="sm:max-w-md w-[calc(100vw-1.5rem)] sm:w-full">
+            <DialogHeader>
+              <DialogTitle>Completar datos</DialogTitle>
+              <DialogDescription>
+                Confirmá tu información y completá los datos obligatorios para continuar.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs text-slate-600 mb-1">Nombre</label>
+                  <input
+                    className="w-full h-10 border rounded-md px-3 text-sm"
+                    value={profileFirstName}
+                    onChange={(e) => setProfileFirstName(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-600 mb-1">Apellido</label>
+                  <input
+                    className="w-full h-10 border rounded-md px-3 text-sm"
+                    value={profileLastName}
+                    onChange={(e) => setProfileLastName(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-600 mb-1">Teléfono *</label>
+                <input
+                  className="w-full h-10 border rounded-md px-3 text-sm"
+                  value={profilePhone}
+                  onChange={(e) => setProfilePhone(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-600 mb-1">Cédula / Documento *</label>
+                <input
+                  className="w-full h-10 border rounded-md px-3 text-sm"
+                  value={profileNationalId}
+                  onChange={(e) => setProfileNationalId(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-600 mb-1">Fecha de nacimiento *</label>
+                <input
+                  type="date"
+                  className="w-full h-10 border rounded-md px-3 text-sm"
+                  value={profileBirthDate}
+                  onChange={(e) => setProfileBirthDate(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <button
+                type="button"
+                onClick={submitCompleteProfile}
+                disabled={profileSaving}
+                className="w-full h-11 rounded-md bg-[#3cadaf] hover:bg-[#31435d] text-white font-semibold disabled:opacity-60"
+              >
+                {profileSaving ? 'Guardando...' : 'Guardar'}
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <PwaInstallPrompt />
 
         <PushPermissionPrompt />
@@ -1403,27 +1545,78 @@ export default function Page() {
   }
 
   return (
-    <section
-      className="space-y-6 max-w-5xl mx-auto px-4 pt-6"
-      style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 96px)' }}
-    >
-      {isSuperAdmin && impersonateAcademyId && (
-        <div className="sticky top-0 z-30 -mx-4 px-4 py-2 bg-amber-50 border-b border-amber-200">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-xs text-amber-900 truncate">
-              Modo admin activo · Academia:{' '}
-              <span className="font-semibold">{impersonateAcademyName ?? impersonateAcademyId}</span>
+    <>
+      <Dialog open={profileModalOpen} onOpenChange={() => {}}>
+        <DialogContent className="sm:max-w-md w-[calc(100vw-1.5rem)] sm:w-full">
+          <DialogHeader>
+            <DialogTitle>Completar datos</DialogTitle>
+            <DialogDescription>
+              Confirmá tu información y completá los datos obligatorios para continuar.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-slate-600 mb-1">Nombre</label>
+                <input
+                  className="w-full h-10 border rounded-md px-3 text-sm"
+                  value={profileFirstName}
+                  onChange={(e) => setProfileFirstName(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-600 mb-1">Apellido</label>
+                <input
+                  className="w-full h-10 border rounded-md px-3 text-sm"
+                  value={profileLastName}
+                  onChange={(e) => setProfileLastName(e.target.value)}
+                />
+              </div>
             </div>
+
+            <div>
+              <label className="block text-xs text-slate-600 mb-1">Teléfono *</label>
+              <input
+                className="w-full h-10 border rounded-md px-3 text-sm"
+                value={profilePhone}
+                onChange={(e) => setProfilePhone(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-600 mb-1">Cédula / Documento *</label>
+              <input
+                className="w-full h-10 border rounded-md px-3 text-sm"
+                value={profileNationalId}
+                onChange={(e) => setProfileNationalId(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-600 mb-1">Fecha de nacimiento *</label>
+              <input
+                type="date"
+                className="w-full h-10 border rounded-md px-3 text-sm"
+                value={profileBirthDate}
+                onChange={(e) => setProfileBirthDate(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
             <button
               type="button"
-              onClick={onExitImpersonation}
-              className="inline-flex items-center rounded-md bg-amber-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm hover:bg-amber-700"
+              onClick={submitCompleteProfile}
+              disabled={profileSaving}
+              className="w-full h-11 rounded-md bg-[#3cadaf] hover:bg-[#31435d] text-white font-semibold disabled:opacity-60"
             >
-              Volver a Super Admin
+              {profileSaving ? 'Guardando...' : 'Guardar'}
             </button>
-          </div>
-        </div>
-      )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex items-center justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold text-[#31435d]">
@@ -1825,6 +2018,6 @@ export default function Page() {
           </div>
         )}
       />
-    </section>
+    </>
   );
 }
