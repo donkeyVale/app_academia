@@ -29,12 +29,15 @@ export default function LoginPage() {
   const [biometricMode, setBiometricMode] = useState<'biometric' | 'device_credential'>('biometric');
   const [error, setError] = useState<string | null>(null);
   const inactiveMsg = 'Tu usuario está inactivo en todas tus academias. Comunicate con el administrador.';
-  const getInactiveInfoFromUrl = () => {
+  const suspendedMsg = 'Tu acceso está temporalmente restringido. Comunicate con el administrador.';
+  const getInfoFromUrl = () => {
     if (typeof window === 'undefined') return null;
     const params = new URLSearchParams(window.location.search);
-    return params.get('inactive') === '1' ? inactiveMsg : null;
+    if (params.get('inactive') === '1') return inactiveMsg;
+    if (params.get('suspended') === '1') return suspendedMsg;
+    return null;
   };
-  const [info, setInfo] = useState<string | null>(() => getInactiveInfoFromUrl());
+  const [info, setInfo] = useState<string | null>(() => getInfoFromUrl());
 
   const cooldownActive = useMemo(() => {
     if (!cooldownUntil) return false;
@@ -48,7 +51,7 @@ export default function LoginPage() {
   }, [cooldownUntil]);
 
   useEffect(() => {
-    const msg = getInactiveInfoFromUrl();
+    const msg = getInfoFromUrl();
     if (msg) toast.error(msg);
   }, []);
 
