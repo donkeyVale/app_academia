@@ -19,62 +19,44 @@ export default function RegisterPage() {
   const [birthDate, setBirthDate] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [academyCode, setAcademyCode] = useState('');
+  const [oauthAcademyCode, setOauthAcademyCode] = useState('');
 
   const [loading, setLoading] = useState(false);
-  const [magicLinkLoading, setMagicLinkLoading] = useState(false);
 
   const onRegisterManual = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
 
-    if (!firstName.trim() || !lastName.trim() || !nationalId.trim() || !phone.trim() || !birthDate.trim() || !email.trim() || !password.trim()) {
+    if (!firstName.trim() || !lastName.trim() || !nationalId.trim() || !phone.trim() || !birthDate.trim() || !email.trim() || !password.trim() || !academyCode.trim()) {
       toast.error('Completá todos los campos obligatorios.');
       return;
     }
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            first_name: firstName,
-            last_name: lastName,
-            national_id: nationalId,
-            phone,
-            birth_date: birthDate,
-          },
-        },
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          nationalId,
+          phone,
+          birthDate,
+          email,
+          password,
+          academyCode,
+        }),
       });
+      const json = await res.json().catch(() => ({}));
 
-      if (error) {
-        toast.error(error.message);
+      if (!res.ok) {
+        toast.error(json?.error ?? 'No se pudo registrar.');
         return;
       }
 
-      // Si hay sesión, podemos completar el perfil y enviar el correo de bienvenida.
-      // Si no, el usuario deberá confirmar el email y luego completar (se le pedirá al entrar).
-      if (data.session) {
-        const res = await fetch('/api/auth/complete-profile', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            firstName,
-            lastName,
-            nationalId,
-            phone,
-            birthDate,
-          }),
-        });
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          toast.error(json?.error ?? 'No se pudo completar el perfil.');
-          return;
-        }
-      }
-
-      toast.success('Registro iniciado. Revisá tu correo para continuar.');
+      toast.success('Registro completado. Ya podés iniciar sesión.');
       window.location.href = '/login';
     } catch (err: any) {
       toast.error(err?.message ?? 'No se pudo registrar.');
@@ -84,13 +66,21 @@ export default function RegisterPage() {
   };
 
   const onRegisterGoogle = async () => {
+    if (!oauthAcademyCode.trim()) {
+      toast.error('Ingresá el código de academia para continuar.');
+      return;
+    }
     if (loading) return;
     setLoading(true);
     try {
+      const code = oauthAcademyCode.trim().toLowerCase();
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('pendingAcademyCode', code);
+      }
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined,
+          redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/?academyCode=${encodeURIComponent(code)}` : undefined,
         },
       });
       if (error) toast.error(error.message);
@@ -99,27 +89,29 @@ export default function RegisterPage() {
     }
   };
 
-  const onMagicLink = async () => {
-    if (magicLinkLoading) return;
-    if (!email.trim()) {
-      toast.error('Ingresá tu correo para enviarte el link.');
+  const onRegisterApple = async () => {
+    if (!oauthAcademyCode.trim()) {
+      toast.error('Ingresá el código de academia para continuar.');
       return;
     }
-    setMagicLinkLoading(true);
+    if (loading) return;
+    setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email,
+      const code = oauthAcademyCode.trim().toLowerCase();
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('pendingAcademyCode', code);
+      }
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'apple',
         options: {
-          emailRedirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : undefined,
+          redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/?academyCode=${encodeURIComponent(code)}` : undefined,
         },
       });
       if (error) {
         toast.error(error.message);
-        return;
       }
-      toast.success('Te enviamos un link a tu correo.');
     } finally {
-      setMagicLinkLoading(false);
+      setLoading(false);
     }
   };
 
@@ -146,7 +138,7 @@ export default function RegisterPage() {
               className={`h-10 rounded-md text-sm font-medium border ${mode === 'oauth' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200'}`}
               onClick={() => setMode('oauth')}
             >
-              Google / Link
+              Google / Apple
             </button>
           </div>
         </div>
@@ -186,6 +178,11 @@ export default function RegisterPage() {
             </div>
 
             <div>
+              <label className="block text-xs text-slate-600 mb-1">Código de academia *</label>
+              <input className="w-full h-10 border rounded-md px-3 text-sm" value={academyCode} onChange={(e) => setAcademyCode(e.target.value)} required />
+            </div>
+
+            <div>
               <label className="block text-xs text-slate-600 mb-1">Contraseña *</label>
               <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} required className="h-10" />
             </div>
@@ -207,25 +204,29 @@ export default function RegisterPage() {
           </form>
         ) : (
           <div className="px-6 pb-6 space-y-3">
-            <button
-              type="button"
-              onClick={onRegisterGoogle}
-              disabled={loading}
-              className="w-full h-11 rounded-md bg-white hover:bg-slate-50 border border-slate-200 text-slate-900 font-semibold disabled:opacity-60"
-            >
-              Continuar con Google
-            </button>
-
             <div className="border-t pt-3">
-              <label className="block text-xs text-slate-600 mb-1">Correo</label>
-              <input type="email" className="w-full h-10 border rounded-md px-3 text-sm" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <label className="block text-xs text-slate-600 mb-1">Código de academia *</label>
+              <input
+                className="w-full h-10 border rounded-md px-3 text-sm"
+                value={oauthAcademyCode}
+                onChange={(e) => setOauthAcademyCode(e.target.value)}
+                placeholder="Ej: tenis-centro"
+              />
               <button
                 type="button"
-                onClick={onMagicLink}
-                disabled={magicLinkLoading}
+                onClick={onRegisterGoogle}
+                disabled={loading}
                 className="mt-2 w-full h-11 rounded-md bg-slate-900 hover:bg-slate-800 text-white font-semibold disabled:opacity-60"
               >
-                {magicLinkLoading ? 'Enviando...' : 'Enviar link mágico'}
+                Continuar con Google
+              </button>
+              <button
+                type="button"
+                onClick={onRegisterApple}
+                disabled={loading}
+                className="mt-2 w-full h-11 rounded-md bg-black hover:bg-neutral-800 text-white font-semibold disabled:opacity-60"
+              >
+                Continuar con Apple
               </button>
             </div>
 

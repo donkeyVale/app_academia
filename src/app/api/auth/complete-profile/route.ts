@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClientServer } from '@/lib/supabase-server';
+import { supabaseAdmin } from '@/lib/supabase-service';
 import nodemailer from 'nodemailer';
 
 async function sendWelcomeEmail(to: string, fullName: string) {
@@ -66,12 +67,14 @@ export async function POST(req: NextRequest) {
       nationalId,
       phone,
       birthDate,
+      academyCode,
     } = body as {
       firstName?: string;
       lastName?: string;
       nationalId?: string;
       phone?: string;
       birthDate?: string;
+      academyCode?: string;
     };
 
     if (!phone?.trim() || !nationalId?.trim() || !birthDate?.trim()) {
@@ -88,6 +91,25 @@ export async function POST(req: NextRequest) {
     const nextFirstName = (firstName ?? currentMeta.first_name ?? '').trim();
     const nextLastName = (lastName ?? currentMeta.last_name ?? '').trim();
     const fullName = `${nextFirstName} ${nextLastName}`.trim();
+    const nextAcademyCode = (academyCode ?? currentMeta.academy_code ?? '').trim().toLowerCase();
+
+    let academyId: string | null = null;
+    if (nextAcademyCode) {
+      const { data: academyRow } = await supabaseAdmin
+        .from('academies')
+        .select('id,is_suspended')
+        .eq('slug', nextAcademyCode)
+        .maybeSingle();
+
+      const academy = (academyRow as { id?: string; is_suspended?: boolean | null } | null) ?? null;
+      if (!academy?.id) {
+        return NextResponse.json({ error: 'Código de academia inválido.' }, { status: 400 });
+      }
+      if (academy.is_suspended) {
+        return NextResponse.json({ error: 'La academia está suspendida y no admite nuevos registros.' }, { status: 403 });
+      }
+      academyId = academy.id;
+    }
 
     const { error: updAuthErr } = await supabase.auth.updateUser({
       data: {
@@ -97,6 +119,7 @@ export async function POST(req: NextRequest) {
         national_id: nationalId,
         phone,
         birth_date: birthDate,
+        ...(nextAcademyCode ? { academy_code: nextAcademyCode } : {}),
         profile_completed_at: new Date().toISOString(),
       },
     });
@@ -105,16 +128,51 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: updAuthErr.message ?? 'No se pudo actualizar el usuario.' }, { status: 400 });
     }
 
-    const { error: upsertErr } = await supabase
+    const { error: upsertErr } = await supabaseAdmin
       .from('profiles')
       .upsert({
         id: uid,
         full_name: fullName || null,
         role: 'student',
+        ...(academyId ? { default_academy_id: academyId } : {}),
       });
 
     if (upsertErr) {
       return NextResponse.json({ error: upsertErr.message ?? 'No se pudo actualizar el perfil.' }, { status: 400 });
+    }
+
+    const { error: roleErr } = await supabaseAdmin
+      .from('user_roles')
+      .upsert({ user_id: uid, role: 'student' }, { onConflict: 'user_id,role' });
+
+    if (roleErr) {
+      return NextResponse.json({ error: roleErr.message ?? 'No se pudo asignar el rol jugador.' }, { status: 400 });
+    }
+
+    if (academyId) {
+      const { error: uaErr } = await supabaseAdmin
+        .from('user_academies')
+        .upsert(
+          {
+            user_id: uid,
+            academy_id: academyId,
+            role: 'student',
+            is_active: true,
+          },
+          { onConflict: 'user_id,academy_id,role' },
+        );
+
+      if (uaErr) {
+        return NextResponse.json({ error: uaErr.message ?? 'No se pudo vincular el usuario a la academia.' }, { status: 400 });
+      }
+    }
+
+    const { error: studentErr } = await supabaseAdmin
+      .from('students')
+      .upsert({ user_id: uid, level: null, notes: null }, { onConflict: 'user_id' });
+
+    if (studentErr) {
+      return NextResponse.json({ error: studentErr.message ?? 'No se pudo crear el registro de jugador.' }, { status: 400 });
     }
 
     try {

@@ -168,6 +168,7 @@ export default function Page() {
   const [profileNationalId, setProfileNationalId] = useState('');
   const [profilePhone, setProfilePhone] = useState('+595');
   const [profileBirthDate, setProfileBirthDate] = useState('');
+  const [pendingAcademyCode, setPendingAcademyCode] = useState('');
   const [selectedAcademyId, setSelectedAcademyId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
     return window.localStorage.getItem('selectedAcademyId');
@@ -210,6 +211,7 @@ export default function Page() {
           nationalId: profileNationalId,
           phone: profilePhone,
           birthDate: profileBirthDate,
+          academyCode: pendingAcademyCode || undefined,
         }),
       });
 
@@ -220,6 +222,13 @@ export default function Page() {
       }
 
       setProfileModalOpen(false);
+      setPendingAcademyCode('');
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('pendingAcademyCode');
+        const url = new URL(window.location.href);
+        url.searchParams.delete('academyCode');
+        window.history.replaceState({}, '', url.pathname + url.search);
+      }
       toast.success('Datos guardados.');
       window.location.reload();
     } catch (err: any) {
@@ -700,8 +709,19 @@ export default function Page() {
       setUserId((userId as string | undefined) ?? null);
 
       const meta = (user?.user_metadata ?? {}) as any;
+      let pendingCode = '';
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const qpCode = String(params.get('academyCode') ?? '').trim().toLowerCase();
+        const lsCode = String(window.localStorage.getItem('pendingAcademyCode') ?? '').trim().toLowerCase();
+        pendingCode = qpCode || lsCode;
+        if (pendingCode) {
+          window.localStorage.setItem('pendingAcademyCode', pendingCode);
+        }
+      }
+      setPendingAcademyCode(pendingCode);
 
-      // Perfil incompleto: para login social / link mágico pedimos datos obligatorios.
+      // Perfil incompleto: para login social pedimos datos obligatorios.
       if (role !== 'super_admin') {
         const missingPhone = !String(meta?.phone ?? '').trim();
         const missingNationalId = !String(meta?.national_id ?? '').trim();
@@ -714,6 +734,29 @@ export default function Page() {
           setProfilePhone(String(meta?.phone ?? '+595') || '+595');
           setProfileBirthDate(String(meta?.birth_date ?? ''));
           setProfileModalOpen(true);
+        } else if (pendingCode) {
+          try {
+            const ensureRes = await fetch('/api/auth/complete-profile', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                firstName: String(meta?.first_name ?? ''),
+                lastName: String(meta?.last_name ?? ''),
+                nationalId: String(meta?.national_id ?? ''),
+                phone: String(meta?.phone ?? ''),
+                birthDate: String(meta?.birth_date ?? ''),
+                academyCode: pendingCode,
+              }),
+            });
+            if (ensureRes.ok && typeof window !== 'undefined') {
+              setPendingAcademyCode('');
+              window.localStorage.removeItem('pendingAcademyCode');
+              const url = new URL(window.location.href);
+              url.searchParams.delete('academyCode');
+              window.history.replaceState({}, '', url.pathname + url.search);
+            }
+          } catch {
+          }
         }
       }
 
